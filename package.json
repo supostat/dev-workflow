@@ -1,0 +1,47 @@
+{
+  "name": "dev-vault",
+  "version": "0.1.0",
+  "description": "Self-managing knowledge base for multi-project development with Claude Code",
+  "type": "module",
+  "bin": {
+    "dev-vault": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "keywords": [
+    "claude-code",
+    "knowledge-base",
+    "developer-tools",
+    "obsidian",
+    "vault"
+  ],
+  "author": "Igor Pugachev",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
