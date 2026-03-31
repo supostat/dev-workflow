@@ -20,6 +20,7 @@ export class VaultWriter {
       "architecture",
       "bugs",
       "debt",
+      "tasks",
     ];
 
     for (const dir of dirs) {

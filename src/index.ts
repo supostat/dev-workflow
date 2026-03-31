@@ -8,7 +8,10 @@ export { readFileOrNull, writeFileSafe, slugify, todayDate } from "./lib/fs-help
 export { AgentRegistry } from "./agents/registry.js";
 export { AgentContextBuilder } from "./agents/context-builder.js";
 export { parseAgentFile } from "./agents/loader.js";
+export { TaskManager } from "./tasks/manager.js";
+export { TaskTracker } from "./tasks/tracker.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
 export type { AgentDefinition, PreparedAgent, AgentPermissions, VaultSection, GitOperation } from "./agents/types.js";
+export type { Task, TaskStatus, TaskFilter } from "./tasks/types.js";
