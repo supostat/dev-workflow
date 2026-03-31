@@ -97,5 +97,6 @@ Extract: File Structure, Naming, Code Style, Patterns, Testing conventions.
 - **Be specific** — "functions use snake_case" not "standard naming"
 - **Reference files** — "error handling in cli/src/main.rs uses anyhow"
 - **Skip gameplan.md** — roadmap is human-authored
+- **Don't add utility crates/packages to stack.md** — only frameworks, ORMs, test runners. Skip small deps like regex, tempfile, serde_json
 - Read max 15 files
 - Never include secrets or credentials

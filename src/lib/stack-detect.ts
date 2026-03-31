@@ -132,6 +132,14 @@ function processPackageJson(filepath: string, stack: StackInfo): void {
   if (workspaces) stack.devTools.push("Monorepo (workspaces)");
 }
 
+function extractSection(content: string, header: string): string {
+  const headerIndex = content.indexOf(header);
+  if (headerIndex === -1) return "";
+  const start = headerIndex + header.length;
+  const nextSection = content.indexOf("\n[", start);
+  return nextSection === -1 ? content.slice(start) : content.slice(start, nextSection);
+}
+
 function processCargoToml(filepath: string, stack: StackInfo): void {
   const content = readFileOrNull(filepath);
   if (!content) return;
@@ -139,18 +147,41 @@ function processCargoToml(filepath: string, stack: StackInfo): void {
   const edition = content.match(/^edition\s*=\s*"(\d+)"/m);
   stack.languages.push(edition ? `Rust ${edition[1]} edition` : "Rust");
 
-  const rustDepMap: Record<string, string> = {
+  const dependenciesSection = extractSection(content, "[dependencies]");
+
+  const rustFrameworkMap: Record<string, string> = {
     "clap": "Clap (CLI)", "tokio": "Tokio (async runtime)",
     "serde": "Serde (serialization)", "axum": "Axum (web)",
     "actix-web": "Actix (web)", "rocket": "Rocket (web)",
-    "diesel": "Diesel (ORM)", "sqlx": "SQLx (DB)",
     "reqwest": "Reqwest (HTTP)", "hyper": "Hyper (HTTP)",
     "tracing": "Tracing (observability)", "anyhow": "Anyhow (errors)",
-    "thiserror": "Thiserror (errors)",
+    "thiserror": "Thiserror (errors)", "tonic": "Tonic (gRPC)",
+    "warp": "Warp (web)",
   };
 
-  for (const [dep, label] of Object.entries(rustDepMap)) {
-    if (content.includes(`${dep} `)) stack.frameworks.push(label);
+  const rustDbMap: Record<string, string> = {
+    "diesel": "Diesel (ORM)", "sqlx": "SQLx",
+    "sea-orm": "SeaORM", "rusqlite": "Rusqlite (SQLite)",
+    "redis": "Redis",
+  };
+
+  const rustTestMap: Record<string, string> = {
+    "assert_cmd": "assert_cmd", "predicates": "predicates",
+    "insta": "Insta (snapshots)", "criterion": "Criterion (bench)",
+    "proptest": "Proptest", "mockall": "Mockall",
+  };
+
+  for (const [dep, label] of Object.entries(rustFrameworkMap)) {
+    if (dependenciesSection.includes(dep)) stack.frameworks.push(label);
+  }
+
+  for (const [dep, label] of Object.entries(rustDbMap)) {
+    if (dependenciesSection.includes(dep)) stack.database.push(label);
+  }
+
+  const devDepsSection = extractSection(content, "[dev-dependencies]");
+  for (const [dep, label] of Object.entries(rustTestMap)) {
+    if (devDepsSection.includes(dep)) stack.testing.push(label);
   }
 
   if (content.includes("[workspace]")) {
