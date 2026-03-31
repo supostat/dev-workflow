@@ -113,16 +113,16 @@ export async function run(args: string[]): Promise<void> {
   const dryRun = args.includes("--dry-run");
 
   if (dryRun) {
-    console.log(`Workflow: ${workflow.name} — ${workflow.description}\n`);
-    console.log("Steps:");
+    console.log(`\n\uD83D\uDD04 Workflow: ${workflow.name} \u2014 ${workflow.description}\n`);
     for (let i = 0; i < workflow.steps.length; i++) {
       const step = workflow.steps[i]!;
-      const gate = step.gate === "none" ? "" : ` [gate: ${step.gate}]`;
-      const fail = step.onFail ? ` → onFail: ${step.onFail}` : "";
-      console.log(`  ${i + 1}. ${step.name} (agent: ${step.agent})${gate}${fail}`);
+      const gate = step.gate === "none" ? "" : ` [${step.gate}]`;
+      const fail = step.onFail ? ` \u2192 retry: ${step.onFail}` : "";
+      console.log(`  \u25CB ${step.name.padEnd(12)} ${step.agent}${gate}${fail}`);
     }
-    console.log(`\nTask: ${taskDescription}`);
-    if (taskId) console.log(`Linked task: ${taskId}`);
+    console.log(`\n\uD83D\uDCDD Task: ${taskDescription}`);
+    if (taskId) console.log(`\uD83D\uDD17 Linked: ${taskId}`);
+    console.log(`\nRun without --dry-run to execute.`);
     return;
   }
 

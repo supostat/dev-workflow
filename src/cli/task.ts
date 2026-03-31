@@ -2,6 +2,7 @@ import { detectContext } from "../lib/context.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
+import { icon, statusIcon, table } from "../lib/output.js";
 
 function parseFlag(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -69,16 +70,18 @@ function taskList(manager: TaskManager, args: string[]): void {
   const tasks = manager.list(status ? { status } : undefined);
 
   if (tasks.length === 0) {
-    console.log("No tasks found.");
+    console.log(`${icon.task} No tasks found.`);
     return;
   }
 
-  console.log("ID".padEnd(12) + "Status".padEnd(14) + "Title");
-  console.log("-".repeat(56));
-
-  for (const t of tasks) {
-    console.log(t.id.padEnd(12) + t.status.padEnd(14) + t.title);
-  }
+  console.log(`\n${icon.task} Tasks\n`);
+  const rows = tasks.map((t) => [
+    t.id,
+    t.title,
+    `${statusIcon(t.status)} ${t.status}`,
+    t.priority,
+  ]);
+  console.log(table(["ID", "Title", "Status", "Priority"], rows));
 }
 
 function taskShow(manager: TaskManager, id: string | undefined): void {

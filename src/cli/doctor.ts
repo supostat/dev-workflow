@@ -6,6 +6,7 @@ import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
 import { AgentRegistry } from "../agents/registry.js";
 import { getBuiltinWorkflows } from "../workflow/builtin.js";
+import { icon } from "../lib/output.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -28,15 +29,15 @@ export function doctor(fix: boolean = false): void {
     return;
   }
 
-  console.log("dev-workflow doctor\n");
+  console.log(`\n${icon.doctor} dev-workflow doctor\n`);
 
   const issues: string[] = [];
   const reader = new VaultReader(context);
 
   if (reader.exists()) {
-    console.log(`  Vault:         .dev-vault/ exists`);
+    console.log(`  ${icon.success} Vault           .dev-vault/ exists`);
   } else {
-    console.log(`  Vault:         .dev-vault/ MISSING`);
+    console.log(`  ${icon.error} Vault           .dev-vault/ MISSING`);
     issues.push("Vault not initialized — run 'dev-workflow init'");
     printIssues(issues);
     return;
@@ -53,13 +54,13 @@ export function doctor(fix: boolean = false): void {
     const lines = fileLineCount(join(context.vaultPath, filename));
     const frontmatterOnly = lines <= 8;
     if (lines === 0) {
-      console.log(`  ${label.padEnd(16)} missing`);
+      console.log(`  ${icon.error} ${label.padEnd(16)} missing`);
       issues.push(`${filename} is missing`);
     } else if (frontmatterOnly) {
-      console.log(`  ${label.padEnd(16)} empty (${lines} lines, frontmatter only)`);
-      issues.push(`${filename} is empty — fill it for better agent context`);
+      console.log(`  ${icon.warning} ${label.padEnd(16)} empty (frontmatter only)`);
+      issues.push(`${filename} is empty \u2014 fill for better agent context`);
     } else {
-      console.log(`  ${label.padEnd(16)} filled (${lines} lines)`);
+      console.log(`  ${icon.success} ${label.padEnd(16)} filled (${lines} lines)`);
     }
   }
 

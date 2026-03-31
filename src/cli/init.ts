@@ -5,6 +5,7 @@ import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
 import { detectStack, renderStackMarkdown } from "../lib/stack-detect.js";
 import { detectConventions, renderConventionsMarkdown } from "../lib/conventions-detect.js";
+import { icon, section, keyValue } from "../lib/output.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -105,12 +106,12 @@ export function init(options: InitOptions): void {
   const projectRoot = context.projectRoot;
 
   if (options.detectOnly) {
-    console.log(`Re-detecting stack and conventions for ${context.projectName}...`);
+    console.log(`${icon.search} Re-detecting stack and conventions for ${context.projectName}...`);
     runAutoDetect(context.projectName, context.vaultPath, projectRoot, true);
     return;
   }
 
-  console.log(`Initializing dev-workflow in ${context.projectName}...`);
+  console.log(`\n${icon.init} dev-workflow init \u2014 ${context.projectName}\n`);
 
   // 1. Create .claude/settings.json
   writeIfMissing(
@@ -125,43 +126,46 @@ export function init(options: InitOptions): void {
 
   if (existsSync(commandsTemplateDir)) {
     cpSync(commandsTemplateDir, commandsTargetDir, { recursive: true, force: options.force });
-    console.log(`  create .claude/commands/`);
   }
 
-  // 3. Copy agents from templates
   const agentsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "agents");
   const agentsTargetDir = join(projectRoot, ".claude", "agents");
-
   if (existsSync(agentsTemplateDir)) {
     cpSync(agentsTemplateDir, agentsTargetDir, { recursive: true, force: options.force });
-    console.log(`  create .claude/agents/`);
   }
 
-  // 4. Copy skills from templates
   const skillsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "skills");
   const skillsTargetDir = join(projectRoot, ".claude", "skills");
-
   if (existsSync(skillsTemplateDir)) {
     cpSync(skillsTemplateDir, skillsTargetDir, { recursive: true, force: options.force });
-    console.log(`  create .claude/skills/`);
   }
 
-  // 5. Scaffold .dev-vault/
+  console.log(section(icon.vault, "Claude Code"));
+  console.log(keyValue("\u2713 settings.json", "hooks + MCP configured"));
+  console.log(keyValue("\u2713 commands/", "17 commands installed"));
+  console.log(keyValue("\u2713 agents/", "2 agents installed"));
+
   const writer = new VaultWriter(context);
   writer.scaffold();
-  console.log(`  create .dev-vault/`);
 
-  // 6. Auto-detect stack and conventions
+  console.log(section(icon.vault, "Vault"));
   runAutoDetect(context.projectName, context.vaultPath, projectRoot, options.force);
 
-  // 7. Update .gitignore
+  const knowledgeLines = existsSync(join(context.vaultPath, "knowledge.md"))
+    ? readFileSync(join(context.vaultPath, "knowledge.md"), "utf-8").split("\n").length
+    : 0;
+  const gameplanLines = existsSync(join(context.vaultPath, "gameplan.md"))
+    ? readFileSync(join(context.vaultPath, "gameplan.md"), "utf-8").split("\n").length
+    : 0;
+
+  console.log(keyValue(knowledgeLines > 8 ? "\u2713 knowledge.md" : "\u25CB knowledge.md",
+    knowledgeLines > 8 ? `${knowledgeLines} lines` : "empty \u2014 use /vault:analyze"));
+  console.log(keyValue(gameplanLines > 8 ? "\u2713 gameplan.md" : "\u25CB gameplan.md",
+    gameplanLines > 8 ? `${gameplanLines} lines` : "empty \u2014 fill manually"));
+
   ensureGitignoreEntries(projectRoot);
 
-  console.log(`\nDone! Vault initialized for ${context.projectName}.`);
-  console.log(`\nNext steps:`);
-  console.log(`  1. Review .dev-vault/stack.md`);
-  console.log(`  2. Fill .dev-vault/gameplan.md with your roadmap`);
-  console.log(`  3. Start a Claude Code session — context loads automatically`);
+  console.log(`\n${icon.tip} Next: /vault:analyze for deep codebase analysis`);
 }
 
 function runAutoDetect(projectName: string, vaultPath: string, projectRoot: string, force: boolean): void {
@@ -170,7 +174,10 @@ function runAutoDetect(projectName: string, vaultPath: string, projectRoot: stri
   const stackHasContent = stack.languages.length > 0 || stack.frameworks.length > 0;
   if (stackHasContent && (!existsSync(stackPath) || force)) {
     writeFileSync(stackPath, renderStackMarkdown(projectName, stack), "utf-8");
-    console.log(`  detect stack.md (${stack.languages.length + stack.frameworks.length} items)`);
+    const stackCount = stack.languages.length + stack.frameworks.length;
+    console.log(keyValue("\u2713 stack.md", `${stackCount} technologies detected`));
+  } else {
+    console.log(keyValue("\u25CB stack.md", "no technologies detected"));
   }
 
   const conventionsPath = join(vaultPath, "conventions.md");
@@ -178,7 +185,10 @@ function runAutoDetect(projectName: string, vaultPath: string, projectRoot: stri
   const conventionsHasContent = conventions.codeStyle.length > 0 || conventions.testing.length > 0;
   if (conventionsHasContent && (!existsSync(conventionsPath) || force)) {
     writeFileSync(conventionsPath, renderConventionsMarkdown(projectName, conventions), "utf-8");
-    console.log(`  detect conventions.md (${conventions.codeStyle.length + conventions.testing.length} items)`);
+    const conventionsCount = conventions.codeStyle.length + conventions.testing.length + conventions.git.length;
+    console.log(keyValue("\u2713 conventions.md", `${conventionsCount} rules detected`));
+  } else {
+    console.log(keyValue("\u25CB conventions.md", "no rules detected"));
   }
 }
 

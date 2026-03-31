@@ -5,6 +5,7 @@ export { renderTemplate } from "./lib/templates.js";
 export { interpolate } from "./lib/interpolate.js";
 export { parseFrontmatter, serializeFrontmatter } from "./lib/frontmatter.js";
 export { readFileOrNull, writeFileSafe, slugify, todayDate } from "./lib/fs-helpers.js";
+export { icon, table, progressBar, box, section, statusIcon, stepLine, keyValue, divider } from "./lib/output.js";
 export { detectStack, renderStackMarkdown } from "./lib/stack-detect.js";
 export { detectConventions, renderConventionsMarkdown } from "./lib/conventions-detect.js";
 export { AgentRegistry } from "./agents/registry.js";
