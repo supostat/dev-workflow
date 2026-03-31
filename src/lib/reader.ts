@@ -1,33 +1,18 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ProjectContext, VaultData, BranchContext, DailyLog } from "./types.js";
-
-function readFileOrNull(path: string): string | null {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return null;
-  }
-}
+import { readFileOrNull, slugify } from "./fs-helpers.js";
+import { parseFrontmatter } from "./frontmatter.js";
 
 function parseBranchFrontmatter(raw: string): Partial<BranchContext> {
-  const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---/);
-  if (!frontmatterMatch?.[1]) return {};
-
-  const fm = frontmatterMatch[1];
-  const getField = (name: string): string | undefined =>
-    fm.match(new RegExp(`^${name}:\\s*(.+)$`, "m"))?.[1]?.trim();
+  const { fields } = parseFrontmatter(raw);
 
   return {
-    branch: getField("branch") ?? "",
-    status: (getField("status") as BranchContext["status"]) ?? "in-progress",
-    created: getField("created") ?? "",
-    parent: getField("parent") ?? "",
+    branch: (fields["branch"] as string) ?? "",
+    status: (fields["status"] as BranchContext["status"]) ?? "in-progress",
+    created: (fields["created"] as string) ?? "",
+    parent: (fields["parent"] as string) ?? "",
   };
-}
-
-function slugifyBranch(branch: string): string {
-  return branch.replace(/\//g, "-");
 }
 
 export class VaultReader {
@@ -58,7 +43,7 @@ export class VaultReader {
   }
 
   readBranch(branchName: string): BranchContext | null {
-    const slug = slugifyBranch(branchName);
+    const slug = slugify(branchName);
     const branchPath = join(this.vaultPath, "branches", `${slug}.md`);
     const raw = readFileOrNull(branchPath);
     if (!raw) return null;

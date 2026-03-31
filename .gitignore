@@ -21,3 +21,4 @@ dist/
 .claude-flow/
 .mcp.json
 CLAUDE.md
+docs/

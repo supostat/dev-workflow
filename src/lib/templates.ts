@@ -1,6 +1,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { interpolate } from "./interpolate.js";
+import { todayDate } from "./fs-helpers.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TEMPLATES_DIR = join(PACKAGE_ROOT, "templates");
@@ -161,10 +163,6 @@ tags: [debt, {{projectName}}]
 `,
 };
 
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function renderTemplate(
   templateName: string,
   variables: Record<string, string> = {},
@@ -184,7 +182,7 @@ export function renderTemplate(
     template = builtin;
   }
 
-  return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => vars[key] ?? "");
+  return interpolate(template, vars);
 }
 
 export function listTemplates(): string[] {

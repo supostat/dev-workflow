@@ -1,24 +1,8 @@
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import type { ProjectContext, BranchContext } from "./types.js";
 import { renderTemplate } from "./templates.js";
-
-function ensureDir(path: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-}
-
-function writeFileSafe(path: string, content: string): void {
-  ensureDir(path);
-  writeFileSync(path, content, "utf-8");
-}
-
-function slugifyBranch(branch: string): string {
-  return branch.replace(/\//g, "-");
-}
-
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { writeFileSafe, slugify, todayDate } from "./fs-helpers.js";
 
 export class VaultWriter {
   private readonly vaultPath: string;
@@ -71,14 +55,14 @@ export class VaultWriter {
   }
 
   writeBranch(branchName: string, content: string): string {
-    const slug = slugifyBranch(branchName);
+    const slug = slugify(branchName);
     const filepath = join(this.vaultPath, "branches", `${slug}.md`);
     writeFileSafe(filepath, content);
     return filepath;
   }
 
   updateBranchStatus(branchName: string, status: BranchContext["status"]): void {
-    const slug = slugifyBranch(branchName);
+    const slug = slugify(branchName);
     const filepath = join(this.vaultPath, "branches", `${slug}.md`);
     if (!existsSync(filepath)) return;
 
