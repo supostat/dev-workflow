@@ -25,8 +25,9 @@ function buildSettingsJson(): string {
   // Resolve the path to hooks relative to project
   // When installed as dependency: node_modules/dev-vault/dist/hooks/
   // When linked: direct path
-  const hookBase = "node_modules/dev-vault/dist/hooks";
-  const statuslinePath = "node_modules/dev-vault/dist/lib/statusline.js";
+  const hookBase = "node_modules/dev-workflow/dist/hooks";
+  const statuslinePath = "node_modules/dev-workflow/dist/lib/statusline.js";
+  const mcpServerPath = "node_modules/dev-workflow/dist/cli/serve.js";
 
   return JSON.stringify({
     hooks: {
@@ -66,6 +67,12 @@ function buildSettingsJson(): string {
     statusLine: {
       type: "command",
       command: `node ${statuslinePath}`,
+    },
+    mcpServers: {
+      "dev-workflow": {
+        command: "node",
+        args: [mcpServerPath],
+      },
     },
   }, null, 2);
 }

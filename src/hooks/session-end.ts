@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
-/**
- * SessionEnd / PreCompact hook — auto-save.
- * Saves minimal session marker to daily log and updates branch status.
- * Full handover with detailed notes is done via /handover command.
- */
-
+import { execSync } from "node:child_process";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { VaultWriter } from "../lib/writer.js";
+import { WorkflowState } from "../workflow/state.js";
 import type { HookOutput } from "../lib/types.js";
+
+function git(command: string, cwd: string): string {
+  try {
+    return execSync(`git ${command}`, { cwd, encoding: "utf-8" }).trim();
+  } catch {
+    return "";
+  }
+}
 
 function run(): void {
   const context = detectContext();
@@ -28,7 +32,7 @@ function run(): void {
   const today = new Date().toISOString().slice(0, 10);
   const time = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-  const marker = [
+  const markerLines = [
     `---`,
     `date: ${today}`,
     `projects: [${context.projectName}]`,
@@ -41,9 +45,27 @@ function run(): void {
     `**Branch:** ${context.branch}`,
     ``,
     `> Session auto-saved. Use /handover for detailed session notes.`,
-  ].join("\n");
+  ];
 
+  const diffStat = git("diff --stat HEAD", context.projectRoot);
+  if (diffStat) {
+    markerLines.push("", "## Changes", "```", diffStat, "```");
+  }
+
+  const statusShort = git("status -s", context.projectRoot);
+  if (statusShort) {
+    markerLines.push("", "## Uncommitted", "```", statusShort, "```");
+  }
+
+  const marker = markerLines.join("\n");
   const dailyPath = writer.writeDailyLog(marker, today);
+
+  const workflowState = new WorkflowState(context.vaultPath);
+  const currentRun = workflowState.loadCurrent();
+  if (currentRun && currentRun.status === "running") {
+    currentRun.status = "paused";
+    workflowState.save(currentRun);
+  }
 
   output({
     status: "ok",

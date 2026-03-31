@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 
-/**
- * SessionStart hook — auto-resume.
- * Detects project context, loads vault data, outputs structured context
- * for Claude Code to consume as system prompt.
- */
-
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
+import { TaskManager } from "../tasks/manager.js";
+import { TaskTracker } from "../tasks/tracker.js";
+import { WorkflowState } from "../workflow/state.js";
 import type { HookOutput } from "../lib/types.js";
 
 function run(): void {
@@ -19,12 +16,11 @@ function run(): void {
 
   const reader = new VaultReader(context);
   if (!reader.exists()) {
-    output({ status: "ok", message: `No .dev-vault/ found in ${context.projectName}. Run 'dev-vault init' to set up.` });
+    output({ status: "ok", message: `No .dev-vault/ found in ${context.projectName}. Run 'dev-workflow init' to set up.` });
     return;
   }
 
   const vaultData = reader.readAll(context.branch);
-
   const sections: string[] = [];
 
   sections.push(`# Dev Vault: ${context.projectName}`);
@@ -61,6 +57,29 @@ function run(): void {
         `\n## Last Session (${latest.date})\n` + truncate(latest.content, 1500),
       );
     }
+  }
+
+  const taskManager = new TaskManager(context.vaultPath);
+  const tracker = new TaskTracker(context.projectRoot, taskManager);
+  const currentTask = tracker.findByBranch(context.branch);
+  if (currentTask) {
+    sections.push(
+      `\n## Current Task: ${currentTask.title}\n` +
+      `Status: ${currentTask.status}\n` +
+      `ID: ${currentTask.id}\n\n` +
+      currentTask.description,
+    );
+  }
+
+  const workflowState = new WorkflowState(context.vaultPath);
+  const pausedRun = workflowState.loadCurrent();
+  if (pausedRun && pausedRun.status === "paused") {
+    sections.push(
+      `\n## Paused Workflow: ${pausedRun.workflowName}\n` +
+      `Step: ${pausedRun.currentStep}\n` +
+      `Run: ${pausedRun.id}\n\n` +
+      `> Resume with: dev-workflow resume`,
+    );
   }
 
   output({
