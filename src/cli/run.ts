@@ -10,6 +10,7 @@ import { WorkflowEngine } from "../workflow/engine.js";
 import type { StepExecutor, GateChecker } from "../workflow/engine.js";
 import { WorkflowState } from "../workflow/state.js";
 import { getBuiltinWorkflow } from "../workflow/builtin.js";
+import { loadCustomWorkflows } from "../workflow/loader.js";
 import type { PreparedAgent } from "../agents/types.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -89,9 +90,17 @@ export async function run(args: string[]): Promise<void> {
   try {
     workflow = getBuiltinWorkflow(workflowName);
   } catch {
-    console.error(`Unknown workflow: ${workflowName}`);
-    process.exitCode = 1;
-    return;
+    const custom = loadCustomWorkflows(context.vaultPath);
+    workflow = custom.find((w) => w.name === workflowName);
+    if (!workflow) {
+      console.error(`Unknown workflow: ${workflowName}`);
+      console.error("Builtin: dev, hotfix, review, test");
+      if (custom.length > 0) {
+        console.error(`Custom: ${custom.map((w) => w.name).join(", ")}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
   }
 
   const taskDescription = args.filter((a) => !a.startsWith("--")).slice(1).join(" ") || workflowName;

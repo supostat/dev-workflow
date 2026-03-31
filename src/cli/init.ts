@@ -3,6 +3,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
+import { detectStack, renderStackMarkdown } from "../lib/stack-detect.js";
+import { detectConventions, renderConventionsMarkdown } from "../lib/conventions-detect.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -127,12 +129,30 @@ export function init(options: InitOptions): void {
   writer.scaffold();
   console.log(`  create .dev-vault/`);
 
-  // 6. Update .gitignore
+  // 6. Auto-detect stack
+  const stackPath = join(context.vaultPath, "stack.md");
+  const stack = detectStack(projectRoot);
+  const stackHasContent = stack.languages.length > 0 || stack.frameworks.length > 0;
+  if (stackHasContent && (!existsSync(stackPath) || options.force)) {
+    writeFileSync(stackPath, renderStackMarkdown(context.projectName, stack), "utf-8");
+    console.log(`  detect stack.md (${stack.languages.length + stack.frameworks.length} items)`);
+  }
+
+  // 7. Auto-detect conventions
+  const conventionsPath = join(context.vaultPath, "conventions.md");
+  const conventions = detectConventions(projectRoot);
+  const conventionsHasContent = conventions.codeStyle.length > 0 || conventions.testing.length > 0;
+  if (conventionsHasContent && (!existsSync(conventionsPath) || options.force)) {
+    writeFileSync(conventionsPath, renderConventionsMarkdown(context.projectName, conventions), "utf-8");
+    console.log(`  detect conventions.md (${conventions.codeStyle.length + conventions.testing.length} items)`);
+  }
+
+  // 8. Update .gitignore
   ensureGitignoreEntries(projectRoot);
 
   console.log(`\nDone! Vault initialized for ${context.projectName}.`);
   console.log(`\nNext steps:`);
-  console.log(`  1. Fill .dev-vault/stack.md with your tech stack`);
+  console.log(`  1. Review .dev-vault/stack.md${stackHasContent ? " (auto-detected)" : ""}`);
   console.log(`  2. Fill .dev-vault/gameplan.md with your roadmap`);
   console.log(`  3. Start a Claude Code session — context loads automatically`);
 }

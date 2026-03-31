@@ -5,6 +5,7 @@ import { status } from "./status.js";
 import { run, resume } from "./run.js";
 import { agent } from "./agent.js";
 import { task } from "./task.js";
+import { doctor } from "./doctor.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -20,6 +21,7 @@ Usage:
   dev-workflow resume [--run <id>]       Resume paused workflow
   dev-workflow agent list|show|run       Manage agents
   dev-workflow task create|list|...      Manage tasks
+  dev-workflow doctor                     Check vault health
   dev-workflow serve                     Start MCP server
   dev-workflow help                      Show this help
 
@@ -46,6 +48,9 @@ switch (command) {
     break;
   case "task":
     task(args.slice(1));
+    break;
+  case "doctor":
+    doctor();
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve());
