@@ -271,6 +271,62 @@ describe("detectConventions", () => {
     expect(conventions.codeStyle).toContain("TypeScript strict mode enabled");
   });
 
+  it("detects Rust edition from Cargo.toml in subdirectory", () => {
+    const cliDir = join(projectRoot, "cli");
+    mkdirSync(cliDir, { recursive: true });
+    writeFileSync(join(cliDir, "Cargo.toml"), '[package]\nname = "app"\nedition = "2024"', "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.codeStyle.some((s) => s.includes("Rust edition: 2024"))).toBe(true);
+  });
+
+  it("detects rustfmt config", () => {
+    writeFileSync(join(projectRoot, "rustfmt.toml"), 'max_width = 100\ntab_spaces = 4', "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.codeStyle.some((s) => s.includes("rustfmt"))).toBe(true);
+  });
+
+  it("detects lefthook hooks", () => {
+    writeFileSync(join(projectRoot, "lefthook.yml"), [
+      "pre-commit:",
+      "  commands:",
+      "    lint:",
+      "      run: cargo clippy",
+      "pre-push:",
+      "  commands:",
+      "    test:",
+      "      run: cargo test",
+    ].join("\n"), "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.git).toContain("Lefthook git hooks");
+    expect(conventions.git.some((s) => s.includes("pre-commit") && s.includes("pre-push"))).toBe(true);
+  });
+
+  it("detects package.json scripts from subdirectory", () => {
+    const webDir = join(projectRoot, "website");
+    mkdirSync(webDir, { recursive: true });
+    writeFileSync(join(webDir, "package.json"), JSON.stringify({
+      scripts: { lint: "next lint", build: "next build" },
+    }), "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.codeStyle.some((s) => s.includes("next lint"))).toBe(true);
+  });
+
+  it("detects biome config", () => {
+    writeFileSync(join(projectRoot, "biome.json"), "{}", "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.codeStyle.some((s) => s.includes("Biome"))).toBe(true);
+  });
+
   it("renderConventionsMarkdown produces valid markdown", () => {
     writeFileSync(join(projectRoot, "tsconfig.json"), JSON.stringify({
       compilerOptions: { strict: true },
