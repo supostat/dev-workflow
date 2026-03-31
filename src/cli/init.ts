@@ -48,6 +48,20 @@ function buildSettingsJson(): string {
           timeout: 10000,
         }],
       }],
+      PostEdit: [{
+        hooks: [{
+          type: "command",
+          command: `node ${hookBase}/post-edit.js`,
+          timeout: 5000,
+        }],
+      }],
+      PostTask: [{
+        hooks: [{
+          type: "command",
+          command: `node ${hookBase}/post-task.js`,
+          timeout: 5000,
+        }],
+      }],
       PreCompact: [
         {
           matcher: "auto",

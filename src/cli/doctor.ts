@@ -20,7 +20,7 @@ function countCustomWorkflows(vaultPath: string): number {
   return readdirSync(workflowsDir).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml")).length;
 }
 
-export function doctor(): void {
+export function doctor(fix: boolean = false): void {
   const context = detectContext();
   if (!context) {
     console.error("Not a git repository.");
@@ -102,7 +102,14 @@ export function doctor(): void {
     issues.push("Settings not found — run 'dev-workflow init'");
   }
 
-  printIssues(issues);
+  if (fix && issues.length > 0) {
+    console.log("\n  Fixing...");
+    const { init } = require("./init.js") as typeof import("./init.js");
+    init({ force: true, detectOnly: false });
+    console.log("  Fixed: re-ran init --force");
+  } else {
+    printIssues(issues);
+  }
 }
 
 function printIssues(issues: string[]): void {
@@ -111,6 +118,7 @@ function printIssues(issues: string[]): void {
     for (const issue of issues) {
       console.log(`    - ${issue}`);
     }
+    console.log("\n  Run 'dev-workflow doctor --fix' to auto-fix.");
   } else {
     console.log("\n  All checks passed.");
   }

@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectContext } from "../lib/context.js";
@@ -109,6 +110,21 @@ export async function run(args: string[]): Promise<void> {
 
   const taskDescription = args.filter((a) => !a.startsWith("--")).slice(1).join(" ") || workflowName;
   const taskId = parseFlag(args, "--task");
+  const dryRun = args.includes("--dry-run");
+
+  if (dryRun) {
+    console.log(`Workflow: ${workflow.name} — ${workflow.description}\n`);
+    console.log("Steps:");
+    for (let i = 0; i < workflow.steps.length; i++) {
+      const step = workflow.steps[i]!;
+      const gate = step.gate === "none" ? "" : ` [gate: ${step.gate}]`;
+      const fail = step.onFail ? ` → onFail: ${step.onFail}` : "";
+      console.log(`  ${i + 1}. ${step.name} (agent: ${step.agent})${gate}${fail}`);
+    }
+    console.log(`\nTask: ${taskDescription}`);
+    if (taskId) console.log(`Linked task: ${taskId}`);
+    return;
+  }
 
   const engine = createEngine(context.vaultPath, context.projectRoot);
   const result = await engine.start(workflow, taskDescription, taskId);
@@ -122,6 +138,38 @@ export async function run(args: string[]): Promise<void> {
     console.log(`Workflow paused at step '${result.currentStep}'. Run 'dev-workflow resume' to continue.`);
   } else if (result.status === "failed") {
     console.error(`Workflow failed at step '${result.currentStep}'.`);
+    process.exitCode = 1;
+  }
+}
+
+export function validate(args: string[]): void {
+  const filepath = args[0];
+  if (!filepath) {
+    console.error("Usage: dev-workflow validate <workflow.yaml>");
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    const content = readFileSync(filepath, "utf-8");
+    const { parseWorkflowYaml } = require("../workflow/loader.js") as typeof import("../workflow/loader.js");
+    const workflow = parseWorkflowYaml(content);
+
+    console.log(`Valid workflow: ${workflow.name}`);
+    console.log(`Description: ${workflow.description}`);
+    console.log(`Steps: ${workflow.steps.length}`);
+    for (const step of workflow.steps) {
+      const issues: string[] = [];
+      if (!step.agent) issues.push("missing agent");
+      if (step.gate !== "none" && step.gate !== "user-approve" && step.gate !== "tests-pass" && step.gate !== "review-pass") {
+        issues.push(`unknown gate: ${step.gate}`);
+      }
+      const status = issues.length > 0 ? ` — ${issues.join(", ")}` : "";
+      console.log(`  ${step.name}: ${step.agent} [${step.gate}]${status}`);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Parse error";
+    console.error(`Invalid workflow: ${message}`);
     process.exitCode = 1;
   }
 }
