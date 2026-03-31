@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, basename } from "node:path";
 
 interface StackInfo {
   languages: string[];
@@ -10,17 +10,66 @@ interface StackInfo {
   devTools: string[];
 }
 
+const SKIP_DIRS = new Set([
+  "node_modules", "vendor", "bower_components",
+  "dist", "build", "out", "target",
+  "__pycache__", "coverage",
+]);
+
+const MARKER_NAMES = new Set([
+  "Cargo.toml", "package.json", "go.mod", "go.work",
+  "pyproject.toml", "requirements.txt",
+  "Gemfile", "composer.json", "pubspec.yaml",
+]);
+
+function findProjectMarkers(root: string, maxDepth: number = 4): string[] {
+  const found: string[] = [];
+
+  function scan(directory: string, depth: number): void {
+    if (depth > maxDepth) return;
+
+    let entries;
+    try { entries = readdirSync(directory, { withFileTypes: true }); }
+    catch { return; }
+
+    for (const entry of entries) {
+      if (entry.isFile() && MARKER_NAMES.has(entry.name)) {
+        found.push(join(directory, entry.name));
+      }
+    }
+
+    if (depth < maxDepth) {
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith(".")) continue;
+        if (SKIP_DIRS.has(entry.name)) continue;
+        scan(join(directory, entry.name), depth + 1);
+      }
+    }
+  }
+
+  scan(root, 0);
+  return found;
+}
+
 function readJsonOrNull(filepath: string): Record<string, unknown> | null {
   try {
-    if (!existsSync(filepath)) return null;
     return JSON.parse(readFileSync(filepath, "utf-8")) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
-function detectFromPackageJson(projectRoot: string, stack: StackInfo): void {
-  const packageJson = readJsonOrNull(join(projectRoot, "package.json"));
+function readFileOrNull(filepath: string): string | null {
+  try {
+    return readFileSync(filepath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+function processPackageJson(filepath: string, stack: StackInfo): void {
+  const packageJson = readJsonOrNull(filepath);
   if (!packageJson) return;
 
   const allDeps = {
@@ -31,13 +80,8 @@ function detectFromPackageJson(projectRoot: string, stack: StackInfo): void {
   const devDeps = (packageJson["devDependencies"] as Record<string, string>) ?? {};
   const engines = (packageJson["engines"] as Record<string, string>) ?? {};
 
-  if (devDeps["typescript"]) {
-    stack.languages.push(`TypeScript ${devDeps["typescript"]}`);
-  }
-
-  if (engines["node"]) {
-    stack.languages.push(`Node.js ${engines["node"]}`);
-  }
+  if (devDeps["typescript"]) stack.languages.push(`TypeScript ${devDeps["typescript"]}`);
+  if (engines["node"]) stack.languages.push(`Node.js ${engines["node"]}`);
 
   const frameworkMap: Record<string, string> = {
     "react": "React", "next": "Next.js", "vue": "Vue", "nuxt": "Nuxt",
@@ -82,39 +126,73 @@ function detectFromPackageJson(projectRoot: string, stack: StackInfo): void {
   }
 
   const packageManager = packageJson["packageManager"] as string | undefined;
-  if (packageManager) {
-    stack.devTools.push(packageManager);
+  if (packageManager) stack.devTools.push(packageManager);
+
+  const workspaces = packageJson["workspaces"] as unknown;
+  if (workspaces) stack.devTools.push("Monorepo (workspaces)");
+}
+
+function processCargoToml(filepath: string, stack: StackInfo): void {
+  const content = readFileOrNull(filepath);
+  if (!content) return;
+
+  const edition = content.match(/^edition\s*=\s*"(\d+)"/m);
+  stack.languages.push(edition ? `Rust ${edition[1]} edition` : "Rust");
+
+  const rustDepMap: Record<string, string> = {
+    "clap": "Clap (CLI)", "tokio": "Tokio (async runtime)",
+    "serde": "Serde (serialization)", "axum": "Axum (web)",
+    "actix-web": "Actix (web)", "rocket": "Rocket (web)",
+    "diesel": "Diesel (ORM)", "sqlx": "SQLx (DB)",
+    "reqwest": "Reqwest (HTTP)", "hyper": "Hyper (HTTP)",
+    "tracing": "Tracing (observability)", "anyhow": "Anyhow (errors)",
+    "thiserror": "Thiserror (errors)",
+  };
+
+  for (const [dep, label] of Object.entries(rustDepMap)) {
+    if (content.includes(`${dep} `)) stack.frameworks.push(label);
+  }
+
+  if (content.includes("[workspace]")) {
+    stack.devTools.push("Cargo workspace");
   }
 }
 
-function detectFromTsconfig(projectRoot: string, stack: StackInfo): void {
-  const tsconfig = readJsonOrNull(join(projectRoot, "tsconfig.json"));
-  if (!tsconfig) return;
+function processGoMod(filepath: string, stack: StackInfo): void {
+  const content = readFileOrNull(filepath);
+  if (!content) return;
 
-  const compilerOptions = tsconfig["compilerOptions"] as Record<string, unknown> | undefined;
-  if (compilerOptions?.["target"]) {
-    stack.languages.push(`Target: ${compilerOptions["target"]}`);
-  }
+  stack.languages.push("Go");
+
+  const goVersion = content.match(/^go\s+(\d+\.\d+)/m);
+  if (goVersion) stack.languages.push(`Go ${goVersion[1]}`);
 }
 
-function detectFromPython(projectRoot: string, stack: StackInfo): void {
-  if (existsSync(join(projectRoot, "requirements.txt"))) {
-    stack.languages.push("Python");
-  }
-  if (existsSync(join(projectRoot, "pyproject.toml"))) {
-    stack.languages.push("Python (pyproject.toml)");
-  }
+function processPyproject(filepath: string, stack: StackInfo): void {
+  stack.languages.push("Python");
+
+  const content = readFileOrNull(filepath);
+  if (!content) return;
+
+  if (content.includes("[tool.poetry]")) stack.devTools.push("Poetry");
+  if (content.includes("[tool.pytest]")) stack.testing.push("pytest");
+  if (content.includes("[tool.ruff]")) stack.devTools.push("Ruff (linter)");
+  if (content.includes("[tool.mypy]")) stack.devTools.push("mypy (types)");
 }
 
-function detectFromGo(projectRoot: string, stack: StackInfo): void {
-  if (existsSync(join(projectRoot, "go.mod"))) {
-    stack.languages.push("Go");
-  }
-}
+function processRequirementsTxt(filepath: string, stack: StackInfo): void {
+  stack.languages.push("Python");
 
-function detectFromRust(projectRoot: string, stack: StackInfo): void {
-  if (existsSync(join(projectRoot, "Cargo.toml"))) {
-    stack.languages.push("Rust");
+  const content = readFileOrNull(filepath);
+  if (!content) return;
+
+  const pyDepMap: Record<string, string> = {
+    "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
+    "sqlalchemy": "SQLAlchemy (ORM)", "pytest": "pytest",
+  };
+
+  for (const [dep, label] of Object.entries(pyDepMap)) {
+    if (content.toLowerCase().includes(dep)) stack.frameworks.push(label);
   }
 }
 
@@ -134,6 +212,9 @@ function detectInfrastructure(projectRoot: string, stack: StackInfo): void {
   if (existsSync(join(projectRoot, "netlify.toml"))) {
     stack.infrastructure.push("Netlify");
   }
+  if (existsSync(join(projectRoot, "lefthook.yml")) || existsSync(join(projectRoot, "lefthook.yaml"))) {
+    stack.devTools.push("Lefthook (git hooks)");
+  }
 }
 
 function deduplicate(items: string[]): string[] {
@@ -146,6 +227,18 @@ function deduplicate(items: string[]): string[] {
   });
 }
 
+const MARKER_PROCESSORS: Record<string, (filepath: string, stack: StackInfo) => void> = {
+  "package.json": processPackageJson,
+  "Cargo.toml": processCargoToml,
+  "go.mod": processGoMod,
+  "go.work": processGoMod,
+  "pyproject.toml": processPyproject,
+  "requirements.txt": processRequirementsTxt,
+  "Gemfile": (_, stack) => { stack.languages.push("Ruby"); },
+  "composer.json": (_, stack) => { stack.languages.push("PHP"); },
+  "pubspec.yaml": (_, stack) => { stack.languages.push("Dart/Flutter"); },
+};
+
 export function detectStack(projectRoot: string): StackInfo {
   const stack: StackInfo = {
     languages: [],
@@ -156,11 +249,16 @@ export function detectStack(projectRoot: string): StackInfo {
     devTools: [],
   };
 
-  detectFromPackageJson(projectRoot, stack);
-  detectFromTsconfig(projectRoot, stack);
-  detectFromPython(projectRoot, stack);
-  detectFromGo(projectRoot, stack);
-  detectFromRust(projectRoot, stack);
+  const markers = findProjectMarkers(projectRoot);
+
+  for (const markerPath of markers) {
+    const markerName = basename(markerPath);
+    const processor = MARKER_PROCESSORS[markerName];
+    if (processor) {
+      processor(markerPath, stack);
+    }
+  }
+
   detectInfrastructure(projectRoot, stack);
 
   stack.languages = deduplicate(stack.languages);

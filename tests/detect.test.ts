@@ -99,6 +99,68 @@ describe("detectStack", () => {
     expect(stack.languages).toContain("Rust");
   });
 
+  it("detects Rust in subdirectory (deep scan)", () => {
+    const cliDir = join(projectRoot, "cli");
+    mkdirSync(cliDir, { recursive: true });
+    writeFileSync(join(cliDir, "Cargo.toml"), '[package]\nname = "my-cli"\nedition = "2021"', "utf-8");
+
+    const stack = detectStack(projectRoot);
+
+    expect(stack.languages.some((l) => l.includes("Rust"))).toBe(true);
+    expect(stack.languages.some((l) => l.includes("2021"))).toBe(true);
+  });
+
+  it("detects Node.js in nested packages directory", () => {
+    const pkgDir = join(projectRoot, "packages", "api");
+    mkdirSync(pkgDir, { recursive: true });
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({
+      dependencies: { express: "^5.0.0" },
+    }), "utf-8");
+
+    const stack = detectStack(projectRoot);
+
+    expect(stack.frameworks.some((f) => f.includes("Express"))).toBe(true);
+  });
+
+  it("skips node_modules during deep scan", () => {
+    const nmDir = join(projectRoot, "node_modules", "some-pkg");
+    mkdirSync(nmDir, { recursive: true });
+    writeFileSync(join(nmDir, "package.json"), JSON.stringify({
+      dependencies: { react: "^19.0.0" },
+    }), "utf-8");
+
+    const stack = detectStack(projectRoot);
+
+    expect(stack.frameworks).toHaveLength(0);
+  });
+
+  it("parses Rust Cargo.toml dependencies", () => {
+    writeFileSync(join(projectRoot, "Cargo.toml"), [
+      '[package]',
+      'name = "app"',
+      'edition = "2021"',
+      '',
+      '[dependencies]',
+      'clap = "4.0"',
+      'tokio = { version = "1.0", features = ["full"] }',
+      'serde = "1.0"',
+    ].join("\n"), "utf-8");
+
+    const stack = detectStack(projectRoot);
+
+    expect(stack.frameworks.some((f) => f.includes("Clap"))).toBe(true);
+    expect(stack.frameworks.some((f) => f.includes("Tokio"))).toBe(true);
+    expect(stack.frameworks.some((f) => f.includes("Serde"))).toBe(true);
+  });
+
+  it("detects lefthook", () => {
+    writeFileSync(join(projectRoot, "lefthook.yml"), "pre-commit:", "utf-8");
+
+    const stack = detectStack(projectRoot);
+
+    expect(stack.devTools.some((t) => t.includes("Lefthook"))).toBe(true);
+  });
+
   it("returns empty for project with no markers", () => {
     const stack = detectStack(projectRoot);
 
@@ -195,6 +257,18 @@ describe("detectConventions", () => {
     const conventions = detectConventions(projectRoot);
 
     expect(conventions.git).toContain(".gitignore configured");
+  });
+
+  it("detects tsconfig in subdirectory (deep scan)", () => {
+    const subDir = join(projectRoot, "packages", "api");
+    mkdirSync(subDir, { recursive: true });
+    writeFileSync(join(subDir, "tsconfig.json"), JSON.stringify({
+      compilerOptions: { strict: true },
+    }), "utf-8");
+
+    const conventions = detectConventions(projectRoot);
+
+    expect(conventions.codeStyle).toContain("TypeScript strict mode enabled");
   });
 
   it("renderConventionsMarkdown produces valid markdown", () => {

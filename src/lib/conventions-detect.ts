@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 interface ConventionsInfo {
@@ -19,8 +19,37 @@ function readJsonOrNull(filepath: string): Record<string, unknown> | null {
   }
 }
 
+function findFile(projectRoot: string, filename: string, maxDepth: number = 4): string | null {
+  const SKIP = new Set(["node_modules", "vendor", "dist", "build", "out", "target", "__pycache__", "coverage"]);
+
+  function scan(directory: string, depth: number): string | null {
+    if (depth > maxDepth) return null;
+    const filePath = join(directory, filename);
+    if (existsSync(filePath)) return filePath;
+
+    if (depth < maxDepth) {
+      let entries;
+      try { entries = readdirSync(directory, { withFileTypes: true }); }
+      catch { return null; }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith(".")) continue;
+        if (SKIP.has(entry.name)) continue;
+        const found = scan(join(directory, entry.name), depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  return scan(projectRoot, 0);
+}
+
 function detectFromTsconfig(projectRoot: string, conventions: ConventionsInfo): void {
-  const tsconfig = readJsonOrNull(join(projectRoot, "tsconfig.json"));
+  const tsconfigPath = findFile(projectRoot, "tsconfig.json");
+  if (!tsconfigPath) return;
+  const tsconfig = readJsonOrNull(tsconfigPath);
   if (!tsconfig) return;
 
   const compilerOptions = tsconfig["compilerOptions"] as Record<string, unknown> | undefined;
