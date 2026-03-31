@@ -1,50 +1,34 @@
-# /new-branch — Create branch context
+# /git:new-branch — Create branch context
 
 Create a context file for the current git branch in `.dev-vault/branches/`.
 
 ## Procedure
 
-1. Run `git branch --show-current` to get branch name
-2. Determine parent branch (usually main/master)
-3. Ask user about the branch goal if not clear from context
-4. Check if there's a task to link: use MCP tool `task_list` to find related tasks
-5. Create `.dev-vault/branches/<branch-slug>.md`:
+1. Run `git branch --show-current`
+2. Determine parent branch
+3. Check for linked tasks via MCP tool `task_list`
+4. Ask user about branch goal if not clear
 
-```markdown
----
-branch: <full branch name>
-status: in-progress
-created: <today>
-parent: <parent branch>
-tags: [branch, <project>]
----
-# <branch-name>
+## Output format
 
-## Goal
-<what this branch aims to achieve>
+Use this exact format (markdown, not code block):
 
-## Tasks
-- [ ] <task 1>
-- [ ] <task 2>
+🌿 **New Branch:** \<branch name\>
 
-## Decisions
-- (none yet)
+- **Parent:** \<parent branch\>
+- **Created:** \<today\>
+- **Linked task:** \<task id or none\>
 
-## Open Questions
-- (none yet)
+**Goal:** \<what this branch aims to achieve\>
 
-## Issues
-- (none yet)
+**Save?** (yes / edit goal / skip)
 
-## Links
-- ADR: (none)
-- Depends on: (none)
-- Blocks: (none)
-```
+5. If yes → create `.dev-vault/branches/<branch-slug>.md`
+6. Link to gameplan.md phase if applicable
+7. If task exists → suggest `/task start <id>`
 
-6. Read `gameplan.md` to link branch to a phase if applicable
-7. If a task exists, link it: `/task start <id>`
+✅ **Created** → `.dev-vault/branches/<slug>.md`
 
 ## Naming
 
-Branch slug: replace `/` with `-`. Example: `feature/auth-flow` -> `feature-auth-flow.md`
+Branch slug: replace `/` with `-`. Example: `feature/auth-flow` → `feature-auth-flow.md`

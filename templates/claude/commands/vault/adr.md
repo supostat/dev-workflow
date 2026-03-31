@@ -1,43 +1,39 @@
-# /adr — Create Architecture Decision Record
+# /vault:adr — Create Architecture Decision Record
 
 Record a significant architectural or design decision in `.dev-vault/architecture/`.
 
 ## Procedure
 
-1. Gather from conversation context:
-   - **Context** — why the decision was needed
-   - **Decision** — what was decided
-   - **Alternatives** — what was considered and rejected
-   - **Consequences** — trade-offs and implications
-2. Use MCP tool `vault_record` with type "adr", or create `.dev-vault/architecture/<YYYY-MM-DD>-<slug>.md`:
+1. Gather from conversation context: Context, Decision, Alternatives, Consequences
+2. Show summary before saving:
 
-```markdown
----
-date: <today>
-status: accepted
-tags: [adr, <project>]
----
-# <decision title>
+📋 **New ADR**
 
-## Context
-<why we needed to decide>
+- **Title:** \<decision title\>
+- **Date:** \<today\>
+- **Status:** accepted
 
-## Decision
-<what we decided>
+**Context:** \<why needed\>
 
-## Alternatives
-<what we rejected and why>
+**Decision:** \<what was decided\>
 
-## Consequences
-<what changes, trade-offs>
-```
+**Alternatives considered:**
+- **\<option A\>** — \<pros/cons\>
+- **\<option B\>** — \<pros/cons\>
 
-3. Reference the ADR from related branch context if applicable
-4. Update `.dev-vault/knowledge.md` if the decision impacts development patterns
+**Consequences:** \<trade-offs\>
+
+**Save?** (yes / edit / skip)
+
+3. If yes → use MCP tool `vault_record` type "adr" or create file directly
+4. Confirm:
+
+✅ **Saved** → `.dev-vault/architecture/<date>-<slug>.md`
+
+💡 Updated knowledge.md if decision impacts patterns
 
 ## When to use
 
 - Choosing between frameworks, libraries, or approaches
 - Defining data models or API contracts
 - Changing project structure or conventions
-- Any decision that future-you would want context on

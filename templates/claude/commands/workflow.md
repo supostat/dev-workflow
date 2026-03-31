@@ -4,39 +4,44 @@ Run, resume, or check status of development workflows.
 
 ## Usage
 
-- `/workflow run dev "task description"` — Run full dev workflow
-- `/workflow run hotfix "fix description"` — Quick hotfix workflow
+- `/workflow run dev "task"` — Full dev workflow
+- `/workflow run hotfix "fix"` — Quick hotfix
 - `/workflow run review` — Code review only
 - `/workflow run test` — Run tests only
-- `/workflow status` — Show current workflow status
-- `/workflow resume` — Resume a paused workflow
+- `/workflow status` — Current workflow status
+- `/workflow resume` — Resume paused workflow
 
-## Procedure
+## Output format for /workflow run
 
-### /workflow run
+🔄 **Workflow:** \<name\> — "\<task description\>"
 
-1. Determine the workflow type and task description from user input
-2. Run `dev-workflow run <type> "<description>"` via shell
-3. Report the result:
-   - **completed** — all steps executed successfully
-   - **paused** — waiting for user approval, suggest `/workflow resume`
-   - **failed** — show which step failed and why
+| # | Step | Agent | Gate | Status |
+|---|------|-------|------|--------|
+| 1 | read | reader | — | ✅ done |
+| 2 | plan | planner | approval | ⏸️ paused |
+| 3 | code | coder | — | ○ pending |
+| 4 | review | reviewer | review-pass | ○ pending |
+| 5 | test | tester | tests-pass | ○ pending |
+| 6 | commit | committer | — | ○ pending |
 
-### /workflow status
+⏸️ **Step 'plan' requires approval.**
 
-1. Use MCP tool `workflow_status` or run `dev-workflow status`
-2. Show: workflow name, current step, step progress (N/M), status
+\<plan content\>
 
-### /workflow resume
+**Approve?** (yes / no / edit)
 
-1. Run `dev-workflow resume` via shell
-2. Report the result
+## Output format for /workflow status
+
+🔄 **Workflow:** \<name\> (\<run id\>)
+
+- **Status:** ✅ completed / ⏸️ paused / 🔴 failed
+- **Step:** \<current\> (N/M)
+- **Task:** \<linked task or none\>
+- **Started:** \<timestamp\>
 
 ## Available Workflows
 
-| Name | Steps | When to use |
-|------|-------|-------------|
-| dev | read → plan → code → review → test → commit | Standard feature development |
-| hotfix | read → code → test → commit | Urgent bug fixes, skip planning |
-| review | read → review | Code review only |
-| test | read → test | Run tests only |
+- **dev** — read → plan → code → review → test → commit
+- **hotfix** — read → code → test → commit
+- **review** — read → review
+- **test** — read → test

@@ -21,32 +21,30 @@ Scan the project for common security issues and record findings in vault.
    - Insecure deserialization: `JSON.parse()` on untrusted input
 
 4. Check configuration:
-   - CORS headers configured
-   - HTTPS enforced
-   - Rate limiting present
-   - Authentication middleware on protected routes
+   - CORS headers, HTTPS, rate limiting, auth middleware
 
 5. Record findings:
    - Critical/High → use MCP tool `vault_record` type "bug"
-   - Patterns found → use MCP tool `vault_knowledge` section "Security"
-   - Overall assessment → append to `.dev-vault/knowledge.md` Security section
+   - Patterns → use MCP tool `vault_knowledge` section "Security"
 
 ## Output format
 
-```
-## Security Scan Results
+Use this exact format (markdown, not code block):
 
-### Critical
-- [file:line] <issue description>
+🔒 **Security Scan — \<projectName\>**
 
-### High
-- [file:line] <issue description>
+### 🔴 Critical
+- **\<file:line\>** — \<issue description\>
 
-### Medium
-- [file:line] <issue description>
+### 🟠 High
+- **\<file:line\>** — \<issue description\>
 
-### Recommendations
-- <action item>
+### 🟡 Medium
+- **\<file:line\>** — \<issue description\>
 
-Scanned N files. Found M issues (C critical, H high, M medium).
-```
+### ✅ Recommendations
+- \<action item\>
+
+**Scanned N files. Found M issues (C critical, H high, M medium).**
+
+💡 Record high issue? (yes → /vault:bug)

@@ -4,46 +4,32 @@ Analyze test coverage gaps and record as tech debt.
 
 ## Procedure
 
-1. Identify test files:
-   - Find all test files: `tests/`, `__tests__/`, `*.test.ts`, `*.spec.ts`, `*_test.rs`, `*_test.go`
-   - Map each test file to the source file it covers
-
-2. Find source files without tests:
-   - List all source files in src/ (or equivalent)
-   - Check which have corresponding test files
-   - Exclude: types, constants, re-exports, generated files
-
-3. Analyze test quality for covered files:
-   - Count test cases per source file
-   - Identify files with minimal coverage (1-2 tests for complex modules)
-   - Check for missing edge case coverage (error paths, boundary values)
-
-4. Run test suite if possible:
-   - `npm test` / `cargo test` / `go test ./...`
-   - Report pass/fail status
-
-5. Record findings:
-   - For each significant gap, use MCP tool `vault_record` type "debt":
-     - Title: "Missing tests for <module>"
-     - Content: what should be tested
-   - Summary → use MCP tool `vault_knowledge` section "Testing"
+1. Identify test files (`tests/`, `__tests__/`, `*.test.ts`, `*_test.rs`, `*_test.go`)
+2. Map each test file to the source file it covers
+3. Find source files without tests (exclude types, constants, re-exports)
+4. Analyze test quality for covered files
+5. Run test suite if possible (`npm test` / `cargo test` / `go test ./...`)
+6. Record findings via MCP tools
 
 ## Output format
 
-```
-## Test Coverage Gaps
+Use this exact format (markdown, not code block):
 
-### Untested modules
-- <file> — <reason it needs tests>
+🧪 **Test Coverage Gaps — \<projectName\>**
 
-### Under-tested modules
-- <file> — has N tests, needs: <specific gaps>
+### 🔴 Untested
+- **\<file\>** — \<reason it needs tests\>
 
-### Test quality issues
-- <observation>
+### 🟡 Under-tested
+- **\<file\>** (N tests) — Missing: \<specific gaps\>
 
-Summary: N/M source files have tests. K files need attention.
-```
+### Quality
+- ✅ \<positive observation\>
+- ⚠️ \<issue\>
+
+**Summary:** N/M source files tested. K need attention.
+
+💡 Record as debt? (yes → /vault:debt for each gap)
 
 ## Rules
 

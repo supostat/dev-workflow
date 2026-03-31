@@ -6,44 +6,47 @@ Create, track, and manage tasks linked to git branches and workflows.
 
 - `/task create "title"` — Create a new task
 - `/task list` — List all tasks
-- `/task start <id>` — Start a task (creates branch, sets in-progress)
-- `/task done <id>` — Mark task as done
-- `/task show <id>` — Show task details
+- `/task start <id>` — Start task (set in-progress)
+- `/task done <id>` — Mark as done
+- `/task show <id>` — Show details
 
-## Procedure
+## Output format for /task create
 
-### /task create
+📋 **Task created**
 
-1. Use MCP tool `task_create` with the title and optional description
-2. Report the created task ID
+- **ID:** task-001
+- **Title:** \<title\>
+- **Status:** ⚪ pending
+- **Priority:** medium
 
-### /task list
+💡 Start working? `/task start task-001`
 
-1. Use MCP tool `task_list` (with optional `--status` filter)
-2. Display as table: ID, Status, Title
+## Output format for /task list
 
-### /task start
+📋 **Tasks**
 
-1. Run `dev-workflow task start <id>` via shell
-2. This creates a git branch `task/<slug>` and sets status to in-progress
-3. Report the branch name
+- 🟢 **task-001** — \<title\> (done, high)
+- 🔵 **task-002** — \<title\> (in-progress, medium)
+- ⚪ **task-003** — \<title\> (pending, low)
+- 🔴 **task-004** — \<title\> (blocked, high)
 
-### /task done
+**N tasks** (done: N, in-progress: N, pending: N)
 
-1. Use MCP tool `task_update` with `status: "done"`
-2. Confirm completion
+## Output format for /task show
 
-### /task show
+📋 **task-001** — \<title\>
 
-1. Use MCP tool `task_list` and find by ID, or run `dev-workflow task show <id>`
-2. Display all fields: id, title, status, branch, workflow, dates, description
+- **Status:** 🟢 done
+- **Priority:** high
+- **Branch:** \<branch or none\>
+- **Workflow:** \<run id or none\>
+- **Created:** \<date\>
+- **Updated:** \<date\>
+
+\<description if any\>
 
 ## Task Lifecycle
 
-```
-pending → in-progress → review → done
-                ↓
-             blocked
-```
+⚪ pending → 🔵 in-progress → 🟠 review → 🟢 done
 
-Tasks are stored as markdown in `.dev-vault/tasks/` and linked to git branches.
+↘ 🔴 blocked

@@ -1,38 +1,28 @@
-# /debt — Record tech debt
+# /vault:debt — Record tech debt
 
 Create a tech debt record in `.dev-vault/debt/`.
 
 ## Procedure
 
-1. Gather from user or conversation context:
-   - **What** — the specific technical debt
-   - **Why deferred** — reason it's not being fixed now
-   - **Priority** — high / medium / low
-   - **Effort** — small / medium / large
-   - **Risk** — what happens if we don't fix it
-2. Use MCP tool `vault_record` with type "debt", or create `.dev-vault/debt/<YYYY-MM-DD>-<slug>.md`:
+1. Gather: What, Why deferred, Priority, Effort, Risk
+2. Show summary before saving:
 
-```markdown
----
-date: <today>
-priority: <high|medium|low>
-effort: <small|medium|large>
-tags: [debt, <project>]
----
-# <title>
+📝 **Tech Debt**
 
-## Problem
-<what's wrong>
+- **Priority:** 🔴 high / 🟡 medium / 🟢 low
+- **Effort:** small / medium / large
+- **Title:** \<title\>
 
-## Why Deferred
-<context>
+**Problem:** \<what's wrong\>
+**Why deferred:** \<context\>
+**Proposal:** \<how to fix\>
+**Risk if ignored:** \<consequences\>
 
-## Proposal
-<how to fix, estimated scope>
+**Save?** (yes / edit / skip)
 
-## Risk If Ignored
-<consequences>
-```
+3. If yes → use MCP tool `vault_record` type "debt"
+4. Confirm:
 
-3. Add reference in `.dev-vault/gameplan.md` backlog section
-4. Consider creating a task: `/task create "<debt title>"`
+✅ **Saved** → `.dev-vault/debt/<date>-<slug>.md`
+
+💡 Added to gameplan.md backlog. Consider: `/task create "<title>"`

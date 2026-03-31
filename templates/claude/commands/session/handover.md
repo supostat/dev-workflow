@@ -1,65 +1,49 @@
-# /handover — Save detailed session context
+# /session:handover — Save detailed session context
 
 Capture the current session's work into `.dev-vault/` for future sessions.
 
 ## Procedure
 
-1. Run `git branch --show-current` and `git diff --stat` to understand current state
-2. Check workflow status via MCP tool `workflow_status` or `dev-workflow status`
-3. Review what was done in this session (from conversation context)
-4. Create/update `.dev-vault/daily/<YYYY-MM-DD>.md`:
+1. Run `git branch --show-current` and `git diff --stat`
+2. Check workflow status via MCP tool `workflow_status`
+3. Review what was done in this session
+4. Show summary before saving:
 
-```markdown
----
-date: <today>
-projects: [<project>]
-branches: [<branch>]
-tags: [session-log]
----
-# Session — <date>
+📤 **Session Handover — \<date\>**
 
-## Done
-- <specific accomplishments with file/commit references>
+**Project:** \<name\> | **Branch:** \<branch\>
 
-## Key Decisions
-- <architectural or design decisions made, with reasoning>
+### ✅ Done
+- \<accomplishment with file/commit reference\>
 
-## Problems & Findings
-- <bugs found, gotchas discovered, workarounds applied>
+### 🧠 Key Decisions
+- \<decision with reasoning\>
 
-## Open Questions
-- <unresolved issues>
+### ⚠️ Problems & Findings
+- \<gotchas discovered\>
 
-## Next Steps
-- <what to do in the next session>
+### ❓ Open Questions
+- \<unresolved issues\>
 
-## Workflow Status
-- <current workflow state if any, paused step, pending actions>
+### ➡️ Next Steps
+- \<what to do next session\>
 
-## Task Status
-- <linked tasks and their current status>
-```
+### 🔄 Status
+- **Workflow:** \<state or idle\>
+- **Tasks:** \<linked tasks and status\>
+- **Uncommitted:** \<N files\>
 
-5. Update `.dev-vault/branches/<branch-slug>.md`:
-   - Mark completed tasks with `[x]`
-   - Add new decisions and findings
-   - Update open questions
-6. Update `.dev-vault/knowledge.md` if session produced lasting insights:
-   - New gotchas or patterns
-   - Architecture decisions
-   - Important findings about dependencies
-   Use MCP tool `vault_knowledge` to append to specific sections.
-7. Check if any records should be created:
-   - Non-trivial bug fixed → `/bug`
-   - Architecture decision made → `/adr`
-   - Tech debt discovered → `/debt`
-8. Update task status if applicable:
-   - Use MCP tool `task_update` to set status
-9. Commit vault changes: `git add .dev-vault/ && git commit -m "session: <brief description>"`
+**Save?** (yes / edit / skip)
+
+5. If yes → write to `.dev-vault/daily/<date>.md`
+6. Update branch context and knowledge.md if insights found
+7. Offer to create records: /vault:bug, /vault:adr, /vault:debt
+8. Commit vault changes
+
+✅ **Saved** → `.dev-vault/daily/<date>.md`
 
 ## Rules
 
-- Daily log entries use Obsidian wikilinks to reference branch and knowledge sections
 - Keep entries concise — reference material, not essays
-- If multiple sessions in one day, append with `---` separator
-- Never include secrets, passwords, or tokens
+- Use Obsidian wikilinks for cross-references
+- Never include secrets or tokens

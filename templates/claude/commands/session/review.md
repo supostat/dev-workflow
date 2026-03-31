@@ -1,42 +1,40 @@
-# /review — Code review notes
+# /session:review — Code review notes
 
 Perform a code review of uncommitted changes and record findings.
 
 ## Procedure
 
-1. Run `git diff --stat` to see scope of changes
-2. Run `git diff` to review actual changes
-3. Load project context via MCP tools or direct file reads:
-   - `vault_read` section: conventions — code style and patterns
-   - `vault_read` section: stack — technology constraints
-   - `vault_read` section: knowledge — known gotchas
-4. Report findings by severity:
+1. Run `git diff --stat` to see scope, then `git diff` for details
+2. Load vault context (conventions, stack, knowledge)
+3. Review against vault knowledge + OWASP Top 10
 
-```
-## Review: <branch or description>
+## Output format
 
-### Critical
-- <security issues, data loss risks>
+Use this exact format (markdown, not code block):
 
-### Warning
-- <pattern violations, potential bugs>
+📝 **Review:** \<branch or description\>
 
-### Suggestion
-- <improvements, readability>
+### 🔴 Critical
+- **\<file:line\>** — \<security issues, data loss risks\>
 
-### Good
-- <positive observations>
-```
+### 🟠 Warning
+- **\<file:line\>** — \<pattern violations, potential bugs\>
 
-5. If significant findings exist, offer to create records:
-   - Bug pattern → suggest `/bug`
-   - Convention violation → suggest updating conventions.md
-   - Architecture concern → suggest `/adr`
-6. Alternatively, run a full workflow: `/workflow run review`
+### 💡 Suggestion
+- **\<file:line\>** — \<improvements, readability\>
+
+### ✅ Good
+- \<positive observations\>
+
+**Verdict:** N findings (C critical, W warnings, S suggestions)
+
+💡 Actions:
+- Bug pattern found? → /vault:bug
+- Convention violated? → update conventions.md
+- Architecture concern? → /vault:adr
 
 ## Rules
 
-- Read-only — never modify project code during review
+- Read-only — never modify project code
 - Reference specific files and line numbers
-- Check OWASP Top 10 for security-relevant changes
 - Verify test coverage for changed code

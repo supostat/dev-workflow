@@ -4,48 +4,38 @@ Generate a structured changelog from recent commits.
 
 ## Procedure
 
-1. Determine range:
-   - Default: since last tag (`git describe --tags --abbrev=0`)
-   - Or: user-specified range (e.g., "last 20 commits")
-   - Fallback: all commits on current branch vs main
+1. Determine range (since last tag, or user-specified)
+2. Collect commits: `git log <range> --oneline --no-merges`
+3. Categorize by prefix: Add/Implement, Update/Refactor, Fix, Remove, Security
 
-2. Collect commits:
-   - `git log <range> --oneline --no-merges`
-   - `git log <range> --format="%H %s" --no-merges` for full info
+## Output format
 
-3. Categorize by commit message:
-   - **Added**: commits starting with "Add", "Implement", "Create"
-   - **Changed**: "Update", "Refactor", "Improve", "Rename"
-   - **Fixed**: "Fix", "Resolve", "Patch"
-   - **Removed**: "Remove", "Delete", "Drop"
-   - **Security**: "Security", "Harden", "CVE"
-   - **Other**: everything else
+Use this exact format (markdown, not code block):
 
-4. Generate changelog:
+📋 **Changelog** — \<range description\>
 
-```
-## [Unreleased] — <today's date>
+### ✨ Added
+- \<description\> (`\<short hash\>`)
 
-### Added
-- <description> (<short hash>)
+### 🔄 Changed
+- \<description\> (`\<short hash\>`)
 
-### Changed
-- <description> (<short hash>)
+### 🐛 Fixed
+- \<description\> (`\<short hash\>`)
 
-### Fixed
-- <description> (<short hash>)
+### 🗑️ Removed
+- \<description\> (`\<short hash\>`)
 
-### Removed
-- <description> (<short hash>)
-```
+### 🔒 Security
+- \<description\> (`\<short hash\>`)
 
-5. Output options:
-   - Print to stdout (default)
-   - Offer to prepend to CHANGELOG.md if it exists
+**N commits, M categories.**
+
+💡 Prepend to CHANGELOG.md? (yes / no)
 
 ## Rules
 
-- Follow Keep a Changelog format (https://keepachangelog.com)
+- Follow Keep a Changelog format
 - Group related commits
 - Skip merge commits
-- Use present tense ("Add" not "Added")
+- Use present tense
