@@ -10,7 +10,7 @@ Create a tech debt record in `.dev-vault/debt/`.
    - **Priority** — high / medium / low
    - **Effort** — small / medium / large
    - **Risk** — what happens if we don't fix it
-2. Create `.dev-vault/debt/<YYYY-MM-DD>-<slug>.md`:
+2. Use MCP tool `vault_record` with type "debt", or create `.dev-vault/debt/<YYYY-MM-DD>-<slug>.md`:
 
 ```markdown
 ---
@@ -35,3 +35,4 @@ tags: [debt, <project>]
 ```
 
 3. Add reference in `.dev-vault/gameplan.md` backlog section
+4. Consider creating a task: `/task create "<debt title>"`

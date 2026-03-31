@@ -6,10 +6,10 @@ Perform a code review of uncommitted changes and record findings.
 
 1. Run `git diff --stat` to see scope of changes
 2. Run `git diff` to review actual changes
-3. Analyze changes against:
-   - `.dev-vault/conventions.md` — code style and patterns
-   - `.dev-vault/stack.md` — technology constraints
-   - `.dev-vault/knowledge.md` — known gotchas
+3. Load project context via MCP tools or direct file reads:
+   - `vault_read` section: conventions — code style and patterns
+   - `vault_read` section: stack — technology constraints
+   - `vault_read` section: knowledge — known gotchas
 4. Report findings by severity:
 
 ```
@@ -32,6 +32,7 @@ Perform a code review of uncommitted changes and record findings.
    - Bug pattern → suggest `/bug`
    - Convention violation → suggest updating conventions.md
    - Architecture concern → suggest `/adr`
+6. Alternatively, run a full workflow: `/workflow run review`
 
 ## Rules
 

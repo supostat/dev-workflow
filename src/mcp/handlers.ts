@@ -8,6 +8,7 @@ import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentContextBuilder } from "../agents/context-builder.js";
 import type { TaskManager } from "../tasks/manager.js";
 import type { TaskStatus } from "../tasks/types.js";
+import { WorkflowState } from "../workflow/state.js";
 
 interface SearchMatch {
   file: string;
@@ -101,13 +102,13 @@ export class ToolHandlers {
         );
 
       case "workflow_run":
-        return { message: "Workflow execution requires CLI or direct API. Use dev-workflow run." };
+        return { message: "Use 'dev-workflow run <workflow> \"task\"' from CLI to execute workflows." };
 
       case "workflow_status":
-        return { message: "Workflow status requires CLI. Use dev-workflow status." };
+        return this.workflowStatus(params["runId"] as string | undefined);
 
       case "workflow_resume":
-        return { message: "Workflow resume requires CLI. Use dev-workflow resume." };
+        return { message: "Use 'dev-workflow resume' from CLI to resume paused workflows." };
 
       case "task_create":
         return this.taskCreate(
@@ -195,6 +196,22 @@ export class ToolHandlers {
       vaultSections: agent.vaultSections,
       permissions: agent.permissions,
     }));
+  }
+
+  private workflowStatus(runId?: string): unknown {
+    const state = new WorkflowState(this.context.vaultPath);
+    if (runId) {
+      try {
+        return state.load(runId);
+      } catch {
+        return { message: `Workflow run not found: ${runId}` };
+      }
+    }
+    const current = state.loadCurrent();
+    if (!current) {
+      return { message: "No active workflow." };
+    }
+    return current;
   }
 
   private agentRun(agentName: string, task: string): unknown {

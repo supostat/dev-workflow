@@ -7,7 +7,8 @@ Create a context file for the current git branch in `.dev-vault/branches/`.
 1. Run `git branch --show-current` to get branch name
 2. Determine parent branch (usually main/master)
 3. Ask user about the branch goal if not clear from context
-4. Create `.dev-vault/branches/<branch-slug>.md`:
+4. Check if there's a task to link: use MCP tool `task_list` to find related tasks
+5. Create `.dev-vault/branches/<branch-slug>.md`:
 
 ```markdown
 ---
@@ -41,8 +42,9 @@ tags: [branch, <project>]
 - Blocks: (none)
 ```
 
-5. Read `gameplan.md` to link branch to a phase if applicable
+6. Read `gameplan.md` to link branch to a phase if applicable
+7. If a task exists, link it: `/task start <id>`
 
 ## Naming
 
-Branch slug: replace `/` with `-`. Example: `feature/auth-flow` → `feature-auth-flow.md`
+Branch slug: replace `/` with `-`. Example: `feature/auth-flow` -> `feature-auth-flow.md`

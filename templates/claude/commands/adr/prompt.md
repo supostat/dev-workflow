@@ -9,7 +9,7 @@ Record a significant architectural or design decision in `.dev-vault/architectur
    - **Decision** — what was decided
    - **Alternatives** — what was considered and rejected
    - **Consequences** — trade-offs and implications
-2. Create `.dev-vault/architecture/<YYYY-MM-DD>-<slug>.md`:
+2. Use MCP tool `vault_record` with type "adr", or create `.dev-vault/architecture/<YYYY-MM-DD>-<slug>.md`:
 
 ```markdown
 ---
@@ -33,6 +33,7 @@ tags: [adr, <project>]
 ```
 
 3. Reference the ADR from related branch context if applicable
+4. Update `.dev-vault/knowledge.md` if the decision impacts development patterns
 
 ## When to use
 

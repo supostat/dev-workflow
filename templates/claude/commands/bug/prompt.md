@@ -10,7 +10,7 @@ Create a bug log in `.dev-vault/bugs/` for non-trivial bugs that were solved.
    - **Fix** — what was done to solve it
    - **Prevention** — how to avoid it in the future
    - **Severity** — critical / high / medium / low
-2. Create `.dev-vault/bugs/<YYYY-MM-DD>-<slug>.md`:
+2. Use MCP tool `vault_record` with type "bug", or create `.dev-vault/bugs/<YYYY-MM-DD>-<slug>.md`:
 
 ```markdown
 ---
@@ -33,7 +33,7 @@ tags: [bug, <project>]
 <how to ensure it doesn't happen again>
 ```
 
-3. If the bug revealed a pattern, update `.dev-vault/knowledge.md`
+3. If the bug revealed a pattern, use MCP tool `vault_knowledge` to append to knowledge.md
 
 ## When to use
 

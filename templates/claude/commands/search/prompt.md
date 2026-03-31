@@ -5,13 +5,14 @@ Search `.dev-vault/` for relevant information.
 ## Procedure
 
 1. Take the user's search query
-2. Search across all `.dev-vault/*.md` and `.dev-vault/**/*.md` files using Grep
+2. Use MCP tool `vault_search` with the query, or search across all `.dev-vault/**/*.md` files using Grep
 3. Present results grouped by file type:
    - **Knowledge** — matches in knowledge.md
    - **Gameplan** — matches in gameplan.md
    - **Branch contexts** — matches in branches/
    - **Daily logs** — matches in daily/
    - **Records** — matches in architecture/, bugs/, debt/
+   - **Tasks** — matches in tasks/
 4. Show relevant surrounding context (3-5 lines around each match)
 5. If no results found, suggest alternative search terms
 
@@ -26,8 +27,8 @@ Search `.dev-vault/` for relevant information.
 ### Branches
 - branches/feature-auth.md:15 — <matching line>
 
-### Daily Logs
-- daily/2026-03-30.md:8 — <matching line>
+### Tasks
+- tasks/task-001.md:3 — <matching line>
 
-Found 5 matches across 3 files.
+Found N matches across M files.
 ```
