@@ -5,6 +5,9 @@ import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
+import { IntelligenceStore } from "../intelligence/store.js";
+import { syncFromVault } from "../intelligence/sync.js";
+import { topN, formatRelevantContext } from "../intelligence/ranker.js";
 import type { HookOutput } from "../lib/types.js";
 
 async function run(): Promise<void> {
@@ -92,6 +95,22 @@ async function run(): Promise<void> {
       `Run: ${pausedRun.id}\n\n` +
       `> Resume with: dev-workflow resume`,
     );
+  }
+
+  const intelligenceStore = new IntelligenceStore(context.vaultPath);
+  syncFromVault(intelligenceStore, context.vaultPath);
+
+  const scoringContext = {
+    branch: context.branch,
+    taskTitle: currentTask?.title ?? null,
+    recentFiles: [],
+    query: null,
+  };
+
+  const ranked = topN(intelligenceStore.allNodes(), scoringContext, 15);
+  const relevantContext = formatRelevantContext(ranked);
+  if (relevantContext) {
+    sections.push("\n" + relevantContext);
   }
 
   output({

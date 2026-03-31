@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { writeFileSafe } from "../lib/fs-helpers.js";
+import { IntelligenceStore } from "../intelligence/store.js";
+import { Collector } from "../intelligence/collector.js";
 import type { HookOutput } from "../lib/types.js";
 
 function run(): void {
@@ -35,6 +37,11 @@ function run(): void {
   }
 
   writeFileSafe(editLogPath, JSON.stringify(editLog, null, 2));
+
+  const intelligenceStore = new IntelligenceStore(context.vaultPath);
+  const collector = new Collector(intelligenceStore);
+  collector.recordFileEdit(filePath);
+  intelligenceStore.save();
 
   output({ status: "ok", message: `Tracked: ${filePath} (${editLog.length} files this session)` });
 }
