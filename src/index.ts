@@ -14,6 +14,9 @@ export { WorkflowEngine } from "./workflow/engine.js";
 export type { StepExecutor, GateChecker, WorkflowResolver } from "./workflow/engine.js";
 export { WorkflowState } from "./workflow/state.js";
 export { getBuiltinWorkflows, getBuiltinWorkflow } from "./workflow/builtin.js";
+export { McpServer } from "./mcp/server.js";
+export { ToolHandlers } from "./mcp/handlers.js";
+export { getToolDefinitions } from "./mcp/tools.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
