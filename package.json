@@ -1,9 +1,10 @@
 {
-  "name": "dev-vault",
+  "name": "dev-workflow",
   "version": "0.1.0",
-  "description": "Self-managing knowledge base for multi-project development with Claude Code",
+  "description": "Development workflow engine with agents and vault for Claude Code",
   "type": "module",
   "bin": {
+    "dev-workflow": "./dist/cli/index.js",
     "dev-vault": "./dist/cli/index.js"
   },
   "main": "./dist/index.js",
