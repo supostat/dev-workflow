@@ -23,7 +23,7 @@ function writeIfMissing(filepath: string, content: string, force: boolean): bool
 
 function buildSettingsJson(): string {
   // Resolve the path to hooks relative to project
-  // When installed as dependency: node_modules/dev-vault/dist/hooks/
+  // When installed as dependency: node_modules/dev-workflow/dist/hooks/
   // When linked: direct path
   const hookBase = "node_modules/dev-workflow/dist/hooks";
   const statuslinePath = "node_modules/dev-workflow/dist/lib/statusline.js";
@@ -86,7 +86,7 @@ export function init(options: InitOptions): void {
   }
 
   const projectRoot = context.projectRoot;
-  console.log(`Initializing dev-vault in ${context.projectName}...`);
+  console.log(`Initializing dev-workflow in ${context.projectName}...`);
 
   // 1. Create .claude/settings.json
   writeIfMissing(
@@ -149,7 +149,7 @@ function ensureGitignoreEntries(projectRoot: string): void {
   const missing = entries.filter((entry) => !content.includes(entry));
   if (missing.length === 0) return;
 
-  const addition = "\n# dev-vault (auto-generated session data)\n" + missing.join("\n") + "\n";
+  const addition = "\n# dev-workflow (auto-generated session data)\n" + missing.join("\n") + "\n";
   writeFileSync(gitignorePath, content.trimEnd() + "\n" + addition, "utf-8");
   console.log(`  update .gitignore`);
 }

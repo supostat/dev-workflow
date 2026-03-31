@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node node_modules/dev-vault/dist/hooks/session-start.js",
+            "command": "node node_modules/dev-workflow/dist/hooks/session-start.js",
             "timeout": 10000
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node node_modules/dev-vault/dist/hooks/session-end.js",
+            "command": "node node_modules/dev-workflow/dist/hooks/session-end.js",
             "timeout": 10000
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node node_modules/dev-vault/dist/hooks/pre-compact.js",
+            "command": "node node_modules/dev-workflow/dist/hooks/pre-compact.js",
             "timeout": 8000
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node node_modules/dev-vault/dist/hooks/pre-compact.js",
+            "command": "node node_modules/dev-workflow/dist/hooks/pre-compact.js",
             "timeout": 8000
           }
         ]
@@ -47,6 +47,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node node_modules/dev-vault/dist/lib/statusline.js"
+    "command": "node node_modules/dev-workflow/dist/lib/statusline.js"
   }
 }
