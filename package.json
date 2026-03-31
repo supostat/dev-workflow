@@ -29,10 +29,12 @@
   ],
   "keywords": [
     "claude-code",
-    "knowledge-base",
     "developer-tools",
-    "obsidian",
-    "vault"
+    "workflow",
+    "agents",
+    "mcp",
+    "vault",
+    "obsidian"
   ],
   "author": "Igor Pugachev",
   "license": "MIT",

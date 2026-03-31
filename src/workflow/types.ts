@@ -27,6 +27,7 @@ export interface StepState {
   output: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  durationMs: number | null;
   attempt: number;
 }
 

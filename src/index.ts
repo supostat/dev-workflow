@@ -24,5 +24,5 @@ export { getToolDefinitions } from "./mcp/tools.js";
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
 export type { AgentDefinition, PreparedAgent, AgentPermissions, VaultSection, GitOperation } from "./agents/types.js";
-export type { Task, TaskStatus, TaskFilter } from "./tasks/types.js";
+export type { Task, TaskStatus, TaskPriority, TaskFilter } from "./tasks/types.js";
 export type { WorkflowDefinition, WorkflowRun, StepDefinition, WorkflowStatus, StepState, GateType } from "./workflow/types.js";

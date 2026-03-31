@@ -90,13 +90,17 @@ export async function run(args: string[]): Promise<void> {
   try {
     workflow = getBuiltinWorkflow(workflowName);
   } catch {
-    const custom = loadCustomWorkflows(context.vaultPath);
+    const custom = [
+      ...loadCustomWorkflows(context.vaultPath),
+      ...loadCustomWorkflows(join(PACKAGE_ROOT, "templates")),
+    ];
     workflow = custom.find((w) => w.name === workflowName);
     if (!workflow) {
+      const customNames = custom.map((w) => w.name);
       console.error(`Unknown workflow: ${workflowName}`);
       console.error("Builtin: dev, hotfix, review, test");
-      if (custom.length > 0) {
-        console.error(`Custom: ${custom.map((w) => w.name).join(", ")}`);
+      if (customNames.length > 0) {
+        console.error(`Custom: ${customNames.join(", ")}`);
       }
       process.exitCode = 1;
       return;

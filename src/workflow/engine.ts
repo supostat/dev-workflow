@@ -24,6 +24,11 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
+function computeDurationMs(startedAt: string | null): number | null {
+  if (!startedAt) return null;
+  return Date.now() - new Date(startedAt).getTime();
+}
+
 export class WorkflowEngine {
   private readonly registry: AgentRegistry;
   private readonly contextBuilder: AgentContextBuilder;
@@ -65,6 +70,7 @@ export class WorkflowEngine {
         output: null,
         startedAt: null,
         completedAt: null,
+        durationMs: null,
         attempt: 0,
       };
     }
@@ -170,6 +176,7 @@ export class WorkflowEngine {
         stepState.status = "completed";
         stepState.output = output;
         stepState.completedAt = nowISO();
+        stepState.durationMs = computeDurationMs(stepState.startedAt);
 
         const nextStep = this.getNextStep(workflow, run.currentStep);
         if (nextStep) {

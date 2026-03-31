@@ -22,7 +22,7 @@ function printHelp(): void {
 dev-workflow — Development workflow engine with agents for Claude Code
 
 Usage:
-  dev-workflow init [--force]            Initialize vault in current project
+  dev-workflow init [--force] [--detect]  Initialize vault (--detect re-scans stack)
   dev-workflow status                    Show vault and workflow status
   dev-workflow run <workflow> "task"     Run a development workflow
   dev-workflow resume [--run <id>]       Resume paused workflow
@@ -40,7 +40,7 @@ Agents:    reader, planner, coder, reviewer, tester, committer
 
 switch (command) {
   case "init":
-    init({ force: args.includes("--force") });
+    init({ force: args.includes("--force"), detectOnly: args.includes("--detect") });
     break;
   case "status":
     status();

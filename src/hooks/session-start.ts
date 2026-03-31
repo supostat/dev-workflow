@@ -7,7 +7,7 @@ import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
 import type { HookOutput } from "../lib/types.js";
 
-function run(): void {
+async function run(): Promise<void> {
   const context = detectContext();
   if (!context) {
     output({ status: "ok", message: "Not a git repository, skipping vault resume." });
@@ -48,6 +48,18 @@ function run(): void {
       `Status: ${vaultData.branch.status}\n\n` +
       truncate(vaultData.branch.raw, 2000),
     );
+  } else if (context.branch !== context.parentBranch) {
+    const { VaultWriter } = await import("../lib/writer.js");
+    const { renderTemplate } = await import("../lib/templates.js");
+    const writer = new VaultWriter(context);
+    const branchContent = renderTemplate("records/branch", {
+      projectName: context.projectName,
+      branch: context.branch,
+      parent: context.parentBranch,
+      goal: "",
+    });
+    writer.writeBranch(context.branch, branchContent);
+    sections.push(`\n## Branch Context: ${context.branch}\n> Auto-created. Fill in the goal.`);
   }
 
   if (vaultData.recentDailyLogs.length > 0) {
@@ -98,4 +110,6 @@ function output(result: HookOutput): void {
   process.stdout.write(JSON.stringify(result));
 }
 
-run();
+run().catch(() => {
+  process.stdout.write(JSON.stringify({ status: "error", message: "Session start hook failed" }));
+});

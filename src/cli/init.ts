@@ -10,6 +10,7 @@ const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 interface InitOptions {
   force: boolean;
+  detectOnly?: boolean;
 }
 
 function writeIfMissing(filepath: string, content: string, force: boolean): boolean {
@@ -88,6 +89,13 @@ export function init(options: InitOptions): void {
   }
 
   const projectRoot = context.projectRoot;
+
+  if (options.detectOnly) {
+    console.log(`Re-detecting stack and conventions for ${context.projectName}...`);
+    runAutoDetect(context.projectName, context.vaultPath, projectRoot, true);
+    return;
+  }
+
   console.log(`Initializing dev-workflow in ${context.projectName}...`);
 
   // 1. Create .claude/settings.json
@@ -129,32 +137,35 @@ export function init(options: InitOptions): void {
   writer.scaffold();
   console.log(`  create .dev-vault/`);
 
-  // 6. Auto-detect stack
-  const stackPath = join(context.vaultPath, "stack.md");
-  const stack = detectStack(projectRoot);
-  const stackHasContent = stack.languages.length > 0 || stack.frameworks.length > 0;
-  if (stackHasContent && (!existsSync(stackPath) || options.force)) {
-    writeFileSync(stackPath, renderStackMarkdown(context.projectName, stack), "utf-8");
-    console.log(`  detect stack.md (${stack.languages.length + stack.frameworks.length} items)`);
-  }
+  // 6. Auto-detect stack and conventions
+  runAutoDetect(context.projectName, context.vaultPath, projectRoot, options.force);
 
-  // 7. Auto-detect conventions
-  const conventionsPath = join(context.vaultPath, "conventions.md");
-  const conventions = detectConventions(projectRoot);
-  const conventionsHasContent = conventions.codeStyle.length > 0 || conventions.testing.length > 0;
-  if (conventionsHasContent && (!existsSync(conventionsPath) || options.force)) {
-    writeFileSync(conventionsPath, renderConventionsMarkdown(context.projectName, conventions), "utf-8");
-    console.log(`  detect conventions.md (${conventions.codeStyle.length + conventions.testing.length} items)`);
-  }
-
-  // 8. Update .gitignore
+  // 7. Update .gitignore
   ensureGitignoreEntries(projectRoot);
 
   console.log(`\nDone! Vault initialized for ${context.projectName}.`);
   console.log(`\nNext steps:`);
-  console.log(`  1. Review .dev-vault/stack.md${stackHasContent ? " (auto-detected)" : ""}`);
+  console.log(`  1. Review .dev-vault/stack.md`);
   console.log(`  2. Fill .dev-vault/gameplan.md with your roadmap`);
   console.log(`  3. Start a Claude Code session — context loads automatically`);
+}
+
+function runAutoDetect(projectName: string, vaultPath: string, projectRoot: string, force: boolean): void {
+  const stackPath = join(vaultPath, "stack.md");
+  const stack = detectStack(projectRoot);
+  const stackHasContent = stack.languages.length > 0 || stack.frameworks.length > 0;
+  if (stackHasContent && (!existsSync(stackPath) || force)) {
+    writeFileSync(stackPath, renderStackMarkdown(projectName, stack), "utf-8");
+    console.log(`  detect stack.md (${stack.languages.length + stack.frameworks.length} items)`);
+  }
+
+  const conventionsPath = join(vaultPath, "conventions.md");
+  const conventions = detectConventions(projectRoot);
+  const conventionsHasContent = conventions.codeStyle.length > 0 || conventions.testing.length > 0;
+  if (conventionsHasContent && (!existsSync(conventionsPath) || force)) {
+    writeFileSync(conventionsPath, renderConventionsMarkdown(projectName, conventions), "utf-8");
+    console.log(`  detect conventions.md (${conventions.codeStyle.length + conventions.testing.length} items)`);
+  }
 }
 
 function ensureGitignoreEntries(projectRoot: string): void {

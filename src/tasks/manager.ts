@@ -2,13 +2,15 @@ import { readdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter, serializeFrontmatter } from "../lib/frontmatter.js";
 import { readFileOrNull, writeFileSafe, todayDate } from "../lib/fs-helpers.js";
-import type { Task, TaskStatus, TaskFilter } from "./types.js";
+import type { Task, TaskStatus, TaskPriority, TaskFilter } from "./types.js";
 
 const VALID_STATUSES: ReadonlySet<string> = new Set([
   "pending", "in-progress", "review", "done", "blocked",
 ]);
 
-type TaskPatch = Partial<Pick<Task, "status" | "description" | "branch" | "workflowRun">>;
+const VALID_PRIORITIES: ReadonlySet<string> = new Set(["high", "medium", "low"]);
+
+type TaskPatch = Partial<Pick<Task, "status" | "priority" | "description" | "branch" | "workflowRun">>;
 
 const TASK_ID_PATTERN = /^task-\d{3,}$/;
 
@@ -32,11 +34,16 @@ function parseTaskFile(filepath: string): Task | null {
     ? fields["status"] as TaskStatus
     : "pending";
 
+  const priority = typeof fields["priority"] === "string" && VALID_PRIORITIES.has(fields["priority"])
+    ? fields["priority"] as TaskPriority
+    : "medium";
+
   return {
     id,
     title,
     description: body.trim(),
     status,
+    priority,
     branch: typeof fields["branch"] === "string" ? fields["branch"] : null,
     workflowRun: typeof fields["workflowRun"] === "string" ? fields["workflowRun"] : null,
     created: typeof fields["created"] === "string" ? fields["created"] : todayDate(),
@@ -49,6 +56,7 @@ function serializeTask(task: Task): string {
     id: task.id,
     title: task.title,
     status: task.status,
+    priority: task.priority,
     created: task.created,
     updated: task.updated,
   };
@@ -75,6 +83,7 @@ export class TaskManager {
       title,
       description,
       status: "pending",
+      priority: "medium",
       branch: null,
       workflowRun: null,
       created: today,
@@ -107,6 +116,7 @@ export class TaskManager {
       if (!task) continue;
 
       if (filter?.status && task.status !== filter.status) continue;
+      if (filter?.priority && task.priority !== filter.priority) continue;
       if (filter?.branch && task.branch !== filter.branch) continue;
 
       tasks.push(task);
@@ -120,6 +130,7 @@ export class TaskManager {
     const task = this.get(id);
 
     if (patch.status !== undefined) task.status = patch.status;
+    if (patch.priority !== undefined) task.priority = patch.priority;
     if (patch.description !== undefined) task.description = patch.description;
     if (patch.branch !== undefined) task.branch = patch.branch;
     if (patch.workflowRun !== undefined) task.workflowRun = patch.workflowRun;
