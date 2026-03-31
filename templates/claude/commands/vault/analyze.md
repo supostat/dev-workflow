@@ -30,6 +30,10 @@ Output:
 
 ## Step 3: Analyze code (5-10 representative files)
 
+**IMPORTANT:** Use a single Agent (subagent_type: Explore) to read all files at once.
+Do NOT read files one by one — this creates too many tool calls in the UI.
+Spawn one agent with the list of files to read and patterns to extract.
+
 Pick diverse areas: entry points, core modules, tests, configs.
 
 Extract: File Structure, Naming, Code Style, Patterns, Testing conventions.
