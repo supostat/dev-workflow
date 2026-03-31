@@ -1,12 +1,13 @@
-# /handover — Save session context
+# /handover — Save detailed session context
 
 Capture the current session's work into `.dev-vault/` for future sessions.
 
 ## Procedure
 
 1. Run `git branch --show-current` and `git diff --stat` to understand current state
-2. Review what was done in this session (from conversation context)
-3. Create/update `.dev-vault/daily/<YYYY-MM-DD>.md`:
+2. Check workflow status via MCP tool `workflow_status` or `dev-workflow status`
+3. Review what was done in this session (from conversation context)
+4. Create/update `.dev-vault/daily/<YYYY-MM-DD>.md`:
 
 ```markdown
 ---
@@ -31,21 +32,30 @@ tags: [session-log]
 
 ## Next Steps
 - <what to do in the next session>
+
+## Workflow Status
+- <current workflow state if any, paused step, pending actions>
+
+## Task Status
+- <linked tasks and their current status>
 ```
 
-4. Update `.dev-vault/branches/<branch-slug>.md`:
+5. Update `.dev-vault/branches/<branch-slug>.md`:
    - Mark completed tasks with `[x]`
    - Add new decisions and findings
    - Update open questions
-5. Update `.dev-vault/knowledge.md` if session produced lasting insights:
+6. Update `.dev-vault/knowledge.md` if session produced lasting insights:
    - New gotchas or patterns
    - Architecture decisions
    - Important findings about dependencies
-6. Check if any records should be created:
+   Use MCP tool `vault_knowledge` to append to specific sections.
+7. Check if any records should be created:
    - Non-trivial bug fixed → `/bug`
    - Architecture decision made → `/adr`
    - Tech debt discovered → `/debt`
-7. Commit vault changes: `git add .dev-vault/ && git commit -m "session: <brief description>"`
+8. Update task status if applicable:
+   - Use MCP tool `task_update` to set status
+9. Commit vault changes: `git add .dev-vault/ && git commit -m "session: <brief description>"`
 
 ## Rules
 

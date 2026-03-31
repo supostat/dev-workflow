@@ -1,10 +1,10 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type { TaskManager } from "./manager.js";
 import type { Task } from "./types.js";
 
-function git(command: string, cwd: string): string {
+function git(args: string[], cwd: string): string {
   try {
-    return execSync(`git ${command}`, { cwd, encoding: "utf-8" }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
   } catch {
     return "";
   }
@@ -29,7 +29,7 @@ export class TaskTracker {
   }
 
   currentTask(): Task | null {
-    const branch = git("branch --show-current", this.projectRoot);
+    const branch = git(["branch", "--show-current"], this.projectRoot);
     if (!branch) return null;
     return this.findByBranch(branch);
   }

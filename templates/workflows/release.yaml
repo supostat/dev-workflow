@@ -1,0 +1,26 @@
+name: release
+description: Full release cycle with review and approval gates
+steps:
+  - name: read
+    agent: reader
+    gate: none
+  - name: review
+    agent: reviewer
+    input: [read.output]
+    gate: review-pass
+    onFail: null
+    maxAttempts: 1
+  - name: test
+    agent: tester
+    input: [read.output]
+    gate: tests-pass
+    onFail: null
+    maxAttempts: 1
+  - name: approve
+    agent: planner
+    input: [review.output, test.output]
+    gate: user-approve
+  - name: commit
+    agent: committer
+    input: [review.output, test.output]
+    gate: none

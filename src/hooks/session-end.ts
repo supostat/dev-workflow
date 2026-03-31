@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { VaultWriter } from "../lib/writer.js";
 import { WorkflowState } from "../workflow/state.js";
 import type { HookOutput } from "../lib/types.js";
 
-function git(command: string, cwd: string): string {
+function git(args: string[], cwd: string): string {
   try {
-    return execSync(`git ${command}`, { cwd, encoding: "utf-8" }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
   } catch {
     return "";
   }
@@ -47,12 +47,12 @@ function run(): void {
     `> Session auto-saved. Use /handover for detailed session notes.`,
   ];
 
-  const diffStat = git("diff --stat HEAD", context.projectRoot);
+  const diffStat = git(["diff", "--stat", "HEAD"], context.projectRoot);
   if (diffStat) {
     markerLines.push("", "## Changes", "```", diffStat, "```");
   }
 
-  const statusShort = git("status -s", context.projectRoot);
+  const statusShort = git(["status", "-s"], context.projectRoot);
   if (statusShort) {
     markerLines.push("", "## Uncommitted", "```", statusShort, "```");
   }

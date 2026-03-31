@@ -1,0 +1,21 @@
+name: deploy
+description: Build, test, and prepare deployment
+steps:
+  - name: read
+    agent: reader
+    gate: none
+  - name: test
+    agent: tester
+    gate: tests-pass
+    onFail: null
+    maxAttempts: 1
+  - name: review
+    agent: reviewer
+    input: [test.output]
+    gate: review-pass
+    onFail: null
+    maxAttempts: 1
+  - name: commit
+    agent: committer
+    input: [test.output, review.output]
+    gate: user-approve

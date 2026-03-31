@@ -1,13 +1,13 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { ProjectContext } from "./types.js";
 
 const VAULT_DIR = ".dev-vault";
 
-function git(command: string, cwd: string): string {
+function git(args: string[], cwd: string): string {
   try {
-    return execSync(`git ${command}`, { cwd, encoding: "utf-8" }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
   } catch {
     return "";
   }
@@ -26,7 +26,7 @@ function resolveProjectRoot(startDir: string): string | null {
 }
 
 function resolveProjectName(projectRoot: string): string {
-  const remote = git("remote get-url origin", projectRoot);
+  const remote = git(["remote", "get-url", "origin"], projectRoot);
   if (remote) {
     const match = remote.match(/\/([^/]+?)(?:\.git)?$/);
     if (match?.[1]) return match[1];
@@ -36,10 +36,10 @@ function resolveProjectName(projectRoot: string): string {
 }
 
 function resolveParentBranch(projectRoot: string): string {
-  const mainExists = git("rev-parse --verify main", projectRoot);
+  const mainExists = git(["rev-parse", "--verify", "main"], projectRoot);
   if (mainExists) return "main";
 
-  const masterExists = git("rev-parse --verify master", projectRoot);
+  const masterExists = git(["rev-parse", "--verify", "master"], projectRoot);
   if (masterExists) return "master";
 
   return "main";
@@ -49,8 +49,8 @@ export function detectContext(cwd: string = process.cwd()): ProjectContext | nul
   const projectRoot = resolveProjectRoot(cwd);
   if (!projectRoot) return null;
 
-  const branch = git("branch --show-current", projectRoot) || "main";
-  const remote = git("remote get-url origin", projectRoot) || null;
+  const branch = git(["branch", "--show-current"], projectRoot) || "main";
+  const remote = git(["remote", "get-url", "origin"], projectRoot) || null;
 
   return {
     projectName: resolveProjectName(projectRoot),

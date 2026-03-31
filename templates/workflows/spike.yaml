@@ -1,0 +1,14 @@
+name: spike
+description: Quick research and prototyping without review or commit
+steps:
+  - name: read
+    agent: reader
+    gate: none
+  - name: plan
+    agent: architect
+    input: [read.output]
+    gate: user-approve
+  - name: code
+    agent: coder
+    input: [read.output, plan.output]
+    gate: none

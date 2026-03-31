@@ -10,6 +10,21 @@ import type { TaskManager } from "../tasks/manager.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
 
+function requireString(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  if (typeof value !== "string" || value === "") {
+    throw new Error(`Missing required parameter: ${key}`);
+  }
+  return value;
+}
+
+function optionalString(params: Record<string, unknown>, key: string): string | undefined {
+  const value = params[key];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return undefined;
+  return value;
+}
+
 interface SearchMatch {
   file: string;
   line: number;
@@ -83,47 +98,47 @@ export class ToolHandlers {
   async handle(toolName: string, params: Record<string, unknown>): Promise<unknown> {
     switch (toolName) {
       case "vault_read":
-        return this.vaultRead(params["section"] as string);
+        return this.vaultRead(requireString(params, "section"));
 
       case "vault_search":
-        return this.vaultSearch(params["query"] as string);
+        return this.vaultSearch(requireString(params, "query"));
 
       case "vault_record":
         return this.vaultRecord(
-          params["type"] as string,
-          params["title"] as string,
-          params["content"] as string,
+          requireString(params, "type"),
+          requireString(params, "title"),
+          requireString(params, "content"),
         );
 
       case "vault_knowledge":
         return this.vaultKnowledge(
-          params["section"] as string,
-          params["content"] as string,
+          requireString(params, "section"),
+          requireString(params, "content"),
         );
 
       case "workflow_run":
         return { message: "Use 'dev-workflow run <workflow> \"task\"' from CLI to execute workflows." };
 
       case "workflow_status":
-        return this.workflowStatus(params["runId"] as string | undefined);
+        return this.workflowStatus(optionalString(params, "runId"));
 
       case "workflow_resume":
         return { message: "Use 'dev-workflow resume' from CLI to resume paused workflows." };
 
       case "task_create":
         return this.taskCreate(
-          params["title"] as string,
-          params["description"] as string | undefined,
+          requireString(params, "title"),
+          optionalString(params, "description"),
         );
 
       case "task_list":
-        return this.taskList(params["status"] as string | undefined);
+        return this.taskList(optionalString(params, "status"));
 
       case "task_update":
         return this.taskUpdate(
-          params["id"] as string,
-          params["status"] as string | undefined,
-          params["description"] as string | undefined,
+          requireString(params, "id"),
+          optionalString(params, "status"),
+          optionalString(params, "description"),
         );
 
       case "agent_list":
@@ -131,8 +146,8 @@ export class ToolHandlers {
 
       case "agent_run":
         return this.agentRun(
-          params["agent"] as string,
-          params["task"] as string,
+          requireString(params, "agent"),
+          requireString(params, "task"),
         );
 
       default:
