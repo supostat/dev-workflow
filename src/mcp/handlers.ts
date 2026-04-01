@@ -12,6 +12,7 @@ import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { topN } from "../intelligence/ranker.js";
+import { syncFromVault } from "../intelligence/sync.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -201,6 +202,10 @@ export class ToolHandlers {
 
   private vaultKnowledge(section: string, content: string): { success: boolean } {
     this.vaultWriter.appendKnowledge(section, content);
+
+    syncFromVault(this.intelligenceStore, this.context.vaultPath);
+    this.intelligenceStore.save();
+
     return { success: true };
   }
 

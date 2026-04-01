@@ -26,6 +26,42 @@ function writeIfMissing(filepath: string, content: string, force: boolean): bool
   return true;
 }
 
+function mergeSettingsJson(filepath: string, newSettings: Record<string, unknown>): void {
+  let existing: Record<string, unknown> = {};
+  if (existsSync(filepath)) {
+    try {
+      existing = JSON.parse(readFileSync(filepath, "utf-8")) as Record<string, unknown>;
+    } catch {
+      existing = {};
+    }
+  }
+
+  const existingHooks = (existing["hooks"] ?? {}) as Record<string, unknown>;
+  const newHooks = (newSettings["hooks"] ?? {}) as Record<string, unknown>;
+  const mergedHooks = { ...existingHooks, ...newHooks };
+
+  const existingPerms = (existing["permissions"] ?? {}) as Record<string, unknown>;
+  const newPerms = (newSettings["permissions"] ?? {}) as Record<string, unknown>;
+  const existingAllow = (existingPerms["allow"] ?? []) as string[];
+  const newAllow = (newPerms["allow"] ?? []) as string[];
+  const existingDeny = (existingPerms["deny"] ?? []) as string[];
+  const newDeny = (newPerms["deny"] ?? []) as string[];
+  const mergedPerms = {
+    allow: [...new Set([...existingAllow, ...newAllow])],
+    deny: [...new Set([...existingDeny, ...newDeny])],
+  };
+
+  const merged = {
+    ...existing,
+    hooks: mergedHooks,
+    permissions: mergedPerms,
+    statusLine: newSettings["statusLine"],
+  };
+
+  mkdirSync(dirname(filepath), { recursive: true });
+  writeFileSync(filepath, JSON.stringify(merged, null, 2), "utf-8");
+}
+
 function buildSettingsJson(): string {
   // Resolve paths from the actual package location (works for npm link, global, and local installs)
   const distDir = join(PACKAGE_ROOT, "dist");
@@ -145,12 +181,11 @@ export function init(options: InitOptions): void {
     console.log(keyValue("\u2713 CLAUDE.md", "project instructions for Claude Code"));
   }
 
-  // 1. Create .claude/settings.json (hooks + statusLine)
-  writeIfMissing(
-    join(projectRoot, ".claude", "settings.json"),
-    buildSettingsJson(),
-    options.force,
-  );
+  // 1. Merge .claude/settings.json (hooks + permissions + statusLine)
+  const settingsPath = join(projectRoot, ".claude", "settings.json");
+  const newSettings = JSON.parse(buildSettingsJson()) as Record<string, unknown>;
+  mergeSettingsJson(settingsPath, newSettings);
+  console.log(`  merge ${settingsPath}`);
 
   // 1b. Create .mcp.json (MCP server — Claude Code reads this for MCP discovery)
   const mcpEntryPath = join(PACKAGE_ROOT, "dist", "cli", "index.js");

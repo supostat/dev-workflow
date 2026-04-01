@@ -21,6 +21,16 @@ function countCustomWorkflows(vaultPath: string): number {
   return readdirSync(workflowsDir).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml")).length;
 }
 
+const VALID_HOOK_EVENTS = new Set([
+  "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification",
+  "UserPromptSubmit", "SessionStart", "SessionEnd", "Stop", "StopFailure",
+  "SubagentStart", "SubagentStop", "PreCompact", "PostCompact",
+  "PermissionRequest", "PermissionDenied", "Setup", "TeammateIdle",
+  "TaskCreated", "TaskCompleted", "Elicitation", "ElicitationResult",
+  "ConfigChange", "WorktreeCreate", "WorktreeRemove",
+  "InstructionsLoaded", "CwdChanged", "FileChanged",
+]);
+
 export function doctor(fix: boolean = false): void {
   const context = detectContext();
   if (!context) {
@@ -34,6 +44,7 @@ export function doctor(fix: boolean = false): void {
   const issues: string[] = [];
   const reader = new VaultReader(context);
 
+  // Vault
   if (reader.exists()) {
     console.log(`  ${icon.success} Vault           .dev-vault/ exists`);
   } else {
@@ -43,6 +54,7 @@ export function doctor(fix: boolean = false): void {
     return;
   }
 
+  // Vault files
   const vaultFiles: Array<[string, string]> = [
     ["stack.md", "stack"],
     ["conventions.md", "conventions"],
@@ -64,6 +76,7 @@ export function doctor(fix: boolean = false): void {
     }
   }
 
+  // Agents
   const agentsDir = join(PACKAGE_ROOT, "templates", "agents");
   const customAgentsDir = join(context.vaultPath, "agents");
   try {
@@ -75,6 +88,7 @@ export function doctor(fix: boolean = false): void {
     issues.push("Agent loading failed — check templates/agents/");
   }
 
+  // Tasks
   const taskManager = new TaskManager(context.vaultPath);
   const tasks = taskManager.list();
   if (tasks.length > 0) {
@@ -88,18 +102,91 @@ export function doctor(fix: boolean = false): void {
     console.log(`  Tasks:         none`);
   }
 
+  // Workflows
   const builtinCount = getBuiltinWorkflows().length;
   const customCount = countCustomWorkflows(context.vaultPath);
   console.log(`  Workflows:     ${builtinCount} builtin${customCount > 0 ? ` + ${customCount} custom` : ""}`);
 
+  // CLAUDE.md
+  const claudeMdPath = join(context.projectRoot, "CLAUDE.md");
+  if (existsSync(claudeMdPath)) {
+    console.log(`  ${icon.success} CLAUDE.md       exists`);
+  } else {
+    console.log(`  ${icon.warning} CLAUDE.md       MISSING`);
+    issues.push("CLAUDE.md not found — run 'dev-workflow init'");
+  }
+
+  // .mcp.json
+  const mcpJsonPath = join(context.projectRoot, ".mcp.json");
+  if (existsSync(mcpJsonPath)) {
+    try {
+      const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, "utf-8")) as Record<string, unknown>;
+      const servers = mcpConfig["mcpServers"] as Record<string, unknown> | undefined;
+      if (servers?.["dev-workflow"]) {
+        console.log(`  ${icon.success} .mcp.json       dev-workflow configured`);
+      } else {
+        console.log(`  ${icon.warning} .mcp.json       exists but dev-workflow missing`);
+        issues.push(".mcp.json exists but dev-workflow server not configured");
+      }
+    } catch {
+      console.log(`  ${icon.error} .mcp.json       invalid JSON`);
+      issues.push(".mcp.json is not valid JSON");
+    }
+  } else {
+    console.log(`  ${icon.error} .mcp.json       MISSING`);
+    issues.push(".mcp.json not found — run 'dev-workflow init'");
+  }
+
+  // settings.json + hooks validation
   const settingsPath = join(context.projectRoot, ".claude", "settings.json");
   if (existsSync(settingsPath)) {
-    const settings = readFileSync(settingsPath, "utf-8");
-    const hasMcp = settings.includes("dev-workflow");
-    console.log(`  MCP config:    .claude/settings.json${hasMcp ? " — configured" : " — missing MCP config"}`);
-    if (!hasMcp) issues.push("MCP server not configured in .claude/settings.json — re-run 'dev-workflow init --force'");
+    try {
+      const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
+      const hooks = settings["hooks"] as Record<string, unknown> | undefined;
+
+      if (hooks) {
+        const invalidEvents = Object.keys(hooks).filter((e) => !VALID_HOOK_EVENTS.has(e));
+        if (invalidEvents.length > 0) {
+          console.log(`  ${icon.error} Hooks           invalid events: ${invalidEvents.join(", ")}`);
+          issues.push(`Invalid hook events: ${invalidEvents.join(", ")} — valid: SessionStart, SessionEnd, PostToolUse, TaskCompleted, PreCompact`);
+        } else {
+          console.log(`  ${icon.success} Hooks           ${Object.keys(hooks).length} events configured`);
+        }
+
+        for (const [eventName, eventConfigs] of Object.entries(hooks)) {
+          const configs = eventConfigs as Array<{ hooks?: Array<{ command?: string }> }>;
+          for (const config of configs) {
+            for (const hook of config.hooks ?? []) {
+              if (hook.command) {
+                const nodePath = hook.command.replace(/^node\s+/, "").split(" ")[0]!;
+                if (!existsSync(nodePath)) {
+                  console.log(`  ${icon.error} Hook path       ${eventName}: file not found`);
+                  issues.push(`Hook ${eventName}: ${nodePath} does not exist — run 'dev-workflow init --force'`);
+                }
+              }
+            }
+          }
+        }
+      } else {
+        console.log(`  ${icon.warning} Hooks           none configured`);
+        issues.push("No hooks in settings.json — run 'dev-workflow init'");
+      }
+
+      const perms = settings["permissions"] as Record<string, unknown> | undefined;
+      if (perms) {
+        const allowCount = (perms["allow"] as string[] | undefined)?.length ?? 0;
+        const denyCount = (perms["deny"] as string[] | undefined)?.length ?? 0;
+        console.log(`  ${icon.success} Permissions     ${allowCount} allow, ${denyCount} deny`);
+      } else {
+        console.log(`  ${icon.warning} Permissions     none configured`);
+        issues.push("No permissions in settings.json — run 'dev-workflow init --force'");
+      }
+    } catch {
+      console.log(`  ${icon.error} Settings        invalid JSON`);
+      issues.push(".claude/settings.json is not valid JSON");
+    }
   } else {
-    console.log(`  MCP config:    .claude/settings.json MISSING`);
+    console.log(`  ${icon.error} Settings        .claude/settings.json MISSING`);
     issues.push("Settings not found — run 'dev-workflow init'");
   }
 
