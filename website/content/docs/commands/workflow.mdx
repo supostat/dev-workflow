@@ -86,6 +86,30 @@ Planner обязан включить в план:
 
 Зачем: resume при обрыве сессии, аудит план vs реализация, context recovery.
 
+## Архитектура: step-файлы
+
+Оркестратор (`dev.md`, 153 строки) не содержит инструкции для каждого шага.
+Перед каждым шагом он **читает step-файл** через Read tool — свежие сфокусированные инструкции.
+
+```
+.claude/commands/workflow/
+  dev.md               ← оркестратор (153 строк)
+  steps/
+    principles.md      ← engineering principles (inlined в plan, coder, review)
+    preflight.md       ← Step 0: baseline + phase task creation
+    read.md            ← Step 1: context gathering
+    plan.md            ← Step 2: architecture + pseudo-code
+    plan-review.md     ← Step 3: 9 criteria
+    coder.md           ← Step 4: test-first + fix mode
+    review.md          ← Step 5: 3 parallel reviewers
+    test.md            ← Step 7: build/lint/test gate
+    verify.md          ← Step 8: task compliance
+    commit.md          ← Step 9: interactive/autonomous
+    vault-updates.md   ← Step 9b: daily log, status
+```
+
+Зачем: один 960-строчный промпт терял инструкции из начала к середине. Step-файлы дают свежий контекст на каждом шаге.
+
 ## CODER: test-first
 
 1. Пишет тесты (из секции Tests плана)

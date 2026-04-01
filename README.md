@@ -31,6 +31,7 @@ dev-workflow gives it a **strict protocol**: every task goes through a 10-step p
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
 - **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore
 - **Plan persistence** — approved plans saved to vault for audit and session resume
+- **Modular prompts** — orchestrator (153 lines) + 11 step files read on demand
 
 ## Quick Start
 
