@@ -1,5 +1,10 @@
 # /vault:from-spec — Fill vault from project specification
 
+## Output language
+
+All user-facing output (phase headers, tables, questions, summaries) MUST be in Russian (ru-RU).
+Vault file content (stack.md, conventions.md, knowledge.md, gameplan.md) stays in English — it is machine-readable context for agents.
+
 Read SPEC.md (or provided file) and fill all vault sections through phased approval.
 For new projects where only a specification exists and the codebase is empty or minimal.
 

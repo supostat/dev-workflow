@@ -1,5 +1,10 @@
 # /workflow:dev — Multi-agent development cycle
 
+## Output language
+
+All user-facing output (display blocks, verdicts, summaries, questions) MUST be in Russian (ru-RU).
+Internal protocol blocks (CONTEXT, PLAN, CODE_DONE, REVIEW, VERIFY) stay in English — they are machine-readable and parsed by the orchestrator.
+
 Orchestrates agents in a 10-step quality pipeline:
 read → plan (with pseudo-code) → plan-review → coder ↔ review×3 (loop) → test → verify → commit.
 Each agent has strict permission boundaries. Context passes between agents as blocks.
