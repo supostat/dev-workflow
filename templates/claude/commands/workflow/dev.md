@@ -7,8 +7,19 @@ Steps 4-6 form an iterative CODER↔REVIEW loop (max 3 iterations).
 
 ## Arguments
 
-`/workflow:dev <task>` — task description as text.
+`/workflow:dev <task>` — interactive mode (default, asks before commit).
 `/workflow:dev <path>` — task from file (.md, .txt).
+`/workflow:dev <task> --auto-commit` — autonomous mode (commits automatically, for swarm use).
+
+### Commit mode
+
+| Mode | Flag | Commit | Gates on limit |
+|------|------|--------|---------------|
+| **Interactive** (default) | — | Ask user | Ask user |
+| **Autonomous** | `--auto-commit` | Auto-commit | Stop without commit |
+
+**Autonomous safety:** will NOT commit if any quality gate exhausts its retry limit.
+Better to leave changes uncommitted than commit broken code.
 
 ## Mode detection
 
@@ -311,7 +322,9 @@ END_PLAN_REVIEW
 - APPROVED → Step 4
 - NEEDS_REVISION → pass remarks to PLAN agent, re-run Step 2 with remarks.
 
-**Max revisions: 2.** After limit — accept plan with warnings and proceed to Step 4.
+**Max revisions: 2.** After limit:
+- **Interactive:** show warnings, ask user whether to proceed
+- **Autonomous:** accept plan with warnings, proceed to Step 4
 
 Display:
 
@@ -533,6 +546,7 @@ Then re-run REVIEW (Step 5).
 
 After limit:
 
+**Interactive:**
 ```
 ⚠️ Review iteration limit (3).
 
@@ -541,6 +555,12 @@ Remaining issues:
 
 1. Accept and commit
 2. Stop without commit
+```
+
+**Autonomous:** stop without commit. Report failure to orchestrator.
+```
+🛑 STOPPED: review limit reached with unresolved CRITICAL/HIGH issues.
+Changes left uncommitted.
 ```
 
 ### Step 7: TEST (mandatory gate)
@@ -568,6 +588,10 @@ Sending to CODER for fix...
 
 Pass error output to CODER as a fix iteration (same as REVIEW CHANGES_REQUESTED).
 After CODER fix → re-run TEST. **Max 3 TEST iterations.**
+
+After limit:
+- **Interactive:** show error, ask user whether to commit anyway or stop
+- **Autonomous:** stop without commit. Failing tests = no commit.
 
 **If all pass:**
 
@@ -616,7 +640,9 @@ END_VERIFY
 
 **COMPLETE** → Step 9.
 
-**INCOMPLETE** → pass missing items to CODER. **Max 2 iterations.** After limit → show gaps to user, proceed to commit.
+**INCOMPLETE** → pass missing items to CODER. **Max 2 iterations.** After limit:
+- **Interactive:** show gaps, ask user whether to commit partial or stop
+- **Autonomous:** stop without commit. Incomplete implementation = no commit.
 
 Display:
 
@@ -639,7 +665,9 @@ Files:
 [from CODE_DONE — file list]
 ```
 
-Stage changes and show to user:
+Stage changes and show diff.
+
+**Interactive mode (default):**
 
 ```
 ── COMMIT ──
@@ -656,6 +684,28 @@ Commit? (yes / no / edit message)
 **"no"** → cancel, changes remain staged
 **"edit"** → user edits, then commit
 
+**Autonomous mode (--auto-commit):**
+
+```
+── COMMIT (auto) ──
+
+[commit message]
+
+Staged:
+[abbreviated diff]
+
+✅ Auto-committed: [hash]
+```
+
+`git add` relevant files, `git commit` immediately. No user prompt.
+
+**Autonomous safety — will NOT auto-commit if any of these occurred:**
+- TEST failed and fix limit reached
+- VERIFY incomplete and fix limit reached
+- Any unresolved CRITICAL review issue
+
+In these cases the pipeline already stopped at the failing gate.
+
 ### Step 10: Summary
 
 ```
@@ -664,6 +714,7 @@ Commit? (yes / no / edit message)
 ═══════════════════════════════
 
 Task: [description]
+Mode: [interactive / autonomous]
 Scope: [small / large]
 
 Agents:
