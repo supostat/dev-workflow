@@ -647,6 +647,16 @@ Merge all 3 REVIEW blocks into one verdict:
 - Any CRITICAL or HIGH from ANY reviewer → **CHANGES_REQUESTED**
 - All PASS with only MEDIUM/LOW → **APPROVED**
 
+**Extract vault-worthy findings** from review blocks. Orchestrator writes directly:
+
+- **Gotchas** (non-obvious behaviour discovered) → append to `.dev-vault/knowledge.md` section "Gotchas"
+- **Architecture concerns** (dependency violation, layer leak) → append to `.dev-vault/knowledge.md` section "Architecture"
+- **New convention** (pattern reviewer noticed is repeated) → append to `.dev-vault/conventions.md` section "Patterns"
+
+Only extract findings that are useful for **future sessions** — not CRITICAL/HIGH bugs (those get fixed by coder), not LOW style nits. Focus on gotchas, patterns, and architecture insights.
+
+If no vault-worthy findings — skip. Do not create noise.
+
 Display:
 
 ```
@@ -861,6 +871,32 @@ Staged:
 - Any unresolved CRITICAL review issue
 
 In these cases the pipeline already stopped at the failing gate.
+
+### Step 9b: Vault updates (after commit)
+
+Orchestrator writes directly to vault after successful commit:
+
+**1. Daily log** — append to `.dev-vault/daily/<today>.md`:
+```
+> workflow:dev completed at HH:MM — "<task summary>"
+> Commit: <hash> | Files: <N> changed, <N> created | Tests: <N>
+> [If review findings:] Gotchas recorded in knowledge.md
+```
+
+**2. Phase status** (phase mode only) — update frontmatter in phase file:
+```yaml
+status: done  # was: pending
+```
+
+**3. Task status** (if task linked) — update task file:
+```yaml
+status: done  # was: in-progress
+```
+
+**4. Gameplan progress** (phase mode only) — check off completed items in `.dev-vault/gameplan.md`:
+```markdown
+- [x] <completed task>  # was: - [ ]
+```
 
 ### Step 10: Summary
 
