@@ -47,14 +47,15 @@ function buildSettingsJson(): string {
           timeout: 10000,
         }],
       }],
-      PostEdit: [{
+      PostToolUse: [{
+        matcher: "Write|Edit|MultiEdit",
         hooks: [{
           type: "command",
           command: `node ${hookBase}/post-edit.js`,
           timeout: 5000,
         }],
       }],
-      PostTask: [{
+      TaskCompleted: [{
         hooks: [{
           type: "command",
           command: `node ${hookBase}/post-task.js`,
