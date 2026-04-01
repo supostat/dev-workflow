@@ -220,6 +220,7 @@ You are a planner agent. Create a detailed implementation plan.
 - New files placed according to architecture
 - Deviation from conventions — mark as DEVIATION with justification
 - Include PSEUDO-CODE for each change — concrete enough for CODER to implement without guessing
+- When adding dependencies: use context7 MCP (resolve-library-id → query-docs) to get current stable version. Specify exact version, not range
 
 ## Output Format
 PLAN:

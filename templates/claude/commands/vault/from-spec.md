@@ -47,6 +47,8 @@ Extract from spec: languages, frameworks, databases, ORMs, testing tools, infras
 
 If spec is vague (e.g., "modern stack"), propose concrete choices with rationale.
 
+**Version check:** for each library/framework, use context7 MCP (`resolve-library-id` → `query-docs`) to verify the current stable version. Specify exact versions, not ranges. If spec mentions a version — verify it's not outdated.
+
 Show before writing:
 
 📚 **Phase 1/4 — stack.md**
