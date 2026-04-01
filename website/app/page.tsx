@@ -92,7 +92,7 @@ export default function HomePage() {
               </div>
               {i < PIPELINE_STEPS.length - 1 && (
                 <span className="text-fd-muted-foreground/30 font-mono hidden md:inline">
-                  &rarr;
+                  {"\u2192"}
                 </span>
               )}
             </div>
@@ -116,7 +116,7 @@ export default function HomePage() {
                 "Код не проверяется на соответствие задаче",
               ].map((item) => (
                 <li key={item} className="flex gap-3">
-                  <span className="text-red-500 shrink-0">&times;</span>
+                  <span className="text-red-500 shrink-0">{"\u00d7"}</span>
                   {item}
                 </li>
               ))}
@@ -135,7 +135,7 @@ export default function HomePage() {
                 "VERIFY сверяет результат с оригинальной задачей",
               ].map((item) => (
                 <li key={item} className="flex gap-3">
-                  <span className="text-green-500 shrink-0">&check;</span>
+                  <span className="text-green-500 shrink-0">{"\u2713"}</span>
                   {item}
                 </li>
               ))}
@@ -188,16 +188,16 @@ export default function HomePage() {
               </div>
               <div className="font-mono text-sm space-y-2">
                 <div>
-                  SPEC.md <span className="text-fd-muted-foreground">&rarr;</span>
+                  SPEC.md <span className="text-fd-muted-foreground">{"\u2192"}</span>
                 </div>
                 <div className="text-blue-400">/vault:from-spec</div>
                 <div>
                   vault filled{" "}
-                  <span className="text-fd-muted-foreground">&rarr;</span>
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>
                 </div>
                 <div className="text-blue-400">/workflow:dev phase-1.md</div>
                 <div>
-                  <span className="text-fd-muted-foreground">&rarr;</span>{" "}
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>{" "}
                   <span className="text-green-400">commit</span>
                 </div>
               </div>
@@ -210,13 +210,13 @@ export default function HomePage() {
                 <div className="text-blue-400">/vault:analyze</div>
                 <div>
                   vault filled{" "}
-                  <span className="text-fd-muted-foreground">&rarr;</span>
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>
                 </div>
                 <div className="text-blue-400">
-                  /workflow:dev &quot;задача&quot;
+                  /workflow:dev {'"'}задача{'"'}
                 </div>
                 <div>
-                  <span className="text-fd-muted-foreground">&rarr;</span>{" "}
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>{" "}
                   <span className="text-green-400">commit</span>
                 </div>
               </div>
@@ -228,14 +228,14 @@ export default function HomePage() {
               <div className="font-mono text-sm space-y-2">
                 <div>Orchestrator</div>
                 <div>
-                  <span className="text-fd-muted-foreground">&rarr;</span>{" "}
-                  Agent&times;N
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>{" "}
+                  Agent{"\u00d7"}N
                 </div>
                 <div className="text-blue-400">
                   /workflow:dev --auto-commit
                 </div>
                 <div>
-                  <span className="text-fd-muted-foreground">&rarr;</span>{" "}
+                  <span className="text-fd-muted-foreground">{"\u2192"}</span>{" "}
                   <span className="text-green-400">commits</span>
                 </div>
               </div>
@@ -273,7 +273,7 @@ export default function HomePage() {
           <div>
             /workflow:dev{" "}
             <span className="text-fd-muted-foreground">
-              &quot;моя задача&quot;
+              {'"'}моя задача{'"'}
             </span>
           </div>
         </div>
