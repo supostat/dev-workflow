@@ -72,6 +72,9 @@ function parseFlag(args: string[], flag: string): string | undefined {
 }
 
 export async function run(args: string[]): Promise<void> {
+  console.log("Note: CLI workflows output agent prompts but do not execute them.");
+  console.log("For full pipeline execution, use /workflow:dev in Claude Code.\n");
+
   const context = detectContext();
   if (!context) {
     console.error("Not a git repository.");

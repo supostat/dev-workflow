@@ -36,9 +36,19 @@ function mergeSettingsJson(filepath: string, newSettings: Record<string, unknown
     }
   }
 
-  const existingHooks = (existing["hooks"] ?? {}) as Record<string, unknown>;
-  const newHooks = (newSettings["hooks"] ?? {}) as Record<string, unknown>;
-  const mergedHooks = { ...existingHooks, ...newHooks };
+  const existingHooks = (existing["hooks"] ?? {}) as Record<string, unknown[]>;
+  const newHooks = (newSettings["hooks"] ?? {}) as Record<string, unknown[]>;
+  const mergedHooks = { ...existingHooks };
+  for (const [event, configs] of Object.entries(newHooks)) {
+    const existingConfigs = mergedHooks[event] ?? [];
+    const newCommands = new Set(
+      configs.map((c) => JSON.stringify((c as Record<string, unknown>)["hooks"] ?? c)),
+    );
+    const filtered = existingConfigs.filter(
+      (c) => !newCommands.has(JSON.stringify((c as Record<string, unknown>)["hooks"] ?? c)),
+    );
+    mergedHooks[event] = [...filtered, ...configs];
+  }
 
   const existingPerms = (existing["permissions"] ?? {}) as Record<string, unknown>;
   const newPerms = (newSettings["permissions"] ?? {}) as Record<string, unknown>;

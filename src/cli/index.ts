@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { init } from "./init.js";
 import { status } from "./status.js";
 import { run, resume, validate } from "./run.js";
@@ -88,6 +91,14 @@ switch (command) {
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);
+    break;
+  }
+  case "version":
+  case "--version":
+  case "-v": {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { name: string; version: string };
+    console.log(`${pkg.name}@${pkg.version}`);
     break;
   }
   case "help":
