@@ -31,8 +31,6 @@ function buildSettingsJson(): string {
   const distDir = join(PACKAGE_ROOT, "dist");
   const hookBase = join(distDir, "hooks");
   const statuslinePath = join(distDir, "lib", "statusline.js");
-  const mcpEntryPath = join(distDir, "cli", "index.js");
-
   return JSON.stringify({
     hooks: {
       SessionStart: [{
@@ -86,12 +84,6 @@ function buildSettingsJson(): string {
       type: "command",
       command: `node ${statuslinePath}`,
     },
-    mcpServers: {
-      "dev-workflow": {
-        command: "node",
-        args: [mcpEntryPath, "serve"],
-      },
-    },
   }, null, 2);
 }
 
@@ -119,10 +111,25 @@ export function init(options: InitOptions): void {
     console.log(keyValue("\u2713 CLAUDE.md", "project instructions for Claude Code"));
   }
 
-  // 1. Create .claude/settings.json
+  // 1. Create .claude/settings.json (hooks + statusLine)
   writeIfMissing(
     join(projectRoot, ".claude", "settings.json"),
     buildSettingsJson(),
+    options.force,
+  );
+
+  // 1b. Create .mcp.json (MCP server — Claude Code reads this for MCP discovery)
+  const mcpEntryPath = join(PACKAGE_ROOT, "dist", "cli", "index.js");
+  writeIfMissing(
+    join(projectRoot, ".mcp.json"),
+    JSON.stringify({
+      mcpServers: {
+        "dev-workflow": {
+          command: "node",
+          args: [mcpEntryPath, "serve"],
+        },
+      },
+    }, null, 2),
     options.force,
   );
 
