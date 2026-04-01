@@ -6,6 +6,7 @@ import { VaultWriter } from "../lib/writer.js";
 import { detectStack, renderStackMarkdown } from "../lib/stack-detect.js";
 import { detectConventions, renderConventionsMarkdown } from "../lib/conventions-detect.js";
 import { icon, section, keyValue } from "../lib/output.js";
+import { renderTemplate } from "../lib/templates.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -112,6 +113,12 @@ export function init(options: InitOptions): void {
   }
 
   console.log(`\n${icon.init} dev-workflow init \u2014 ${context.projectName}\n`);
+
+  // 0. Create CLAUDE.md
+  const claudeMdPath = join(projectRoot, "CLAUDE.md");
+  if (writeIfMissing(claudeMdPath, renderTemplate("project/claude-md", { projectName: context.projectName }), options.force)) {
+    console.log(keyValue("\u2713 CLAUDE.md", "project instructions for Claude Code"));
+  }
 
   // 1. Create .claude/settings.json
   writeIfMissing(

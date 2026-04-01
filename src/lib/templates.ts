@@ -161,6 +161,44 @@ tags: [debt, {{projectName}}]
 
 ## Risk If Ignored
 `,
+
+  "project/claude-md": `# {{projectName}}
+
+## Dev Workflow
+
+This project uses [dev-workflow](https://github.com/supostat/dev-workflow) for structured development with Claude Code.
+
+### Available Commands
+
+| Command | Description |
+|---------|------------|
+| \`/vault:from-spec\` | Fill vault from SPEC.md (new project) |
+| \`/vault:analyze\` | Fill vault from codebase (existing project) |
+| \`/workflow:dev "task"\` | Full 10-step pipeline: plan, code, review, test, verify, commit |
+| \`/session:resume\` | Restore session context |
+| \`/session:review\` | Multi-perspective code review |
+| \`/session:handover\` | Save session context |
+
+### Vault
+
+Project knowledge is stored in \`.dev-vault/\`:
+- \`stack.md\` — technology stack
+- \`conventions.md\` — code conventions
+- \`knowledge.md\` — architecture, gotchas, patterns
+- \`gameplan.md\` — roadmap and phases
+
+### Workflow
+
+1. Create task: \`dev-workflow task create "title"\`
+2. Start: \`dev-workflow task start <id>\`
+3. Implement: \`/workflow:dev "task description"\`
+4. Review: \`/session:review\`
+5. Handover: \`/session:handover\`
+
+## Project
+
+<!-- Add project-specific instructions below -->
+`,
 };
 
 export function renderTemplate(
