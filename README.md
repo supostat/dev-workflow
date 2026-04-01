@@ -26,9 +26,11 @@ dev-workflow gives it a **strict protocol**: every task goes through a 10-step p
 - **Intelligence** — pattern graph with scoring (recency, frequency, context match)
 - **Phase mode** — break large specs into phases, code each subtask separately
 - **Interactive & autonomous** — ask before commit (default) or auto-commit for swarm use
-- **13 MCP tools** — programmatic access to vault, tasks, intelligence
-- **5 hooks** — session-start/end, post-edit, post-task, pre-compact
+- **13 MCP tools** — programmatic access to vault, tasks, intelligence (via `.mcp.json`)
+- **5 hooks** — SessionStart, SessionEnd, PostToolUse, TaskCompleted, PreCompact
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
+- **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore
+- **Plan persistence** — approved plans saved to vault for audit and session resume
 
 ## Quick Start
 
@@ -127,9 +129,10 @@ Violation = immediate pipeline abort.
 ## CLI
 
 ```bash
-dev-workflow init [--force] [--detect]   # Initialize vault and hooks
+dev-workflow init [--force] [--detect]   # Initialize vault, hooks, CLAUDE.md, .mcp.json
+dev-workflow update                      # Update commands/agents from package
 dev-workflow status                      # Vault and workflow status
-dev-workflow doctor [--fix]              # Health check
+dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management
 dev-workflow agent list|show|run         # Agent management
 dev-workflow run dev|hotfix|review|test  # CLI workflows
