@@ -46,3 +46,22 @@ After each subtask complete:
 - Re-read `.dev-vault/conventions.md` (may have new patterns from review)
 - Re-read `.dev-vault/knowledge.md` (may have new gotchas from review)
 - Pass updated vault content to next subtask's CODER and REVIEW agents
+
+## 5. Suggest vault records
+
+If the pipeline produced notable findings, suggest (do not auto-create):
+
+- **Architecture decision made** (e.g., chose pattern, changed layer structure) → suggest `/vault:adr`
+- **Non-trivial bug fixed** (root cause worth remembering) → suggest `/vault:bug`
+- **Work deferred** (known issue left for later) → suggest `/vault:debt`
+
+Display:
+
+```
+Suggest vault records:
+  → /vault:adr — "<decision title>"
+  → /vault:bug — "<bug title>"
+  → /vault:debt — "<deferred work>"
+```
+
+Only suggest if there are actual findings. Do not suggest if pipeline was clean.

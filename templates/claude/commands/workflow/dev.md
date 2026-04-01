@@ -138,6 +138,15 @@ Agents:
   VERIFY          [Explore]      — [verdict]
   COMMIT          [git]          — [hash]
 
+[If review found gotchas:]     Gotchas → knowledge.md
+[If architecture concerns:]    Concerns → knowledge.md
+[If plan had deviations:]      Deviations noted
+
+Suggest vault records:
+  [If architecture decisions made:] → /vault:adr
+  [If non-trivial bugs fixed:]      → /vault:bug
+  [If work deferred:]               → /vault:debt
+
 ═══════════════════════════════
 ```
 
