@@ -417,18 +417,31 @@ END_PLAN_REVIEW
 
 **Result:**
 
-- APPROVED → Step 4
+- APPROVED → save plan, then Step 4
 - NEEDS_REVISION → pass remarks to PLAN agent, re-run Step 2 with remarks.
 
 **Max revisions: 2.** After limit:
 - **Interactive:** show warnings, ask user whether to proceed
 - **Autonomous:** accept plan with warnings, proceed to Step 4
 
+**Save approved PLAN to vault** (orchestrator writes directly after approval):
+
+- **Phase mode:** save next to phase file as `<phase-file>.plan.md`
+  - Example: `.dev-vault/phases/phase-1-foundation.plan.md`
+- **Normal mode:** save to `.dev-vault/plans/<date>-<slug>.md`
+  - Example: `.dev-vault/plans/2026-04-01-add-email-validation.plan.md`
+
+This persists the plan for:
+- Resume if session is interrupted between PLAN and COMMIT
+- Audit: compare what was planned vs what was implemented
+- Reference: CODER can re-read plan from file if context is lost
+
 Display:
 
 ```
 ── PLAN_REVIEW ──
 Verdict: ✅ APPROVED / ⚠️ NEEDS_REVISION
+[If approved:] Plan saved → <path>
 ```
 
 ### Step 4: CODER
