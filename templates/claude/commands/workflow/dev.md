@@ -152,6 +152,48 @@ TEST is not a subagent — orchestrator runs bash commands directly.
 
 These rules are law. The orchestrator MUST launch each agent with the correct subagent type.
 
+## Engineering principles (shared across all agents)
+
+Every agent in this pipeline receives these principles as baseline quality bar.
+Project-specific conventions (.dev-vault/conventions.md) override where they conflict.
+
+```
+PRINCIPLES:
+
+Architecture:
+- Single Responsibility: one module/file = one reason to change
+- Dependency Rule: inner layers never import from outer layers
+- Explicit dependencies: constructor/parameter injection, no hidden globals or singletons
+- Boundaries: validate and sanitize at system entry points, trust internal code
+
+Error handling:
+- Fail fast at boundaries, recover gracefully inside
+- Every error path must be tested
+- No silent swallowing: catch → handle or propagate, never empty catch
+- External calls (network, FS, DB) always have error handling and timeouts
+
+Production readiness:
+- No TODO/FIXME/HACK in committed code
+- No debug logging (console.log/print) — use structured logging
+- No hardcoded values that should be config or constants
+- Idempotent operations where possible
+
+Code structure:
+- Max 300 lines per file, max 30 lines per function
+- Extract when reused 2+ times OR > 5 lines of non-trivial logic
+- Composition over inheritance
+- No god objects, no utility dumps (helpers/, utils/, misc/)
+- Types and names replace comments — if code needs a comment, rename or extract
+
+Testing:
+- Test behaviour, not implementation details
+- One logical assertion per test
+- No shared mutable state between tests
+- Cover: happy path, edge cases (empty, null, boundary), error paths
+
+END_PRINCIPLES
+```
+
 ## Procedure
 
 ### Step 1: READ
@@ -225,6 +267,9 @@ You are a planner agent. Create a detailed implementation plan.
 ## Gameplan
 [.dev-vault/gameplan.md — current phase, or "Not defined"]
 
+## Engineering Principles
+[PRINCIPLES block from above]
+
 ## Rules
 - STRICTLY follow project conventions (naming, structure, error handling)
 - Each change tied to a specific file and location
@@ -237,6 +282,12 @@ You are a planner agent. Create a detailed implementation plan.
 PLAN:
 Summary: [what we're doing — 1-2 sentences]
 Scope: [small: 1-4 files / large: 5+ files]
+
+Architecture:
+  Layer: [domain / infrastructure / presentation / API]
+  Boundaries: [where this change sits, what calls it, what it calls]
+  Dependencies: [new dependencies with direction →, justify each]
+  Error boundaries: [external calls, user input, invariants]
 
 Changes:
 1. [file] — [what to change]
@@ -297,6 +348,9 @@ You are a plan reviewer. Check the plan for completeness, correctness, and risks
 ## Conventions
 [.dev-vault/conventions.md if exists]
 
+## Engineering Principles
+[PRINCIPLES block]
+
 ## Check criteria
 1. Completeness — all files accounted for? Missing dependencies?
 2. Conventions — matches project conventions?
@@ -304,6 +358,9 @@ You are a plan reviewer. Check the plan for completeness, correctness, and risks
 4. Tests — cover the changes?
 5. Deviations — justified?
 6. Risks — what could break? Edge cases?
+7. Architecture — correct layer? dependency direction inward? single responsibility?
+8. Production readiness — error handling for external calls? no TODOs? no hardcoded config?
+9. Simplicity — simpler approach that achieves the same? over-engineered?
 
 ## Output Format
 PLAN_REVIEW:
@@ -352,6 +409,9 @@ You are a coder agent. The ONLY agent allowed to modify files.
 ## Stack
 [.dev-vault/stack.md — summary]
 
+## Engineering Principles
+[PRINCIPLES block]
+
 ## Rules
 - Follow the plan. No changes outside the plan. Scope creep FORBIDDEN.
 - Follow project conventions: naming, error handling, file structure.
@@ -360,6 +420,17 @@ You are a coder agent. The ONLY agent allowed to modify files.
 - git commit/push FORBIDDEN.
 - git checkout/reset/rebase FORBIDDEN.
 - Allowed bash: build, test, lint commands only.
+
+## Production checklist (verify EVERY file before CODE_DONE)
+- [ ] Single responsibility: file/function does one thing
+- [ ] Error handling: every external call has error path with timeout
+- [ ] No TODO/FIXME/HACK in code
+- [ ] No console.log/print for debugging
+- [ ] No hardcoded values that should be config/constants
+- [ ] Types explicit (no `any`, no implicit `unknown`)
+- [ ] Edge cases handled: null, empty, boundary
+- [ ] File under 300 lines, functions under 30 lines
+- [ ] Names self-documenting: if you wrote a comment, rename or extract instead
 
 ## Output Format
 CODE_DONE:
@@ -435,9 +506,16 @@ Focus EXCLUSIVELY on code quality and conventions. Ignore security.
 ## Conventions
 [.dev-vault/conventions.md if exists]
 
+## Engineering Principles
+[PRINCIPLES block]
+
 ## Check (quality ONLY)
 - Plan adherence — everything implemented? Nothing extra?
 - Conventions — naming, error handling, structure per project
+- Architecture — single responsibility? correct layer? dependency direction inward?
+- God objects — does any file/class know too much or do too many things?
+- Abstractions — premature (interface with one impl)? missing (pattern repeated 3+ times)?
+- Production readiness — TODOs? debug logging? hardcoded config? missing timeouts?
 - Duplication — DRY violations
 - Complexity — unnecessary abstractions, over-engineering
 - Dead code — unused imports, unreachable branches
