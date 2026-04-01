@@ -210,7 +210,8 @@ export function init(options: InitOptions): void {
   console.log(keyValue(gameplanLines > 8 ? "\u2713 gameplan.md" : "\u25CB gameplan.md",
     gameplanLines > 8 ? `${gameplanLines} lines` : "empty \u2014 fill manually"));
 
-  ensureGitignoreEntries(projectRoot);
+  const detectedStack = detectStack(projectRoot);
+  ensureGitignoreEntries(projectRoot, detectedStack);
 
   console.log(`\n${icon.tip} Next: /vault:analyze for deep codebase analysis`);
 }
@@ -239,19 +240,69 @@ function runAutoDetect(projectName: string, vaultPath: string, projectRoot: stri
   }
 }
 
-function ensureGitignoreEntries(projectRoot: string): void {
+function ensureGitignoreEntries(projectRoot: string, stack: ReturnType<typeof detectStack>): void {
   const gitignorePath = join(projectRoot, ".gitignore");
-  const entries = [".dev-vault/daily/", ".dev-vault/branches/", ".dev-vault/.edit-log.json", ".dev-vault/.intelligence.json"];
+
+  const devWorkflowEntries = [
+    ".dev-vault/daily/",
+    ".dev-vault/branches/",
+    ".dev-vault/.edit-log.json",
+    ".dev-vault/.intelligence.json",
+  ];
+
+  const stackEntries: string[] = [];
+  const allLangs = stack.languages.map((l) => l.toLowerCase());
+  const allFrameworks = stack.frameworks.map((f) => f.toLowerCase());
+
+  const hasLang = (keyword: string) => allLangs.some((l) => l.includes(keyword));
+  const hasFramework = (keyword: string) => allFrameworks.some((f) => f.includes(keyword));
+
+  // Universal
+  stackEntries.push(".DS_Store", "*.swp", "*.swo", "*~", "coverage/", ".env", ".env.*");
+
+  // Node / TypeScript
+  if (hasLang("typescript") || hasLang("node") || existsSync(join(projectRoot, "package.json"))) {
+    stackEntries.push("node_modules/", "dist/", "*.tsbuildinfo", ".turbo/");
+  }
+
+  // Next.js
+  if (hasFramework("next")) {
+    stackEntries.push(".next/", "out/");
+  }
+
+  // Rust
+  if (hasLang("rust") || existsSync(join(projectRoot, "Cargo.toml"))) {
+    stackEntries.push("target/");
+  }
+
+  // Python
+  if (hasLang("python") || existsSync(join(projectRoot, "pyproject.toml")) || existsSync(join(projectRoot, "requirements.txt"))) {
+    stackEntries.push("__pycache__/", "*.pyc", ".venv/", "*.egg-info/");
+  }
+
+  // Go
+  if (hasLang("go")) {
+    stackEntries.push("bin/");
+  }
 
   let content = "";
   if (existsSync(gitignorePath)) {
     content = readFileSync(gitignorePath, "utf-8");
   }
 
-  const missing = entries.filter((entry) => !content.includes(entry));
-  if (missing.length === 0) return;
+  const missingDevWorkflow = devWorkflowEntries.filter((e) => !content.includes(e));
+  const missingStack = stackEntries.filter((e) => !content.includes(e));
 
-  const addition = "\n# dev-workflow (auto-generated session data)\n" + missing.join("\n") + "\n";
-  writeFileSync(gitignorePath, content.trimEnd() + "\n" + addition, "utf-8");
-  console.log(`  update .gitignore`);
+  const additions: string[] = [];
+  if (missingDevWorkflow.length > 0) {
+    additions.push("# dev-workflow (session data)", ...missingDevWorkflow);
+  }
+  if (missingStack.length > 0) {
+    additions.push("# dev-workflow (stack-detected)", ...missingStack);
+  }
+
+  if (additions.length === 0) return;
+
+  writeFileSync(gitignorePath, content.trimEnd() + "\n\n" + additions.join("\n") + "\n", "utf-8");
+  console.log(`  update .gitignore (+${missingDevWorkflow.length + missingStack.length} entries)`);
 }
