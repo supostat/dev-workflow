@@ -2,35 +2,36 @@
 
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
-import type { HookOutput } from "../lib/types.js";
 import { existsSync } from "node:fs";
+import { readStdin, hookSuccess } from "./stdin.js";
 
-function run(): void {
-  const context = detectContext();
+async function run(): Promise<void> {
+  const input = await readStdin();
+
+  const context = detectContext(input.cwd);
   if (!context) {
-    output({ status: "ok", message: "Skipping post-task." });
+    hookSuccess("Skipping post-task.");
     return;
   }
 
   if (!existsSync(context.vaultPath)) {
-    output({ status: "ok", message: "No vault." });
+    hookSuccess("No vault.");
     return;
   }
 
   const today = new Date().toISOString().slice(0, 10);
   const time = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const subject = input.task_subject ?? "unknown task";
 
   const writer = new VaultWriter(context);
   writer.writeDailyLog(
-    `> Task completed at ${time} on branch ${context.branch}`,
+    `> Task completed at ${time} on branch ${context.branch}: ${subject}`,
     today,
   );
 
-  output({ status: "ok", message: "Post-task recorded." });
+  hookSuccess("Post-task recorded.");
 }
 
-function output(result: HookOutput): void {
-  process.stdout.write(JSON.stringify(result));
-}
-
-run();
+run().catch(() => {
+  hookSuccess("Post-task hook failed silently.");
+});

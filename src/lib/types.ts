@@ -41,9 +41,3 @@ export interface InitOptions {
   projectRoot: string;
   force: boolean;
 }
-
-export interface HookOutput {
-  status: "ok" | "error";
-  message: string;
-  context?: VaultData;
-}

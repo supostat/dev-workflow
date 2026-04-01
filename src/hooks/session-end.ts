@@ -7,7 +7,7 @@ import { VaultWriter } from "../lib/writer.js";
 import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { Collector } from "../intelligence/collector.js";
-import type { HookOutput } from "../lib/types.js";
+import { readStdin, hookSuccess } from "./stdin.js";
 
 function git(args: string[], cwd: string): string {
   try {
@@ -17,16 +17,18 @@ function git(args: string[], cwd: string): string {
   }
 }
 
-function run(): void {
-  const context = detectContext();
+async function run(): Promise<void> {
+  const input = await readStdin();
+
+  const context = detectContext(input.cwd);
   if (!context) {
-    output({ status: "ok", message: "Not a git repository, skipping." });
+    hookSuccess("Not a git repository, skipping.");
     return;
   }
 
   const reader = new VaultReader(context);
   if (!reader.exists()) {
-    output({ status: "ok", message: "No vault found, skipping." });
+    hookSuccess("No vault found, skipping.");
     return;
   }
 
@@ -60,7 +62,7 @@ function run(): void {
   }
 
   const marker = markerLines.join("\n");
-  const dailyPath = writer.writeDailyLog(marker, today);
+  writer.writeDailyLog(marker, today);
 
   const intelligenceStore = new IntelligenceStore(context.vaultPath);
   const collector = new Collector(intelligenceStore);
@@ -80,14 +82,9 @@ function run(): void {
     workflowState.save(currentRun);
   }
 
-  output({
-    status: "ok",
-    message: `Session saved → ${dailyPath}`,
-  });
+  hookSuccess("Session saved.");
 }
 
-function output(result: HookOutput): void {
-  process.stdout.write(JSON.stringify(result));
-}
-
-run();
+run().catch(() => {
+  hookSuccess("Session end hook failed silently.");
+});

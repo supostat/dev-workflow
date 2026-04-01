@@ -8,18 +8,20 @@ import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { syncFromVault } from "../intelligence/sync.js";
 import { topN, formatRelevantContext } from "../intelligence/ranker.js";
-import type { HookOutput } from "../lib/types.js";
+import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
-  const context = detectContext();
+  const input = await readStdin();
+
+  const context = detectContext(input.cwd);
   if (!context) {
-    output({ status: "ok", message: "Not a git repository, skipping vault resume." });
+    hookSuccess("Not a git repository, skipping vault resume.");
     return;
   }
 
   const reader = new VaultReader(context);
   if (!reader.exists()) {
-    output({ status: "ok", message: `No .dev-vault/ found in ${context.projectName}. Run 'dev-workflow init' to set up.` });
+    hookSuccess(`No .dev-vault/ found in ${context.projectName}. Run 'dev-workflow init' to set up.`);
     return;
   }
 
@@ -113,11 +115,17 @@ async function run(): Promise<void> {
     sections.push("\n" + relevantContext);
   }
 
-  output({
-    status: "ok",
-    message: sections.join("\n"),
-    context: vaultData,
-  });
+  const message = sections.join("\n");
+
+  const output = {
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: message,
+    },
+  };
+
+  process.stdout.write(JSON.stringify(output));
 }
 
 function truncate(text: string, maxLength: number): string {
@@ -125,10 +133,6 @@ function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + "\n\n... (truncated)";
 }
 
-function output(result: HookOutput): void {
-  process.stdout.write(JSON.stringify(result));
-}
-
 run().catch(() => {
-  process.stdout.write(JSON.stringify({ status: "error", message: "Session start hook failed" }));
+  process.stdout.write(JSON.stringify({ continue: true }));
 });

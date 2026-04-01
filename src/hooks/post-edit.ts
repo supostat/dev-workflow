@@ -6,17 +6,19 @@ import { detectContext } from "../lib/context.js";
 import { writeFileSafe } from "../lib/fs-helpers.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { Collector } from "../intelligence/collector.js";
-import type { HookOutput } from "../lib/types.js";
+import { readStdin, hookSuccess } from "./stdin.js";
 
-function run(): void {
-  const context = detectContext();
+async function run(): Promise<void> {
+  const input = await readStdin();
+
+  const context = detectContext(input.cwd);
   if (!context) {
-    output({ status: "ok", message: "Skipping post-edit." });
+    hookSuccess("Skipping post-edit.");
     return;
   }
 
   if (!existsSync(context.vaultPath)) {
-    output({ status: "ok", message: "No vault." });
+    hookSuccess("No vault.");
     return;
   }
 
@@ -31,7 +33,7 @@ function run(): void {
     }
   }
 
-  const filePath = process.env["CLAUDE_FILE_PATH"] ?? "unknown";
+  const filePath = (input.tool_input?.["file_path"] as string) ?? "unknown";
   if (!editLog.includes(filePath)) {
     editLog.push(filePath);
   }
@@ -43,11 +45,9 @@ function run(): void {
   collector.recordFileEdit(filePath);
   intelligenceStore.save();
 
-  output({ status: "ok", message: `Tracked: ${filePath} (${editLog.length} files this session)` });
+  hookSuccess(`Tracked: ${filePath} (${editLog.length} files this session)`);
 }
 
-function output(result: HookOutput): void {
-  process.stdout.write(JSON.stringify(result));
-}
-
-run();
+run().catch(() => {
+  hookSuccess("Post-edit hook failed silently.");
+});
