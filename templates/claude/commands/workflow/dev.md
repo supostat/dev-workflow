@@ -1,6 +1,7 @@
 # /workflow:dev — Multi-agent development cycle
 
-Orchestrates 6 agents in an 8-step cycle: read → plan → plan-review → coder ↔ review (loop) → commit.
+Orchestrates agents in a 10-step quality pipeline:
+read → plan (with pseudo-code) → plan-review → coder ↔ review×3 (loop) → test → verify → commit.
 Each agent has strict permission boundaries. Context passes between agents as blocks.
 Steps 4-6 form an iterative CODER↔REVIEW loop (max 3 iterations).
 
@@ -23,7 +24,8 @@ Phase mode plans the entire phase, then codes each subtask separately for focuse
 ```
 READ (full phase) → PLAN (full phase, outputs subtasks) → PLAN_REVIEW
 → for each subtask:
-    CODER(subtask) → REVIEW(subtask) → fix loop
+    CODER(subtask) → REVIEW×3(subtask) → fix loop → TEST (all tests)
+→ VERIFY (full phase against spec)
 → COMMIT (all changes, one commit)
 → Summary
 ```
@@ -66,12 +68,16 @@ for each subtask in PLAN.Subtasks:
   - Accumulated context from previous subtasks (CODE_DONE blocks)
   - Vault context
   
-  REVIEW receives:
+  REVIEW×3 receives (parallel):
   - Current subtask from PLAN
   - CODE_DONE for this subtask
   - Vault context
   
   fix loop (max 3 iterations per subtask)
+  
+  TEST after each subtask:
+  - Run ALL tests (not just new ones) — catches regressions
+  - If fail → CODER fix → re-test
 ```
 
 **Step 7 (COMMIT) in phase mode** — one commit for the entire phase:
@@ -119,15 +125,19 @@ Steps below describe normal mode (single task). Phase mode follows the same agen
 ## Permission matrix (violation = ABORT)
 
 ```
-Agent          Read   Write   Bash           Subagent
-─────────────  ─────  ──────  ─────────────  ────────
-READ           ✅     ❌      ❌             Explore
-PLAN           ✅     ❌      ❌             Explore
-PLAN_REVIEW    ✅     ❌      ❌             Explore
-CODER          ✅     ✅      ✅ build/test  Full
-REVIEW         ✅     ❌      ❌             Explore
-COMMIT         ❌     ❌      ✅ git only    Full
+Agent          Read   Write   Bash              Subagent
+─────────────  ─────  ──────  ────────────────  ────────
+READ           ✅     ❌      ❌                Explore
+PLAN           ✅     ❌      ❌                Explore
+PLAN_REVIEW    ✅     ❌      ❌                Explore
+CODER          ✅     ✅      ✅ build/test     Full
+REVIEW×3       ✅     ❌      ❌                Explore
+TEST           ❌     ❌      ✅ build/test     Orchestrator (bash)
+VERIFY         ✅     ❌      ❌                Explore
+COMMIT         ❌     ❌      ✅ git only       Full
 ```
+
+TEST is not a subagent — orchestrator runs bash commands directly.
 
 These rules are law. The orchestrator MUST launch each agent with the correct subagent type.
 
@@ -209,6 +219,7 @@ You are a planner agent. Create a detailed implementation plan.
 - Each change tied to a specific file and location
 - New files placed according to architecture
 - Deviation from conventions — mark as DEVIATION with justification
+- Include PSEUDO-CODE for each change — concrete enough for CODER to implement without guessing
 
 ## Output Format
 PLAN:
@@ -217,13 +228,28 @@ Scope: [small: 1-4 files / large: 5+ files]
 
 Changes:
 1. [file] — [what to change]
-   - [specific change]
+   ```[language]
+   // after [anchor: function/line/class]
+   [pseudo-code or signature sketch]
+   ```
+
+2. [file] — [what to change]
+   ```[language]
+   // modify [function/block]
+   [pseudo-code showing the change]
+   ```
 
 New files:
 - [file] — [purpose]
+  ```[language]
+  [structure sketch: exports, key functions, types]
+  ```
 
 Tests:
-- [test file] — [what to test: happy path, edge cases, errors]
+- [test file] — [what to test]
+  - happy path: [scenario]
+  - edge case: [scenario]
+  - error: [scenario]
 
 Order:
 1. [file] — [why first]
@@ -341,53 +367,130 @@ Save CODE_DONE block. Display:
 Changed: [N], Created: [N], Tests: [N]
 ```
 
-### Step 5: REVIEW
+### Step 5: REVIEW (3 specialized reviewers in parallel)
 
-Launch Explore subagent:
+Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
+
+**REVIEW:security** — Explore subagent:
 
 ```
-You are a code reviewer. Check code quality. NEVER modify code — only report issues.
+You are a SECURITY reviewer. NEVER modify code — only report issues.
+Focus EXCLUSIVELY on security. Ignore style, naming, structure.
+
+## What coder did
+[CODE_DONE or CODE_FIX block]
+
+## Security guidelines
+[.dev-vault/knowledge.md — Security section, or OWASP Top 10 defaults]
+
+## Check (security ONLY)
+- Injection (SQL, command, path traversal)
+- XSS (unescaped user input)
+- Hardcoded secrets, API keys, credentials
+- Missing authentication/authorization
+- Insecure deserialization
+- Missing input validation at system boundaries
+- Timing attacks, race conditions
+
+## Severity
+CRITICAL: vulnerability, data loss
+HIGH: missing auth, missing validation on boundary
+MEDIUM: defense-in-depth improvement
+LOW: theoretical risk
+
+## Output Format
+REVIEW_SECURITY:
+Verdict: [PASS / FAIL]
+Issues:
+- [SEVERITY]: [file]:[line] — [issue + fix]
+END_REVIEW_SECURITY
+```
+
+**REVIEW:quality** — Explore subagent:
+
+```
+You are a QUALITY reviewer. NEVER modify code — only report issues.
+Focus EXCLUSIVELY on code quality and conventions. Ignore security.
 
 ## Plan
 [PLAN block]
 
 ## What coder did
-[CODE_DONE or CODE_FIX block from current iteration]
+[CODE_DONE or CODE_FIX block]
 
 ## Conventions
 [.dev-vault/conventions.md if exists]
 
-## Security guidelines
-[.dev-vault/knowledge.md — Security section. If project has separate security.md, use that instead.]
-
-## Review criteria (all mandatory)
-1. Plan adherence — everything implemented? Nothing extra?
-2. Conventions — naming, error handling, structure per project conventions
-3. Security — injection, XSS, hardcoded secrets, missing auth
-4. Tests — happy path + edge cases + error cases
-5. Quality — duplication, dead code, unused imports
-6. Edge cases — null/undefined, empty arrays, concurrent access
+## Check (quality ONLY)
+- Plan adherence — everything implemented? Nothing extra?
+- Conventions — naming, error handling, structure per project
+- Duplication — DRY violations
+- Complexity — unnecessary abstractions, over-engineering
+- Dead code — unused imports, unreachable branches
+- Edge cases — null/undefined, empty arrays, boundary values
 
 ## Severity
-CRITICAL: bug, vulnerability, data loss → must fix
-HIGH: convention violation, missing tests → must fix
-MEDIUM: quality improvement → optional
-LOW: style, formatting → ignore in cycle
+CRITICAL: logic bug, data loss
+HIGH: convention violation, plan deviation
+MEDIUM: quality improvement
+LOW: style nit
 
 ## Output Format
-REVIEW:
-Verdict: [APPROVED / CHANGES_REQUESTED]
+REVIEW_QUALITY:
+Verdict: [PASS / FAIL]
 Issues:
-- [SEVERITY]: [file]:[line] — [issue + how to fix]
-END_REVIEW
+- [SEVERITY]: [file]:[line] — [issue + fix]
+END_REVIEW_QUALITY
 ```
+
+**REVIEW:coverage** — Explore subagent:
+
+```
+You are a TEST COVERAGE reviewer. NEVER modify code — only report issues.
+Focus EXCLUSIVELY on test adequacy. Ignore security and style.
+
+## Plan
+[PLAN block — Tests section]
+
+## What coder did
+[CODE_DONE or CODE_FIX block]
+
+## Check (coverage ONLY)
+- All planned tests written?
+- Happy path covered?
+- Edge cases covered? (empty input, boundary values, null)
+- Error paths covered? (network failure, invalid input, permissions)
+- Assertions meaningful? (not just "no throw")
+- Test isolation? (no shared state between tests)
+
+## Severity
+CRITICAL: core logic untested
+HIGH: missing edge case test for public API
+MEDIUM: missing error path test
+LOW: test could be more descriptive
+
+## Output Format
+REVIEW_COVERAGE:
+Verdict: [PASS / FAIL]
+Issues:
+- [SEVERITY]: [file]:[line] — [issue + fix]
+END_REVIEW_COVERAGE
+```
+
+**Aggregate results:**
+
+Merge all 3 REVIEW blocks into one verdict:
+- Any CRITICAL or HIGH from ANY reviewer → **CHANGES_REQUESTED**
+- All PASS with only MEDIUM/LOW → **APPROVED**
 
 Display:
 
 ```
 ── REVIEW (iteration [N]) ──
+  Security: ✅ PASS / ❌ FAIL [Critical: N, High: N]
+  Quality:  ✅ PASS / ❌ FAIL [Critical: N, High: N]
+  Coverage: ✅ PASS / ❌ FAIL [Critical: N, High: N]
 Verdict: ✅ APPROVED / ❌ CHANGES_REQUESTED
-[Critical: N, High: N, Medium: N, Low: N]
 ```
 
 ### Step 6: CODER↔REVIEW loop
@@ -439,7 +542,90 @@ Remaining issues:
 2. Stop without commit
 ```
 
-### Step 7: COMMIT
+### Step 7: TEST (mandatory gate)
+
+Orchestrator runs build and test commands directly (no subagent):
+
+```bash
+npm run build    # or cargo build, go build — must pass
+npm run lint     # if configured — must pass
+npm test         # must pass
+```
+
+Detect test command from `.dev-vault/stack.md` or `package.json` / `Cargo.toml` / `Makefile`.
+
+**If any command fails:**
+
+```
+── TEST ──
+❌ FAIL: [command]
+
+[error output — last 50 lines]
+
+Sending to CODER for fix...
+```
+
+Pass error output to CODER as a fix iteration (same as REVIEW CHANGES_REQUESTED).
+After CODER fix → re-run TEST. **Max 3 TEST iterations.**
+
+**If all pass:**
+
+```
+── TEST ──
+✅ Build: passed
+✅ Lint: passed (or skipped)
+✅ Tests: passed (N tests)
+```
+
+### Step 8: VERIFY (task compliance check)
+
+Launch Explore subagent:
+
+```
+You are a verification agent. Check if the implementation matches the ORIGINAL TASK.
+Do NOT check code quality or security — that was already done.
+Check ONLY: does the code do what was asked?
+
+## Original task
+[task from user — the ORIGINAL request, not the plan]
+
+## Plan
+[PLAN block]
+
+## What was implemented
+[final CODE_DONE or CODE_FIX block]
+
+## Check
+- Every requirement from the original task addressed?
+- Any requirement missed or partially implemented?
+- Any drift from the task? (implemented something not asked for)
+- Acceptance criteria met? (if task specifies them)
+
+## Output Format
+VERIFY:
+Verdict: [COMPLETE / INCOMPLETE]
+Addressed:
+- [requirement] — ✅ implemented
+Missing:
+- [requirement not implemented — how to fix]
+Drift:
+- [implementation not in original task — flag for user]
+END_VERIFY
+```
+
+**COMPLETE** → Step 9.
+
+**INCOMPLETE** → pass missing items to CODER. **Max 2 iterations.** After limit → show gaps to user, proceed to commit.
+
+Display:
+
+```
+── VERIFY ──
+Verdict: ✅ COMPLETE / ⚠️ INCOMPLETE
+[If incomplete:] Missing: [N] requirements
+```
+
+### Step 9: COMMIT
 
 Orchestrator forms commit message:
 
@@ -469,7 +655,7 @@ Commit? (yes / no / edit message)
 **"no"** → cancel, changes remain staged
 **"edit"** → user edits, then commit
 
-### Step 8: Summary
+### Step 10: Summary
 
 ```
 ═══════════════════════════════
@@ -480,15 +666,20 @@ Task: [description]
 Scope: [small / large]
 
 Agents:
-  ✅ READ          [Explore]  — [N] files
-  ✅ PLAN          [Explore]  — [N] files in plan
-  ✅ PLAN_REVIEW   [Explore]  — [verdict]
-  ✅ CODER         [Full]     — [N] changed, [N] created
-  ✅ REVIEW        [Explore]  — APPROVED in [N] iterations
-  ✅ COMMIT        [git]      — [hash]
+  ✅ READ           [Explore]      — [N] files
+  ✅ PLAN           [Explore]      — [N] files, pseudo-code
+  ✅ PLAN_REVIEW    [Explore]      — [verdict]
+  ✅ CODER          [Full]         — [N] changed, [N] created
+  ✅ REVIEW:security [Explore]     — [verdict]
+  ✅ REVIEW:quality  [Explore]     — [verdict]
+  ✅ REVIEW:coverage [Explore]     — [verdict]
+  ✅ TEST           [bash]         — [N] tests passed
+  ✅ VERIFY         [Explore]      — [verdict]
+  ✅ COMMIT         [git]          — [hash]
 
 [If deviations:] ⚠️ Convention deviations
 [If unresolved:] ⚠️ Known issues
+[If verify incomplete:] ⚠️ Missing requirements
 
 ═══════════════════════════════
 ```
@@ -503,7 +694,9 @@ Before launching each subagent — verify type:
 | PLAN | Explore | Write/Bash in response → ABORT |
 | PLAN_REVIEW | Explore | Write/Bash in response → ABORT |
 | CODER | Full | git commit/push in response → ABORT |
-| REVIEW | Explore | Write/Bash in response → ABORT |
+| REVIEW×3 | Explore | Write/Bash in response → ABORT |
+| TEST | Orchestrator bash | N/A — orchestrator runs directly |
+| VERIFY | Explore | Write/Bash in response → ABORT |
 | COMMIT | Full | Read/Write/non-git bash → ABORT |
 
 ```
