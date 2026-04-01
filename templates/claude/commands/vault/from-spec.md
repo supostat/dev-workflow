@@ -226,9 +226,14 @@ Phase 1: <name>
 
 After approval, offer to create tasks and phase files:
 
-> Create tasks from Phase 1? (yes / no)
+> Create tasks? (all phases / phase 1 only / no)
 
-If yes — create task for each item in Phase 1 via `dev-workflow task create "<title>"`.
+- **all phases** — create tasks for every phase (tasks will have status `pending`)
+- **phase 1 only** — create tasks only for Phase 1
+- **no** — skip task creation
+
+Create each task via `dev-workflow task create "<title>"` or MCP `task_create`.
+Tasks from later phases stay `pending` until their phase starts.
 
 > Create executable phase files? (yes / no)
 

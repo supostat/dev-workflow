@@ -37,8 +37,14 @@ If argument is a file path, read the file and detect mode:
 
 Phase mode plans the entire phase, then codes each subtask separately for focused quality.
 
+**Phase startup:** before READ, orchestrator checks if tasks exist for this phase:
+1. Read `## Tasks` section from phase file
+2. Check `.dev-vault/tasks/` for matching tasks (by title substring match)
+3. If tasks are missing — create them via `dev-workflow task create "<title>"` for each task in the phase
+4. Display created tasks
+
 ```
-READ (full phase) → PLAN (full phase, outputs subtasks) → PLAN_REVIEW
+[auto-create tasks] → READ (full phase) → PLAN (full phase, outputs subtasks) → PLAN_REVIEW
 → for each subtask:
     CODER(subtask) → REVIEW×3(subtask) → fix loop → TEST (all tests)
 → VERIFY (full phase against spec)
