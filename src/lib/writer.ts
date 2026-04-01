@@ -21,6 +21,7 @@ export class VaultWriter {
       "bugs",
       "debt",
       "tasks",
+      "phases",
       "workflows",
     ];
 

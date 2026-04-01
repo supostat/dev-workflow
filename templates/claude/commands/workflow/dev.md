@@ -9,6 +9,113 @@ Steps 4-6 form an iterative CODER↔REVIEW loop (max 3 iterations).
 `/workflow:dev <task>` — task description as text.
 `/workflow:dev <path>` — task from file (.md, .txt).
 
+## Mode detection
+
+If argument is a file path, read the file and detect mode:
+
+- **Single task** (no `## Tasks` section or only 1 task) → **Normal mode** (Steps 1-8 below)
+- **Phase file** (has `## Tasks` with 2+ items, or has `phase:` in frontmatter) → **Phase mode**
+
+### Phase mode
+
+Phase mode plans the entire phase, then codes each subtask separately for focused quality.
+
+```
+READ (full phase) → PLAN (full phase, outputs subtasks) → PLAN_REVIEW
+→ for each subtask:
+    CODER(subtask) → REVIEW(subtask) → fix loop
+→ COMMIT (all changes, one commit)
+→ Summary
+```
+
+**Step 2 (PLAN) in phase mode** — add to agent prompt:
+
+```
+You are planning a PHASE with multiple subtasks.
+Break this into ordered implementation steps.
+Each step must be completable in one CODER iteration.
+
+Output format:
+PLAN:
+Summary: [phase goal]
+Scope: large
+
+Subtasks:
+1. [name]
+   Files: [list]
+   Tests: [list]
+   Depends on: [previous subtask number or "none"]
+
+2. [name]
+   Files: [list]
+   Tests: [list]
+   Depends on: 1
+
+...
+END_PLAN
+```
+
+**Steps 4-6 in phase mode** — loop over subtasks:
+
+```
+for each subtask in PLAN.Subtasks:
+  display: ── SUBTASK [N/total]: [name] ──
+  
+  CODER receives:
+  - Current subtask from PLAN
+  - Accumulated context from previous subtasks (CODE_DONE blocks)
+  - Vault context
+  
+  REVIEW receives:
+  - Current subtask from PLAN
+  - CODE_DONE for this subtask
+  - Vault context
+  
+  fix loop (max 3 iterations per subtask)
+```
+
+**Step 7 (COMMIT) in phase mode** — one commit for the entire phase:
+
+```
+feat(<scope>): implement Phase N — <phase name>
+
+<summary of all subtasks completed>
+
+Subtasks:
+- <subtask 1>: <files>
+- <subtask 2>: <files>
+...
+```
+
+**Step 8 (Summary) in phase mode** — show subtask breakdown:
+
+```
+═══════════════════════════════
+    PHASE [N] COMPLETE
+═══════════════════════════════
+
+Phase: [name]
+Subtasks: [completed]/[total]
+
+  ✅ 1. [subtask name] — [N] files
+  ✅ 2. [subtask name] — [N] files
+  ...
+
+Agents:
+  ✅ READ          [Explore]  — [N] files
+  ✅ PLAN          [Explore]  — [N] subtasks
+  ✅ PLAN_REVIEW   [Explore]  — APPROVED
+  ✅ CODER         [Full]     — [total] changed, [total] created
+  ✅ REVIEW        [Explore]  — [total iterations] across subtasks
+  ✅ COMMIT        [git]      — [hash]
+
+═══════════════════════════════
+```
+
+## Normal mode
+
+Steps below describe normal mode (single task). Phase mode follows the same agents and permission matrix but with the subtask loop described above.
+
 ## Permission matrix (violation = ABORT)
 
 ```

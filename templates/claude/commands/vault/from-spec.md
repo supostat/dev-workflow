@@ -217,11 +217,58 @@ Phase 1: <name>
 
 **Apply?** (yes / edit / skip)
 
-After approval, offer to create tasks:
+After approval, offer to create tasks and phase files:
 
 > Create tasks from Phase 1? (yes / no)
 
 If yes — create task for each item in Phase 1 via `dev-workflow task create "<title>"`.
+
+> Create executable phase files? (yes / no)
+
+If yes — for each phase in gameplan.md, create `.dev-vault/phases/phase-N-<slug>.md`:
+
+```markdown
+---
+phase: <N>
+name: <phase name>
+status: pending
+depends_on: <N-1 or null>
+---
+
+# Phase N: <name>
+
+## Goal
+<from gameplan "Done when" criteria>
+
+## Tasks
+1. <task from gameplan>
+2. <task from gameplan>
+
+## New files
+- <path> — <purpose>
+
+## Changes to existing files
+- <path> — <what to change>
+
+## Tests
+- <test file> — <what to test>
+```
+
+For each phase file:
+- Derive file/change list from spec requirements for that phase
+- Keep tasks matching gameplan.md exactly
+- "New files" and "Changes" are best-effort estimates from spec context
+
+After creation:
+
+```
+✅ Phase files created:
+  .dev-vault/phases/phase-1-<slug>.md
+  .dev-vault/phases/phase-2-<slug>.md
+  ...
+
+💡 Run: /workflow:dev .dev-vault/phases/phase-1-<slug>.md
+```
 
 ### Step 4: Summary
 
