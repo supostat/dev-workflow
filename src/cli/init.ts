@@ -31,7 +31,7 @@ function buildSettingsJson(): string {
   const distDir = join(PACKAGE_ROOT, "dist");
   const hookBase = join(distDir, "hooks");
   const statuslinePath = join(distDir, "lib", "statusline.js");
-  const mcpServerPath = join(distDir, "cli", "serve.js");
+  const mcpEntryPath = join(distDir, "cli", "index.js");
 
   return JSON.stringify({
     hooks: {
@@ -89,7 +89,7 @@ function buildSettingsJson(): string {
     mcpServers: {
       "dev-workflow": {
         command: "node",
-        args: [mcpServerPath],
+        args: [mcpEntryPath, "serve"],
       },
     },
   }, null, 2);
