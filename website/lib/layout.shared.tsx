@@ -8,7 +8,7 @@ export function baseOptions(): BaseLayoutProps {
     links: [
       {
         text: "GitHub",
-        url: "https://github.com/pug-/dev-workflow",
+        url: "https://github.com/supostat/dev-workflow",
       },
     ],
   };

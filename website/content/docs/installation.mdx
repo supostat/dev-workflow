@@ -11,12 +11,18 @@ description: Как установить и настроить dev-workflow
 - Git-репозиторий
 - Claude Code (VS Code extension или CLI)
 
-## Установка через npm link (разработка)
+## Установка
+
+```bash
+npm install -g @engramm/dev-workflow
+```
+
+### Из исходников (для разработки)
 
 ```bash
 cd dev-workflow
-npm install
-npm run build
+pnpm install
+pnpm run build
 npm link
 ```
 
