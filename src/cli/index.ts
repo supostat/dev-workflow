@@ -84,7 +84,7 @@ switch (command) {
     update();
     break;
   case "doctor":
-    doctor(args.includes("--fix"));
+    doctor(args.includes("--fix")).catch(handleAsyncError);
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);

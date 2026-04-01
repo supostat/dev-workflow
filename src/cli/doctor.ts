@@ -31,7 +31,7 @@ const VALID_HOOK_EVENTS = new Set([
   "InstructionsLoaded", "CwdChanged", "FileChanged",
 ]);
 
-export function doctor(fix: boolean = false): void {
+export async function doctor(fix: boolean = false): Promise<void> {
   const context = detectContext();
   if (!context) {
     console.error("Not a git repository.");
@@ -192,7 +192,7 @@ export function doctor(fix: boolean = false): void {
 
   if (fix && issues.length > 0) {
     console.log("\n  Fixing...");
-    const { init } = require("./init.js") as typeof import("./init.js");
+    const { init } = await import("./init.js");
     init({ force: true, detectOnly: false });
     console.log("  Fixed: re-ran init --force");
   } else {
