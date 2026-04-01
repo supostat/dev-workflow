@@ -1,0 +1,48 @@
+# Step 9b: Vault updates (after commit)
+
+Orchestrator writes directly to vault after successful commit.
+Use **Edit tool** to append — **never overwrite** existing vault files.
+
+## 1. Daily log
+
+Append to `.dev-vault/daily/<today>.md`:
+
+```
+> workflow:dev completed at HH:MM — "<task summary>"
+> Commit: <hash> | Files: <N> changed, <N> created | Tests: <N>
+> [If review findings:] Gotchas recorded in knowledge.md
+```
+
+If file exists — read first, then Edit to append after `---` separator.
+If file does not exist — create with Write tool.
+
+## 2. Phase status (phase mode only)
+
+Update frontmatter in phase file:
+
+```yaml
+status: done  # was: pending
+```
+
+## 3. Task status (if task linked)
+
+Update task file:
+
+```yaml
+status: done  # was: in-progress
+```
+
+## 4. Gameplan progress (phase mode only)
+
+Check off completed items in `.dev-vault/gameplan.md`:
+
+```markdown
+- [x] <completed task>  # was: - [ ]
+```
+
+## Phase mode: vault refresh between subtasks
+
+After each subtask complete:
+- Re-read `.dev-vault/conventions.md` (may have new patterns from review)
+- Re-read `.dev-vault/knowledge.md` (may have new gotchas from review)
+- Pass updated vault content to next subtask's CODER and REVIEW agents
