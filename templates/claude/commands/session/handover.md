@@ -35,8 +35,13 @@ Capture the current session's work into `.dev-vault/` for future sessions.
 
 **Save?** (yes / edit / skip)
 
-5. If yes → write to `.dev-vault/daily/<date>.md`
+5. If yes → APPEND to `.dev-vault/daily/<date>.md`
+   - If file exists: read it first, then use Edit tool to append at the end (after `---` separator)
+   - If file does not exist: create with Write tool
+   - NEVER overwrite existing daily log content
 6. Update branch context and knowledge.md if insights found
+   - knowledge.md: use Edit tool to append to specific section, preserve existing
+   - branch context: use Edit tool to update status field only
 7. Offer to create records: /vault:bug, /vault:adr, /vault:debt
 8. Commit vault changes
 
@@ -44,6 +49,8 @@ Capture the current session's work into `.dev-vault/` for future sessions.
 
 ## Rules
 
+- **APPEND ONLY** — never overwrite existing vault files. Read first, then append.
+- Use Edit tool for modifications, not Write tool (Write overwrites the entire file)
 - Keep entries concise — reference material, not essays
 - Use Obsidian wikilinks for cross-references
 - Never include secrets or tokens

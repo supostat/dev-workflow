@@ -79,3 +79,4 @@ If perspectives disagree (e.g., Pragmatism says "good enough" but Quality says "
 - Each finding tagged with source perspective
 - Conflicts: if Security blocks but Pragmatism approves → Security wins
 - Critical from ANY perspective → overall REQUEST_CHANGES
+- When updating vault files (knowledge.md, conventions.md): APPEND only, use Edit tool, never overwrite

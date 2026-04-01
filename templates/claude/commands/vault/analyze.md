@@ -65,11 +65,11 @@ Extract: File Structure, Naming, Code Style, Patterns, Testing conventions.
 For each phase:
 1. Show exactly what will be written
 2. Wait for approval
-3. Write to vault via MCP tools or direct edit
+3. Write to vault: read file first, then use Edit tool to APPEND (never Write tool which overwrites)
 4. Confirm what was written
 5. Proceed to next phase
 
-**Preserve existing content** — only append new information.
+**APPEND ONLY** — read existing content first, then append. Never use Write tool on existing vault files.
 
 ### conventions.md sections:
 - `## File Structure`: `- <directory> — <purpose>`
