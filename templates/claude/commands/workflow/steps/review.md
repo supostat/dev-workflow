@@ -3,7 +3,6 @@
 Before launching reviewers, orchestrator runs `git diff` to capture actual changes.
 Pass BOTH the CODE_DONE summary AND the real diff to each reviewer.
 
-Read `.claude/commands/workflow/steps/principles.md` first.
 
 Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
 
@@ -64,7 +63,12 @@ Focus EXCLUSIVELY on code quality and conventions. Ignore security.
 [.dev-vault/conventions.md content]
 
 ## Engineering Principles
-[content from steps/principles.md]
+- Single Responsibility, Dependency Rule (inward), explicit dependencies
+- Fail fast at boundaries, every error path tested, no silent catch
+- No TODO/FIXME, no debug logging, no hardcoded config
+- Max 300 lines/file, 30 lines/function, composition over inheritance
+- No god objects, no utility dumps (helpers/, utils/)
+- Test behaviour not implementation
 
 ## Check (quality ONLY)
 - Plan adherence — everything implemented? Nothing extra?

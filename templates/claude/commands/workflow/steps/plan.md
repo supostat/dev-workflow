@@ -1,6 +1,6 @@
 # Step 2: PLAN
 
-Read `.claude/commands/workflow/steps/principles.md` first, then launch **Explore** subagent:
+Launch **Explore** subagent:
 
 ```
 You are a planner agent. Create a detailed implementation plan.
@@ -24,7 +24,16 @@ You are a planner agent. Create a detailed implementation plan.
 [.dev-vault/gameplan.md — current phase]
 
 ## Engineering Principles
-[content from steps/principles.md]
+- Single Responsibility: one module/file = one reason to change
+- Dependency Rule: inner layers never import from outer layers
+- Explicit dependencies: constructor injection, no hidden globals
+- Boundaries: validate at entry points, trust internal code
+- Fail fast at boundaries, every error path tested, no silent catch
+- External calls: always error handling + timeouts
+- No TODO/FIXME, no debug logging, no hardcoded config
+- Max 300 lines/file, 30 lines/function
+- Composition over inheritance, no god objects
+- Test behaviour not implementation, cover happy+edge+error paths
 
 ## Rules
 - STRICTLY follow project conventions (naming, structure, error handling)

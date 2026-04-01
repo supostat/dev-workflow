@@ -86,7 +86,7 @@ All step files are in: `.claude/commands/workflow/steps/`
 
 ```
 steps/
-  principles.md      ← engineering principles (read before PLAN, CODER, REVIEW)
+  principles.md      ← engineering principles (inlined in plan, coder, review)
   preflight.md       ← Step 0: baseline + phase task creation
   read.md            ← Step 1: context gathering
   plan.md            ← Step 2: architecture analysis + pseudo-code

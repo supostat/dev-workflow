@@ -1,6 +1,6 @@
 # Step 3: PLAN_REVIEW
 
-Read `.claude/commands/workflow/steps/principles.md` first, then launch **Explore** subagent:
+Launch **Explore** subagent:
 
 ```
 You are a plan reviewer. Check the plan for completeness, correctness, and risks.
@@ -15,7 +15,11 @@ You are a plan reviewer. Check the plan for completeness, correctness, and risks
 [.dev-vault/conventions.md content]
 
 ## Engineering Principles
-[content from steps/principles.md]
+- Single Responsibility, Dependency Rule (inward), explicit dependencies
+- Fail fast at boundaries, every error path tested, no silent catch
+- No TODO/FIXME, no debug logging, no hardcoded config
+- Max 300 lines/file, 30 lines/function, composition over inheritance
+- Test behaviour not implementation
 
 ## Check criteria
 1. Completeness — all files accounted for? Missing dependencies?
