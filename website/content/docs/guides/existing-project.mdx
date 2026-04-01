@@ -1,0 +1,65 @@
+---
+title: Существующий проект
+description: Подключение dev-workflow к проекту с уже написанным кодом
+---
+
+# Существующий проект
+
+## Шаг 1: Инициализация
+
+```bash
+cd existing-project
+dev-workflow init
+```
+
+Stack и conventions определятся автоматически из package.json / Cargo.toml / и т.д.
+
+## Шаг 2: Анализ кодовой базы
+
+В Claude Code:
+
+```
+/vault:analyze
+```
+
+3 фазы:
+1. **Conventions** — извлекает реальные конвенции из кода (naming, structure, patterns)
+2. **Knowledge** — архитектура, gotchas, паттерны
+3. **Verification** — проверка непротиворечивости
+
+## Шаг 3: Заполнить gameplan (вручную)
+
+Редактировать `.dev-vault/gameplan.md` — дорожная карта вашего проекта. Что сделать дальше, приоритеты, бэклог.
+
+## Шаг 4: Работа
+
+```bash
+dev-workflow task create "Добавить валидацию ввода"
+dev-workflow task start <task-id>
+git checkout -b task/validation
+```
+
+В Claude Code:
+
+```
+/session:resume
+/workflow:dev "Добавить валидацию ввода"
+```
+
+## Шаг 5: Review и merge
+
+```
+/session:review      # мульти-перспективный review
+/git:pr-review       # review для PR
+/git:changelog       # changelog
+```
+
+После мержа:
+
+```
+/git:merge           # перенос знаний в knowledge.md
+```
+
+```bash
+dev-workflow task done <task-id>
+```

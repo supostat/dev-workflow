@@ -1,0 +1,48 @@
+---
+title: Quality Pipeline
+description: 10-шаговый pipeline с quality gates, test-first и мульти-перспективным review
+---
+
+# Quality Pipeline
+
+Pipeline `/workflow:dev` построен на принципе: **каждый gap в качестве закрывается отдельным gate**.
+
+## Полная цепочка
+
+```
+Step 0:  PREFLIGHT    ← baseline: git clean? tests pass? lint clean?
+Step 1:  READ         ← контекст: файлы, зависимости, паттерны
+Step 2:  PLAN         ← архитектурный анализ + pseudo-code
+Step 3:  PLAN_REVIEW  ← 9 критериев (architecture, production, simplicity)
+Step 4:  CODER        ← test-first: тесты → fail → код → pass
+Step 5:  REVIEW×3     ← security + quality + coverage (параллельно)
+Step 6:  fix loop     ← CODER↔REVIEW до 3 итераций
+Step 7:  TEST         ← build + lint + tests (сравнение с baseline)
+Step 8:  VERIFY       ← соответствие исходной задаче
+Step 9:  COMMIT       ← interactive или autonomous
+```
+
+## Что закрывает каждый gate
+
+| Gate | Проблема | Как решает |
+|------|----------|-----------|
+| PREFLIGHT | Грязный working directory, сломанные тесты до старта | Baseline — не обвинять coder в чужих ошибках |
+| PLAN pseudo-code | Coder интерпретирует план по-своему | Конкретный код в плане — coder следует, не додумывает |
+| PLAN_REVIEW architecture | План не учитывает слои, dependency direction | 3 архитектурных критерия в review |
+| Test-first в CODER | Тесты подгоняются под реализацию | Тесты пишутся первыми, должны упасть |
+| REVIEW×3 parallel | Один reviewer бегло по всему | 3 специалиста глубоко в своей области |
+| Real git diff в REVIEW | Reviewer видит самоотчёт, не реальный код | `git diff` вместо CODE_DONE текста |
+| TEST baseline | Старые тесты падают, coder ни при чём | Сравнение с PREFLIGHT baseline |
+| VERIFY | Drift от задачи за время code↔review loop | Сверка с оригинальной задачей |
+| Rollback | Провал pipeline оставляет грязный state | Stash или restore при остановке |
+
+## Gates по режимам
+
+| Gate | Interactive | Autonomous |
+|------|-----------|------------|
+| PLAN_REVIEW fail | Спросить user | Auto-retry (max 2) |
+| REVIEW fail | Спросить user | Auto-fix (max 3) |
+| TEST fail | Спросить user | Auto-fix (max 3), stop на лимите |
+| VERIFY fail | Спросить user | Auto-fix (max 2), stop на лимите |
+| COMMIT | Спросить user | Auto-commit |
+| Лимит исчерпан | Выбор: accept / stop | Stop без коммита, stash |

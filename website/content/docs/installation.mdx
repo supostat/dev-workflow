@@ -1,0 +1,57 @@
+---
+title: Установка
+description: Как установить и настроить dev-workflow
+---
+
+# Установка
+
+## Требования
+
+- Node.js 20+
+- Git-репозиторий
+- Claude Code (VS Code extension или CLI)
+
+## Установка через npm link (разработка)
+
+```bash
+cd dev-workflow
+npm install
+npm run build
+npm link
+```
+
+## Инициализация в проекте
+
+```bash
+cd your-project
+dev-workflow init
+```
+
+Команда `init` создаёт:
+
+| Что | Где | Назначение |
+|-----|-----|-----------|
+| Vault | `.dev-vault/` | Хранилище знаний (stack, conventions, knowledge, gameplan) |
+| Хуки | `.claude/settings.json` | 5 автоматических хуков для Claude Code |
+| MCP-сервер | `.claude/settings.json` | Программный доступ к vault |
+| Slash-команды | `.claude/commands/` | 4 группы: vault/, session/, git/, workflow/ |
+| StatusLine | `.claude/settings.json` | Статус проекта в нижней строке Claude Code |
+
+## Проверка
+
+```bash
+dev-workflow doctor
+```
+
+Покажет состояние каждого компонента: vault, агенты, задачи, workflows, MCP config.
+
+```bash
+dev-workflow doctor --fix
+```
+
+Автоматическое исправление: перезапускает `init --force`.
+
+## Следующий шаг
+
+- Новый проект со спекой: `/vault:from-spec`
+- Существующий проект: `/vault:analyze`

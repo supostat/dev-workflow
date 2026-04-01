@@ -1,0 +1,46 @@
+---
+title: Хуки
+description: Автоматика Claude Code — session, post-edit, post-task, pre-compact
+---
+
+# Хуки
+
+Хуки — команды, которые Claude Code запускает автоматически при определённых событиях. dev-workflow устанавливает 5 хуков при `init`.
+
+## Список хуков
+
+| Хук | Когда | Что делает |
+|-----|-------|-----------|
+| **SessionStart** | Начало сессии | Загружает vault-контекст, intelligence, задачи, workflow |
+| **SessionEnd** | Конец сессии | Сохраняет daily log, обновляет intelligence, паузит workflow |
+| **PostEdit** | После редактирования файла | Трекает редактирование в intelligence |
+| **PostTask** | После завершения задачи | Записывает в daily log |
+| **PreCompact** | Перед сжатием контекста | Сохраняет маркер для восстановления |
+
+## SessionStart
+
+Самый важный хук. При каждом старте сессии Claude Code получает:
+
+- Имя проекта и текущую ветку
+- Содержимое vault (stack, conventions, knowledge, gameplan)
+- Branch context (если не на main)
+- Текущую задачу (если привязана к ветке)
+- Активный workflow (если на паузе)
+- Top-15 релевантных паттернов из intelligence
+
+## SessionEnd
+
+Автоматический auto-save:
+
+- Создаёт/дополняет `.dev-vault/daily/<date>.md`
+- Записывает: проект, ветка, diff stat, uncommitted files
+- Обновляет intelligence: co-edited файлы, данные сессии
+- Если workflow был running — ставит на паузу
+
+## Ручной запуск (для тестирования)
+
+```bash
+node node_modules/dev-workflow/dist/hooks/session-start.js
+node node_modules/dev-workflow/dist/hooks/session-end.js
+CLAUDE_FILE_PATH="src/file.ts" node node_modules/dev-workflow/dist/hooks/post-edit.js
+```

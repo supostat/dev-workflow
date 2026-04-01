@@ -1,0 +1,4 @@
+{
+  "title": "Команды",
+  "pages": ["cli", "vault", "workflow", "session", "git"]
+}

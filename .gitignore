@@ -22,4 +22,4 @@ dist/
 .swarm/
 .mcp.json
 CLAUDE.md
-docs/
+/docs/

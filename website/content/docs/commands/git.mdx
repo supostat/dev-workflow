@@ -1,0 +1,46 @@
+---
+title: Git-команды
+description: Slash-команды для работы с git — ветки, PR, changelog, merge
+---
+
+# Git-команды
+
+## /git:new-branch
+
+Создать branch context для текущей ветки.
+
+```
+/git:new-branch
+```
+
+Создаёт `.dev-vault/branches/<slug>.md` с целью ветки, parent branch, связанными задачами.
+
+## /git:pr-review
+
+PR review с vault-контекстом. 5 перспектив + проверка конвенций из vault.
+
+```
+/git:pr-review
+```
+
+Анализирует `git diff main...HEAD`, проверяет против conventions.md и knowledge.md.
+
+## /git:changelog
+
+Генерация changelog из git history.
+
+```
+/git:changelog
+```
+
+Категоризация: Added, Changed, Fixed, Removed, Security. Keep a Changelog формат.
+
+## /git:merge
+
+Перенос знаний после мержа ветки.
+
+```
+/git:merge
+```
+
+Переносит решения и gotchas из branch context в knowledge.md. Обновляет gameplan.md.

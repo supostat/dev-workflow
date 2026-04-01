@@ -1,0 +1,85 @@
+---
+title: /workflow:dev
+description: Мульти-агентный pipeline от задачи до коммита — 10 шагов с quality gates
+---
+
+# /workflow:dev
+
+Главная команда. Оркестрирует 10-шаговый pipeline от задачи до коммита.
+
+```
+/workflow:dev "добавить валидацию email"
+/workflow:dev .dev-vault/phases/phase-1-foundation.md
+/workflow:dev "задача" --auto-commit
+```
+
+## 10 шагов
+
+| # | Шаг | Агент | Что делает |
+|---|-----|-------|-----------|
+| 0 | PREFLIGHT | bash | Baseline: git status, build, tests |
+| 1 | READ | Explore | Сбор контекста из кодовой базы |
+| 2 | PLAN | Explore | Детальный план с pseudo-code и архитектурным анализом |
+| 3 | PLAN_REVIEW | Explore | 9 критериев: полнота, архитектура, production readiness |
+| 4 | CODER | Full | Реализация (test-first) |
+| 5 | REVIEW×3 | Explore×3 | Параллельно: security, quality, coverage |
+| 6 | fix loop | Full+Explore | CODER↔REVIEW до 3 итераций |
+| 7 | TEST | bash | build + lint + tests (обязательно) |
+| 8 | VERIFY | Explore | Соответствие исходной задаче |
+| 9 | COMMIT | Full | git add + commit |
+
+## Режимы
+
+### Interactive (default)
+
+Спрашивает перед коммитом. При провале gate — спрашивает: продолжить или остановить.
+
+### Autonomous (`--auto-commit`)
+
+Для использования в swarm. Коммитит автоматически. При провале gate — останавливается без коммита, stash-ит изменения.
+
+### Phase mode
+
+При передаче файла фазы — планирует всю фазу, кодит каждую подзадачу отдельно:
+
+```
+READ → PLAN (full phase) → PLAN_REVIEW
+→ for each subtask:
+    CODER → REVIEW×3 → fix → TEST
+→ VERIFY → COMMIT (один коммит)
+```
+
+## Engineering principles
+
+Все агенты получают shared PRINCIPLES block:
+- Single Responsibility, Dependency Rule, explicit dependencies
+- Fail fast, every error path tested, no silent swallowing
+- No TODO/FIXME, no debug logging, no hardcoded config
+- Max 300 lines/file, 30 lines/function
+- Test behaviour, not implementation
+
+## PLAN: архитектурный анализ
+
+Planner обязан включить в план:
+- **Layer** — в каком слое сидит изменение
+- **Boundaries** — что вызывает, кто вызывает
+- **Dependencies** — с направлением стрелок
+- **Error boundaries** — где может сломаться
+- **Pseudo-code** — конкретный код для каждого изменения
+
+## REVIEW×3: параллельные специалисты
+
+| Reviewer | Фокус |
+|----------|-------|
+| **Security** | OWASP, injection, secrets, auth, validation |
+| **Quality** | SRP, layers, conventions, DRY, dead code, architecture |
+| **Coverage** | Все тесты написаны? edge cases? error paths? |
+
+Каждый получает реальный `git diff`, а не самоотчёт coder-а.
+
+## CODER: test-first
+
+1. Пишет тесты (из секции Tests плана)
+2. Запускает — проверяет что тесты ПАДАЮТ
+3. Пишет реализацию
+4. Запускает — проверяет что тесты ПРОХОДЯТ

@@ -1,0 +1,63 @@
+---
+title: CLI
+description: Справочник команд dev-workflow для терминала
+---
+
+# CLI Reference
+
+Все команды запускаются как `dev-workflow <command>`.
+
+## Основные команды
+
+| Команда | Описание |
+|---------|----------|
+| `init [--force] [--detect]` | Инициализация vault, хуков, команд |
+| `status` | Состояние vault, задач, workflow |
+| `doctor [--fix]` | Диагностика и автоисправление |
+| `help` | Справка |
+
+## Workflows
+
+| Команда | Описание |
+|---------|----------|
+| `run <workflow> "задача" [--dry-run] [--task <id>]` | Запуск workflow |
+| `resume [--run <id>]` | Продолжить паузу |
+| `validate <file.yaml>` | Валидация кастомного workflow |
+
+Workflow: `dev`, `hotfix`, `review`, `test`.
+
+## Задачи
+
+| Команда | Описание |
+|---------|----------|
+| `task create "title" ["description"]` | Создать задачу |
+| `task list [--status <status>]` | Список задач |
+| `task show <id>` | Детали задачи |
+| `task start <id>` | Старт (привязка к ветке) |
+| `task done <id>` | Завершить |
+| `task block <id>` | Заблокировать |
+
+## Агенты
+
+| Команда | Описание |
+|---------|----------|
+| `agent list` | Список агентов |
+| `agent show <name>` | Детали агента |
+| `agent run <name> "задача"` | Генерация промпта |
+
+## Поиск и конфигурация
+
+| Команда | Описание |
+|---------|----------|
+| `search "запрос"` | Поиск по vault |
+| `config show` | Показать настройки |
+| `config get <path>` | Получить значение |
+| `config set <path> <value>` | Установить значение |
+| `export [file.json]` | Экспорт vault |
+| `import <file.json>` | Импорт vault |
+
+## MCP-сервер
+
+```bash
+dev-workflow serve    # запуск MCP-сервера (stdin/stdout JSON-RPC)
+```

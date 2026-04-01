@@ -1,0 +1,95 @@
+---
+title: Новый проект
+description: От спецификации до работающего кода — пошаговое руководство
+---
+
+# Новый проект: от спеки до кода
+
+## Шаг 1: Создать проект и SPEC.md
+
+```bash
+mkdir my-project && cd my-project
+git init
+```
+
+Создать `SPEC.md` с описанием:
+
+```markdown
+# My Project
+
+## Technology Stack
+- TypeScript, Node.js
+- PostgreSQL with Prisma
+- Vitest for testing
+
+## Architecture
+- REST API with Express
+- 3-layer: routes → services → repositories
+
+## Features
+### Phase 1: Auth
+- User registration
+- Login with JWT
+
+### Phase 2: CRUD
+- Items CRUD endpoints
+- Validation middleware
+```
+
+## Шаг 2: Инициализация
+
+```bash
+dev-workflow init
+```
+
+## Шаг 3: Заполнить vault из спеки
+
+В Claude Code:
+
+```
+/vault:from-spec
+```
+
+4 фазы с approval. После завершения — vault заполнен, задачи созданы, файлы фаз сгенерированы.
+
+## Шаг 4: Проверить состояние
+
+```bash
+dev-workflow status
+dev-workflow task list
+```
+
+## Шаг 5: Реализовать Phase 1
+
+```
+/workflow:dev .dev-vault/phases/phase-1-auth.md
+```
+
+Pipeline в phase mode:
+1. READ — сканирует проект
+2. PLAN — разбивает фазу на подзадачи с pseudo-code
+3. PLAN_REVIEW — 9 критериев
+4. CODER (для каждой подзадачи, test-first)
+5. REVIEW×3 (security + quality + coverage)
+6. TEST (после каждой подзадачи)
+7. VERIFY — соответствие спеке
+8. COMMIT — один коммит на фазу
+
+## Шаг 6: Записать находки
+
+```
+/session:handover
+/vault:adr        # если было архитектурное решение
+```
+
+## Шаг 7: Phase 2 и далее
+
+```bash
+dev-workflow task done <task-id>
+```
+
+```
+/workflow:dev .dev-vault/phases/phase-2-crud.md
+```
+
+Повторить для каждой фазы.

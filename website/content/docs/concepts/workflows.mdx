@@ -1,0 +1,79 @@
+---
+title: Workflows
+description: Цепочки агентов с quality gates — dev, hotfix, review, test
+---
+
+# Workflows
+
+Workflow — последовательность агентов с gates (точками контроля). Каждый шаг может пройти, провалиться, или потребовать повтора.
+
+## Встроенные workflows
+
+| Workflow | Шаги | Когда использовать |
+|----------|------|--------------------|
+| **dev** | read → plan → code → review → test → commit | Полный цикл разработки |
+| **hotfix** | read → code → test → commit | Быстрый фикс без ревью плана |
+| **review** | read → review | Только ревью кода |
+| **test** | read → test | Только тесты |
+
+## /workflow:dev — полный pipeline
+
+Slash-command `/workflow:dev` — мульти-агентный оркестратор с 10 шагами:
+
+```
+PREFLIGHT → READ → PLAN → PLAN_REVIEW
+→ CODER → REVIEW×3 → fix loop
+→ TEST → VERIFY → COMMIT
+```
+
+### Quality gates
+
+| Gate | Шаг | Что проверяет |
+|------|-----|--------------|
+| Plan review | PLAN_REVIEW | Полнота, архитектура, риски (9 критериев) |
+| Code review | REVIEW×3 | Security, quality, coverage (параллельно) |
+| Tests | TEST | build + lint + tests (обязательно) |
+| Verification | VERIFY | Соответствие исходной задаче |
+
+### Режимы
+
+```
+/workflow:dev "задача"                  # interactive — спрашивает перед коммитом
+/workflow:dev "задача" --auto-commit    # autonomous — для swarm
+```
+
+### Phase mode
+
+Если передать файл фазы — pipeline переключается в phase mode:
+
+```
+/workflow:dev .dev-vault/phases/phase-1-foundation.md
+```
+
+Plan создаётся для всей фазы, затем каждая подзадача проходит отдельный CODER→REVIEW→TEST цикл. Один коммит на всю фазу.
+
+## CLI workflows
+
+```bash
+dev-workflow run dev "задача" --dry-run    # превью шагов
+dev-workflow run dev "задача"              # запуск
+dev-workflow resume                        # продолжить паузу
+dev-workflow validate workflow.yaml        # валидация кастомного
+```
+
+## Кастомные workflows
+
+Создать `.dev-vault/workflows/custom.yaml`:
+
+```yaml
+name: custom
+description: Custom workflow
+steps:
+  - name: read
+    agent: reader
+  - name: code
+    agent: coder
+    gate: tests-pass
+  - name: commit
+    agent: committer
+```

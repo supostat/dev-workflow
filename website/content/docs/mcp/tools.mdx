@@ -1,0 +1,63 @@
+---
+title: MCP Tools
+description: 13 программных инструментов для работы с vault, задачами, intelligence
+---
+
+# MCP Tools
+
+MCP-сервер dev-workflow предоставляет 13 tools. Подключается автоматически при `init`.
+
+## Vault
+
+| Tool | Параметры | Описание |
+|------|-----------|----------|
+| `vault_read` | `section: stack\|conventions\|knowledge\|gameplan` | Прочитать секцию vault |
+| `vault_search` | `query: string` | Поиск по всем vault-файлам |
+| `vault_record` | `type: adr\|bug\|debt`, `title`, `content` | Создать запись |
+| `vault_knowledge` | `section: string`, `content: string` | Дописать в knowledge.md |
+| `vault_status` | — | Полное состояние vault одним вызовом |
+
+### vault_status
+
+Возвращает агрегированную информацию:
+
+```json
+{
+  "project": "my-project",
+  "branch": "feature/auth",
+  "sections": {
+    "stack": { "filled": true, "lines": 45 },
+    "conventions": { "filled": true, "lines": 82 },
+    "knowledge": { "filled": false, "lines": 6 },
+    "gameplan": { "filled": true, "lines": 38 }
+  },
+  "tasks": { "total": 5, "pending": 2, "in-progress": 1, "done": 2 },
+  "workflow": null,
+  "intelligence": { "patterns": 47, "edges": 23 }
+}
+```
+
+## Задачи
+
+| Tool | Параметры | Описание |
+|------|-----------|----------|
+| `task_create` | `title`, `description?` | Создать задачу |
+| `task_list` | `status?` | Список задач с фильтром |
+| `task_update` | `id`, `status?`, `description?` | Обновить задачу |
+| `task_start` | `id` | Старт: статус in-progress + привязка к ветке |
+
+## Intelligence
+
+| Tool | Параметры | Описание |
+|------|-----------|----------|
+| `intelligence_query` | `branch?`, `task?`, `limit?` | Поиск паттернов с scoring |
+
+Возвращает массив `ScoredNode` отсортированный по score (recency + frequency + context match).
+
+## Workflow и агенты
+
+| Tool | Параметры | Описание |
+|------|-----------|----------|
+| `workflow_status` | `runId?` | Статус текущего/указанного workflow run |
+| `agent_list` | — | Список агентов с permissions |
+| `agent_run` | `agent`, `task` | Генерация промпта агента с vault-контекстом |

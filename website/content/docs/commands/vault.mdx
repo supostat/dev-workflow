@@ -1,0 +1,52 @@
+---
+title: Vault-команды
+description: Slash-команды для работы с vault в Claude Code
+---
+
+# Vault-команды
+
+Slash-команды работают внутри Claude Code (VS Code или CLI). Устанавливаются в `.claude/commands/vault/` при `dev-workflow init`.
+
+## /vault:from-spec
+
+Заполнить vault из спецификации проекта. Для новых проектов, где есть только SPEC.md.
+
+```
+/vault:from-spec              # ищет SPEC.md в корне
+/vault:from-spec docs/spec.md # конкретный файл
+```
+
+**4 фазы с user-approve:**
+1. **stack.md** — технологии из спеки (с проверкой версий через context7)
+2. **conventions.md** — конвенции (или предложение на основе стека)
+3. **knowledge.md** — архитектура, data model, API, security (мульти-перспективный анализ)
+4. **gameplan.md** — фазы и задачи
+
+После gameplan — предлагает создать файлы фаз (`.dev-vault/phases/`) и задачи.
+
+## /vault:analyze
+
+Глубокий анализ существующей кодовой базы. Заполняет conventions.md и knowledge.md.
+
+```
+/vault:analyze
+```
+
+**3 фазы:** conventions → knowledge → verification. Каждая фаза требует approval.
+
+## Записи
+
+| Команда | Что создаёт | Где |
+|---------|------------|-----|
+| `/vault:bug` | Запись о решённом баге | `.dev-vault/bugs/` |
+| `/vault:adr` | Архитектурное решение | `.dev-vault/architecture/` |
+| `/vault:debt` | Техдолг | `.dev-vault/debt/` |
+
+## Анализ
+
+| Команда | Что делает |
+|---------|-----------|
+| `/vault:search` | Поиск по vault |
+| `/vault:deps` | Карта зависимостей модулей |
+| `/vault:security-scan` | Аудит безопасности |
+| `/vault:test-gaps` | Поиск непокрытого тестами кода |

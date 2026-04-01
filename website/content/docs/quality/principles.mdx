@@ -1,0 +1,55 @@
+---
+title: Engineering Principles
+description: Базовые инженерные принципы, shared между всеми агентами pipeline
+---
+
+# Engineering Principles
+
+Каждый агент в pipeline получает единый блок принципов. Это не конвенции проекта (naming, structure) — это **инженерный quality bar**.
+
+## Architecture
+
+- **Single Responsibility:** один модуль/файл = одна причина для изменения
+- **Dependency Rule:** inner layers никогда не импортируют из outer layers
+- **Explicit dependencies:** constructor/parameter injection, без скрытых глобалов и синглтонов
+- **Boundaries:** валидация на входных точках системы, доверие внутреннему коду
+
+## Error handling
+
+- **Fail fast** на границах, graceful recovery внутри
+- Каждый error path **протестирован**
+- Нет silent swallowing: `catch` → handle или propagate, никогда пустой catch
+- Внешние вызовы (network, FS, DB) всегда с error handling и timeout
+
+## Production readiness
+
+- Нет `TODO`/`FIXME`/`HACK` в закоммиченном коде
+- Нет debug logging (`console.log`/`print`) — использовать structured logging
+- Нет hardcoded значений, которые должны быть config или constants
+- Idempotent operations где возможно
+
+## Code structure
+
+- Max **300 строк** на файл, **30 строк** на функцию
+- Извлекать при 2+ повторениях ИЛИ > 5 строк нетривиальной логики
+- Composition over inheritance
+- Нет god objects, нет utility dumps (`helpers/`, `utils/`, `misc/`)
+- Types и имена заменяют комментарии — если код требует комментарий, переименовать или извлечь
+
+## Testing
+
+- Тестировать **поведение**, не реализацию
+- Одно логическое assertion на тест
+- Нет shared mutable state между тестами
+- Покрывать: happy path, edge cases (empty, null, boundary), error paths
+
+## Как это используется
+
+Агенты получают PRINCIPLES block и применяют при:
+
+| Агент | Применение |
+|-------|-----------|
+| PLAN | Архитектурный анализ в плане |
+| PLAN_REVIEW | 3 дополнительных критерия: architecture, production readiness, simplicity |
+| CODER | Production checklist перед CODE_DONE |
+| REVIEW:quality | Архитектурные проверки: SRP, layers, god objects |

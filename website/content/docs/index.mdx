@@ -1,0 +1,50 @@
+---
+title: Обзор
+description: dev-workflow — движок разработки с агентами и vault для Claude Code
+---
+
+# dev-workflow
+
+Движок разработки с мульти-агентным pipeline, vault-хранилищем знаний и интеграцией с Claude Code.
+
+## Что это
+
+dev-workflow решает проблему: Claude Code — мощный инструмент, но без структуры он импровизирует. Пропускает ревью, забывает про тесты, теряет контекст между сессиями.
+
+dev-workflow даёт **жёсткий протокол**: каждая задача проходит через 10-шаговый pipeline с quality gates, каждый агент изолирован по правам доступа, контекст сохраняется между сессиями.
+
+## Ключевые компоненты
+
+| Компонент | Назначение |
+|-----------|-----------|
+| **Vault** | Хранилище знаний о проекте: стек, конвенции, архитектура, план |
+| **Агенты** | 8 специализированных ролей: reader, planner, coder, reviewer, tester, committer, architect, debugger |
+| **Workflows** | Цепочки агентов с gates: dev, hotfix, review, test |
+| **Intelligence** | Граф паттернов — автоматический сбор и ранжирование контекста |
+| **Хуки** | Автоматика: session-start/end, post-edit, post-task, pre-compact |
+| **MCP-сервер** | Программный доступ к vault, задачам, intelligence |
+
+## Pipeline
+
+```
+PREFLIGHT → READ → PLAN → PLAN_REVIEW
+→ CODER → REVIEW×3 → fix loop
+→ TEST → VERIFY → COMMIT
+```
+
+Каждый шаг — отдельный агент с изолированными правами. Coder не может коммитить, reviewer не может править код, commit-агент не может читать файлы.
+
+## Быстрый старт
+
+```bash
+npm install -g dev-workflow   # или npm link для разработки
+cd my-project
+dev-workflow init
+```
+
+Затем в Claude Code:
+
+```
+/vault:analyze         — заполнить vault из кодовой базы
+/workflow:dev "задача" — запустить pipeline
+```

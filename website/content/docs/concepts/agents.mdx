@@ -1,0 +1,61 @@
+---
+title: Агенты
+description: 8 специализированных ролей с изолированными правами доступа
+---
+
+# Агенты
+
+Агенты — специализированные роли с жёсткими ограничениями доступа. Каждый агент получает vault-контекст и задачу, возвращает структурированный результат.
+
+## 8 встроенных агентов
+
+| Агент | Роль | Vault-секции | Write | Bash |
+|-------|------|-------------|-------|------|
+| **reader** | Сбор контекста | все | нет | нет |
+| **planner** | Планирование | stack, conventions, knowledge, gameplan | нет | нет |
+| **coder** | Написание кода | stack, conventions, branch | да | build/test |
+| **reviewer** | Ревью кода | conventions, knowledge | нет | нет |
+| **tester** | Тестирование | stack, conventions | tests/ | test |
+| **committer** | Коммит | branch | нет | git only |
+| **architect** | Архитектура | stack, conventions, knowledge, gameplan | нет | нет |
+| **debugger** | Отладка | stack, conventions, knowledge | нет | нет |
+
+## Матрица доступа
+
+Ключевой принцип: **изоляция**. Coder — единственный кто пишет файлы. Reviewer — никогда не правит код. Committer — только 3 git-команды.
+
+```
+Agent      Read   Write   Bash           Subagent
+─────────  ─────  ──────  ─────────────  ────────
+reader     yes    no      no             Explore
+planner    yes    no      no             Explore
+coder      yes    yes     build/test     Full
+reviewer   yes    no      no             Explore
+committer  no     no      git only       Full
+```
+
+Нарушение матрицы = немедленная остановка pipeline.
+
+## Как агенты получают контекст
+
+Каждый агент — шаблон в `templates/agents/<name>.md` с YAML-frontmatter:
+
+```yaml
+name: coder
+description: Writes code strictly by plan
+vault: [stack, conventions, branch]
+read: true
+write: [src/**, tests/**]
+shell: [npm run build, npm run lint]
+git: []
+```
+
+Оркестратор читает vault-файлы, подставляет в шаблон (`{{stack}}`, `{{conventions}}`), передаёт агенту.
+
+## CLI
+
+```bash
+dev-workflow agent list            # список агентов
+dev-workflow agent show coder      # детали агента
+dev-workflow agent run reader "задача"  # сгенерировать промпт
+```

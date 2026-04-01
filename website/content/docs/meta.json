@@ -1,0 +1,12 @@
+{
+  "title": "dev-workflow",
+  "pages": [
+    "index",
+    "installation",
+    "concepts",
+    "commands",
+    "mcp",
+    "quality",
+    "guides"
+  ]
+}
