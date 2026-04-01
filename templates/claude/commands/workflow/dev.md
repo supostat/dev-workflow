@@ -201,6 +201,42 @@ END_PRINCIPLES
 
 ## Procedure
 
+### Step 0: PREFLIGHT
+
+Orchestrator runs directly (no subagent):
+
+```bash
+git status -s                # check for uncommitted changes
+npm run build 2>&1 || true   # baseline build (or cargo build, go build)
+npm test 2>&1 || true        # baseline tests
+```
+
+Save results as BASELINE block:
+
+```
+BASELINE:
+Git: [clean / N uncommitted files]
+Build: [pass / fail]
+Tests: [N passed, M failed / no test command]
+Lint: [pass / N warnings / no lint command]
+END_BASELINE
+```
+
+Display:
+
+```
+── PREFLIGHT ──
+Git: ✅ clean / ⚠️ N uncommitted files
+Build: ✅ / ❌ (baseline failure)
+Tests: ✅ N passed / ⚠️ M already failing
+```
+
+**If uncommitted changes:**
+- **Interactive:** ask: stash / continue / abort
+- **Autonomous:** continue (don't touch existing work)
+
+**If tests already failing:** record failing test names in BASELINE. TEST step (Step 7) will compare against this — only NEW failures are coder's responsibility.
+
 ### Step 1: READ
 
 Read vault context files (if they exist):
@@ -421,10 +457,16 @@ You are a coder agent. The ONLY agent allowed to modify files.
 - Follow the plan. No changes outside the plan. Scope creep FORBIDDEN.
 - Follow project conventions: naming, error handling, file structure.
 - If plan has DEVIATION — implement as described.
-- Write tests from the Tests section of the plan.
 - git commit/push FORBIDDEN.
 - git checkout/reset/rebase FORBIDDEN.
 - Allowed bash: build, test, lint commands only.
+
+## Implementation order (test-first)
+1. Write test files FIRST (from Tests section of the plan)
+2. Run tests — they MUST FAIL (proves tests are meaningful, not vacuous)
+3. Write implementation code
+4. Run tests — they MUST PASS
+5. If a test passes before implementation exists — the test is wrong, rewrite it
 
 ## Production checklist (verify EVERY file before CODE_DONE)
 - [ ] Single responsibility: file/function does one thing
@@ -459,6 +501,9 @@ Changed: [N], Created: [N], Tests: [N]
 
 ### Step 5: REVIEW (3 specialized reviewers in parallel)
 
+Before launching reviewers, orchestrator runs `git diff` to capture actual changes.
+Pass BOTH the CODE_DONE summary AND the real diff to each reviewer.
+
 Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
 
 **REVIEW:security** — Explore subagent:
@@ -468,7 +513,10 @@ You are a SECURITY reviewer. NEVER modify code — only report issues.
 Focus EXCLUSIVELY on security. Ignore style, naming, structure.
 
 ## What coder did
-[CODE_DONE or CODE_FIX block]
+[CODE_DONE or CODE_FIX block — summary]
+
+## Actual diff
+[git diff output — the real changes, not just coder's self-report]
 
 ## Security guidelines
 [.dev-vault/knowledge.md — Security section, or OWASP Top 10 defaults]
@@ -506,7 +554,10 @@ Focus EXCLUSIVELY on code quality and conventions. Ignore security.
 [PLAN block]
 
 ## What coder did
-[CODE_DONE or CODE_FIX block]
+[CODE_DONE or CODE_FIX block — summary]
+
+## Actual diff
+[git diff output — the real changes, not just coder's self-report]
 
 ## Conventions
 [.dev-vault/conventions.md if exists]
@@ -550,7 +601,10 @@ Focus EXCLUSIVELY on test adequacy. Ignore security and style.
 [PLAN block — Tests section]
 
 ## What coder did
-[CODE_DONE or CODE_FIX block]
+[CODE_DONE or CODE_FIX block — summary]
+
+## Actual diff
+[git diff output — the real changes, not just coder's self-report]
 
 ## Check (coverage ONLY)
 - All planned tests written?
@@ -640,11 +694,15 @@ Remaining issues:
 2. Stop without commit
 ```
 
-**Autonomous:** stop without commit. Report failure to orchestrator.
+**Autonomous:** stop without commit. Stash changes for recovery.
 ```
 🛑 STOPPED: review limit reached with unresolved CRITICAL/HIGH issues.
-Changes left uncommitted.
+Changes stashed → git stash push -m "workflow:dev — stopped at review"
 ```
+
+**Rollback on pipeline stop (all stop points):**
+- **Interactive:** ask: keep changes / stash / discard (`git restore .`)
+- **Autonomous:** always stash (`git stash push -m "workflow:dev — stopped at [step]"`)
 
 ### Step 7: TEST (mandatory gate)
 
@@ -657,6 +715,8 @@ npm test         # must pass
 ```
 
 Detect test command from `.dev-vault/stack.md` or `package.json` / `Cargo.toml` / `Makefile`.
+
+**Compare against BASELINE from Step 0:** if a test was already failing before pipeline started, it is NOT a new failure. Only count failures that are NOT in BASELINE as coder's responsibility.
 
 **If any command fails:**
 
