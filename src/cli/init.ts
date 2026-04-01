@@ -208,7 +208,7 @@ function runAutoDetect(projectName: string, vaultPath: string, projectRoot: stri
 
 function ensureGitignoreEntries(projectRoot: string): void {
   const gitignorePath = join(projectRoot, ".gitignore");
-  const entries = [".dev-vault/daily/", ".dev-vault/branches/"];
+  const entries = [".dev-vault/daily/", ".dev-vault/branches/", ".dev-vault/.edit-log.json", ".dev-vault/.intelligence.json"];
 
   let content = "";
   if (existsSync(gitignorePath)) {
