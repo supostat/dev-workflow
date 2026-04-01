@@ -7,8 +7,11 @@ import { renderTemplate } from "../lib/templates.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentContextBuilder } from "../agents/context-builder.js";
 import type { TaskManager } from "../tasks/manager.js";
+import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
+import { IntelligenceStore } from "../intelligence/store.js";
+import { topN } from "../intelligence/ranker.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -78,6 +81,8 @@ export class ToolHandlers {
   private readonly agentRegistry: AgentRegistry;
   private readonly contextBuilder: AgentContextBuilder;
   private readonly taskManager: TaskManager;
+  private readonly intelligenceStore: IntelligenceStore;
+  private readonly taskTracker: TaskTracker;
 
   constructor(
     vaultReader: VaultReader,
@@ -86,6 +91,8 @@ export class ToolHandlers {
     agentRegistry: AgentRegistry,
     contextBuilder: AgentContextBuilder,
     taskManager: TaskManager,
+    intelligenceStore: IntelligenceStore,
+    taskTracker: TaskTracker,
   ) {
     this.vaultReader = vaultReader;
     this.vaultWriter = vaultWriter;
@@ -93,6 +100,8 @@ export class ToolHandlers {
     this.agentRegistry = agentRegistry;
     this.contextBuilder = contextBuilder;
     this.taskManager = taskManager;
+    this.intelligenceStore = intelligenceStore;
+    this.taskTracker = taskTracker;
   }
 
   async handle(toolName: string, params: Record<string, unknown>): Promise<unknown> {
@@ -116,14 +125,21 @@ export class ToolHandlers {
           requireString(params, "content"),
         );
 
-      case "workflow_run":
-        return { message: "Use 'dev-workflow run <workflow> \"task\"' from CLI to execute workflows." };
+      case "vault_status":
+        return this.vaultStatus();
 
       case "workflow_status":
         return this.workflowStatus(optionalString(params, "runId"));
 
-      case "workflow_resume":
-        return { message: "Use 'dev-workflow resume' from CLI to resume paused workflows." };
+      case "intelligence_query":
+        return this.intelligenceQuery(
+          optionalString(params, "branch"),
+          optionalString(params, "task"),
+          params["limit"] as number | undefined,
+        );
+
+      case "task_start":
+        return this.taskStart(requireString(params, "id"));
 
       case "task_create":
         return this.taskCreate(
@@ -202,6 +218,84 @@ export class ToolHandlers {
     if (status) patch["status"] = status;
     if (description) patch["description"] = description;
     return this.taskManager.update(id, patch as { status?: TaskStatus; description?: string });
+  }
+
+  private vaultStatus(): unknown {
+    const sectionInfo = (content: string | null) => {
+      if (!content) return { filled: false, lines: 0 };
+      const lines = content.split("\n").length;
+      return { filled: lines > 8, lines };
+    };
+
+    const tasks = this.taskManager.list();
+    const statusCounts: Record<string, number> = {};
+    for (const task of tasks) {
+      statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
+    }
+
+    const workflowState = new WorkflowState(this.context.vaultPath);
+    const currentRun = workflowState.loadCurrent();
+
+    return {
+      project: this.context.projectName,
+      branch: this.context.branch,
+      sections: {
+        stack: sectionInfo(this.vaultReader.readStack()),
+        conventions: sectionInfo(this.vaultReader.readConventions()),
+        knowledge: sectionInfo(this.vaultReader.readKnowledge()),
+        gameplan: sectionInfo(this.vaultReader.readGameplan()),
+      },
+      tasks: {
+        total: tasks.length,
+        ...statusCounts,
+      },
+      workflow: currentRun ? {
+        active: true,
+        name: currentRun.workflowName,
+        step: currentRun.currentStep,
+        status: currentRun.status,
+      } : null,
+      intelligence: {
+        patterns: this.intelligenceStore.nodeCount(),
+        edges: this.intelligenceStore.edgeCount(),
+      },
+    };
+  }
+
+  private intelligenceQuery(branch?: string, task?: string, limit?: number): unknown {
+    const scoringContext = {
+      branch: branch ?? this.context.branch,
+      taskTitle: task ?? null,
+      recentFiles: [],
+      query: task ?? null,
+    };
+
+    const scored = topN(this.intelligenceStore.allNodes(), scoringContext, limit ?? 15);
+    return scored.map((entry) => ({
+      id: entry.node.id,
+      category: entry.node.category,
+      content: entry.node.content,
+      score: Math.round(entry.score * 1000) / 1000,
+      lastAccessed: entry.node.lastAccessed,
+    }));
+  }
+
+  private taskStart(id: string): unknown {
+    const task = this.taskManager.get(id);
+    const slug = task.title
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+    const branchName = `task/${slug}`;
+
+    this.taskTracker.linkBranch(id, branchName);
+
+    return {
+      id: task.id,
+      title: task.title,
+      status: "in-progress",
+      branch: branchName,
+    };
   }
 
   private agentList(): unknown {

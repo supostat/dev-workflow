@@ -10,6 +10,8 @@ import { VaultWriter } from "../src/lib/writer.js";
 import { AgentRegistry } from "../src/agents/registry.js";
 import { AgentContextBuilder } from "../src/agents/context-builder.js";
 import { TaskManager } from "../src/tasks/manager.js";
+import { TaskTracker } from "../src/tasks/tracker.js";
+import { IntelligenceStore } from "../src/intelligence/store.js";
 import type { ProjectContext } from "../src/lib/types.js";
 
 function createTestEnv() {
@@ -44,17 +46,20 @@ Agent {{projectName}}: {{taskDescription}}
   const registry = new AgentRegistry(agentsDir);
   const contextBuilder = new AgentContextBuilder(vaultReader, context);
   const taskManager = new TaskManager(vaultPath);
+  const intelligenceStore = new IntelligenceStore(vaultPath);
+  const taskTracker = new TaskTracker(projectRoot, taskManager);
   const handlers = new ToolHandlers(
     vaultReader, writer, context, registry, contextBuilder, taskManager,
+    intelligenceStore, taskTracker,
   );
 
   return { projectRoot, context, handlers, taskManager, agentsDir };
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 12 tool definitions", () => {
+  it("returns 13 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(12);
+    expect(tools).toHaveLength(13);
   });
 
   it("each tool has name, description, and inputSchema", () => {
@@ -163,6 +168,56 @@ describe("ToolHandlers", () => {
     expect(result.permissions).toBeTruthy();
   });
 
+  it("vault_status returns structured status", async () => {
+    const result = await env.handlers.handle("vault_status", {}) as {
+      project: string;
+      branch: string;
+      sections: Record<string, { filled: boolean; lines: number }>;
+      tasks: { total: number };
+      intelligence: { patterns: number; edges: number };
+    };
+
+    expect(result.project).toBe("test-project");
+    expect(result.branch).toBe("main");
+    expect(result.sections.stack).toBeDefined();
+    expect(result.sections.conventions).toBeDefined();
+    expect(result.sections.knowledge).toBeDefined();
+    expect(result.sections.gameplan).toBeDefined();
+    expect(result.tasks.total).toBe(0);
+    expect(result.intelligence.patterns).toBeGreaterThanOrEqual(0);
+  });
+
+  it("intelligence_query returns scored patterns", async () => {
+    const result = await env.handlers.handle("intelligence_query", {
+      branch: "main",
+      task: "test query",
+      limit: 5,
+    }) as Array<{ id: string; score: number }>;
+
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("intelligence_query works without parameters", async () => {
+    const result = await env.handlers.handle("intelligence_query", {}) as Array<unknown>;
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("task_start links task to branch", async () => {
+    await env.handlers.handle("task_create", { title: "My Feature" });
+    const result = await env.handlers.handle("task_start", {
+      id: "task-001",
+    }) as { id: string; status: string; branch: string };
+
+    expect(result.id).toBe("task-001");
+    expect(result.status).toBe("in-progress");
+    expect(result.branch).toBe("task/my-feature");
+  });
+
+  it("task_start throws for unknown task", async () => {
+    await expect(env.handlers.handle("task_start", { id: "task-999" }))
+      .rejects.toThrow();
+  });
+
   it("throws for unknown tool", async () => {
     await expect(env.handlers.handle("nonexistent", {}))
       .rejects.toThrow("Unknown tool: nonexistent");
@@ -212,7 +267,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(12);
+    expect(result.tools).toHaveLength(13);
   });
 
   it("handles tools/call", async () => {

@@ -58,16 +58,11 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
-      name: "workflow_run",
-      description: "Start a development workflow (dev, hotfix, review, test)",
+      name: "vault_status",
+      description: "Get full vault status: section completeness, tasks summary, active workflow, intelligence stats",
       inputSchema: {
         type: "object",
-        properties: {
-          workflow: { type: "string", enum: ["dev", "hotfix", "review", "test"] },
-          task: { type: "string", description: "Task description" },
-          taskId: { type: "string", description: "Optional task ID to link" },
-        },
-        required: ["workflow", "task"],
+        properties: {},
       },
     },
     {
@@ -81,15 +76,26 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
-      name: "workflow_resume",
-      description: "Resume a paused workflow",
+      name: "intelligence_query",
+      description: "Query intelligence graph for relevant patterns scored by recency, frequency, and context match",
       inputSchema: {
         type: "object",
         properties: {
-          runId: { type: "string" },
-          stepOutput: { type: "string", description: "Output for the paused step" },
+          branch: { type: "string", description: "Current branch for context scoring" },
+          task: { type: "string", description: "Task description for context scoring" },
+          limit: { type: "number", description: "Max results (default 15)" },
         },
-        required: ["runId"],
+      },
+    },
+    {
+      name: "task_start",
+      description: "Start a task: set status to in-progress and link to a git branch",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Task ID" },
+        },
+        required: ["id"],
       },
     },
     {
