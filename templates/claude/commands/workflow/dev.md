@@ -94,6 +94,12 @@ for each subtask in PLAN.Subtasks:
   TEST after each subtask:
   - Run ALL tests (not just new ones) — catches regressions
   - If fail → CODER fix → re-test
+
+  After subtask complete — VAULT REFRESH:
+  - Re-read .dev-vault/conventions.md (may have new patterns from review)
+  - Re-read .dev-vault/knowledge.md (may have new gotchas from review)
+  - Pass updated vault content to next subtask's CODER and REVIEW agents
+  - This ensures each subtask benefits from findings of previous subtasks
 ```
 
 **Step 7 (COMMIT) in phase mode** — one commit for the entire phase:
