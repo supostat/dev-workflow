@@ -57,9 +57,9 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 13 tool definitions", () => {
+  it("returns 14 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(14);
   });
 
   it("each tool has name, description, and inputSchema", () => {
@@ -267,7 +267,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(13);
+    expect(result.tools).toHaveLength(14);
   });
 
   it("handles tools/call", async () => {

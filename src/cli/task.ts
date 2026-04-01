@@ -2,7 +2,9 @@ import { detectContext } from "../lib/context.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
+import { join } from "node:path";
 import { icon, statusIcon, table } from "../lib/output.js";
+import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 
 function parseFlag(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -24,6 +26,9 @@ export function task(args: string[]): void {
   switch (subcommand) {
     case "create":
       taskCreate(manager, args.slice(1));
+      break;
+    case "create-from-phase":
+      taskCreateFromPhase(manager, context.projectRoot, args[1]);
       break;
     case "list":
       taskList(manager, args.slice(1));
@@ -162,6 +167,38 @@ function taskBlock(manager: TaskManager, id: string | undefined): void {
     console.log(`Task ${id} marked as blocked`);
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : "Task not found");
+    process.exitCode = 1;
+  }
+}
+
+function taskCreateFromPhase(manager: TaskManager, projectRoot: string, phaseFile: string | undefined): void {
+  if (!phaseFile) {
+    console.error("Usage: dev-workflow task create-from-phase <phase-file>");
+    process.exitCode = 1;
+    return;
+  }
+
+  const fullPath = phaseFile.startsWith("/") ? phaseFile : join(projectRoot, phaseFile);
+
+  try {
+    const result = createTasksFromPhase(fullPath, manager);
+    if (result.created.length > 0) {
+      console.log(`Created ${result.created.length} tasks:`);
+      for (const title of result.created) {
+        console.log(`  + ${title}`);
+      }
+    }
+    if (result.skipped.length > 0) {
+      console.log(`Skipped ${result.skipped.length} (already exist):`);
+      for (const title of result.skipped) {
+        console.log(`  = ${title}`);
+      }
+    }
+    if (result.created.length === 0 && result.skipped.length === 0) {
+      console.log("No tasks found in phase file.");
+    }
+  } catch (error: unknown) {
+    console.error(error instanceof Error ? error.message : "Failed to parse phase file");
     process.exitCode = 1;
   }
 }

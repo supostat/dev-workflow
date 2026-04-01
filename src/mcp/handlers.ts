@@ -13,6 +13,7 @@ import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { topN } from "../intelligence/ranker.js";
 import { syncFromVault } from "../intelligence/sync.js";
+import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -141,6 +142,9 @@ export class ToolHandlers {
 
       case "task_start":
         return this.taskStart(requireString(params, "id"));
+
+      case "task_create_from_phase":
+        return this.taskCreateFromPhase(requireString(params, "phaseFile"));
 
       case "task_create":
         return this.taskCreate(
@@ -283,6 +287,11 @@ export class ToolHandlers {
       score: Math.round(entry.score * 1000) / 1000,
       lastAccessed: entry.node.lastAccessed,
     }));
+  }
+
+  private taskCreateFromPhase(phaseFile: string): unknown {
+    const fullPath = phaseFile.startsWith("/") ? phaseFile : join(this.context.projectRoot, phaseFile);
+    return createTasksFromPhase(fullPath, this.taskManager);
   }
 
   private taskStart(id: string): unknown {

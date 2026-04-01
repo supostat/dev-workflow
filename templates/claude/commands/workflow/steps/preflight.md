@@ -4,11 +4,16 @@ Orchestrator runs directly (no subagent).
 
 ## Phase mode: auto-create tasks
 
-If argument is a phase file:
-1. Read `## Tasks` section from phase file
-2. Check `.dev-vault/tasks/` for matching tasks (by title substring match)
-3. If tasks are missing — create them via `dev-workflow task create "<title>"` for each task in the phase
-4. Display created tasks
+If argument is a phase file, call MCP tool `task_create_from_phase`:
+
+```
+task_create_from_phase(phaseFile: "<path to phase file>")
+```
+
+This parses `## Tasks` from the phase file and creates missing tasks automatically.
+Returns: `{ created: [...], skipped: [...] }`.
+
+Display the result before proceeding.
 
 ## Baseline check
 

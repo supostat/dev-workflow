@@ -134,6 +134,17 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
+      name: "task_create_from_phase",
+      description: "Parse ## Tasks from a phase file and create missing tasks",
+      inputSchema: {
+        type: "object",
+        properties: {
+          phaseFile: { type: "string", description: "Path to phase file, e.g. .dev-vault/phases/phase-3-core.md" },
+        },
+        required: ["phaseFile"],
+      },
+    },
+    {
       name: "agent_list",
       description: "List available agents with their capabilities",
       inputSchema: {
