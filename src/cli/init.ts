@@ -27,12 +27,11 @@ function writeIfMissing(filepath: string, content: string, force: boolean): bool
 }
 
 function buildSettingsJson(): string {
-  // Resolve the path to hooks relative to project
-  // When installed as dependency: node_modules/dev-workflow/dist/hooks/
-  // When linked: direct path
-  const hookBase = "node_modules/dev-workflow/dist/hooks";
-  const statuslinePath = "node_modules/dev-workflow/dist/lib/statusline.js";
-  const mcpServerPath = "node_modules/dev-workflow/dist/cli/serve.js";
+  // Resolve paths from the actual package location (works for npm link, global, and local installs)
+  const distDir = join(PACKAGE_ROOT, "dist");
+  const hookBase = join(distDir, "hooks");
+  const statuslinePath = join(distDir, "lib", "statusline.js");
+  const mcpServerPath = join(distDir, "cli", "serve.js");
 
   return JSON.stringify({
     hooks: {
