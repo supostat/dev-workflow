@@ -38,6 +38,10 @@
   ],
   "author": "Igor Pugachev",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supostat/dev-workflow.git"
+  },
   "engines": {
     "node": ">=20"
   },
