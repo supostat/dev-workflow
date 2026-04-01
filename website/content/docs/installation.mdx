@@ -37,11 +37,43 @@ dev-workflow init
 
 | Что | Где | Назначение |
 |-----|-----|-----------|
-| Vault | `.dev-vault/` | Хранилище знаний (stack, conventions, knowledge, gameplan) |
-| Хуки | `.claude/settings.json` | 5 автоматических хуков для Claude Code |
-| MCP-сервер | `.claude/settings.json` | Программный доступ к vault |
-| Slash-команды | `.claude/commands/` | 4 группы: vault/, session/, git/, workflow/ |
+| CLAUDE.md | `./CLAUDE.md` | Инструкции для Claude Code (команды, vault, workflow) |
+| Vault | `.dev-vault/` | Хранилище знаний (stack, conventions, knowledge, gameplan, phases, plans) |
+| Хуки | `.claude/settings.json` | 5 хуков: SessionStart, SessionEnd, PostToolUse, TaskCompleted, PreCompact |
+| Permissions | `.claude/settings.json` | Разрешения: файлы, тесты, git, агенты, MCP |
+| MCP-сервер | `.mcp.json` | Программный доступ к vault (13 tools) |
+| Slash-команды | `.claude/commands/` | 4 группы: vault/ (8), session/ (3), git/ (4), workflow/ (1) |
 | StatusLine | `.claude/settings.json` | Статус проекта в нижней строке Claude Code |
+| .gitignore | `.gitignore` | Записи по стеку (node\_modules, target/, \_\_pycache\_\_ и т.д.) |
+
+### Permissions
+
+`init` добавляет permissions в `.claude/settings.json`:
+
+| Allow | Deny |
+|-------|------|
+| Read, Edit, Write | .env файлы |
+| npm/pnpm test, run, build | git push |
+| node, npx | git reset --hard |
+| git status, diff, log, add, commit | rm -rf |
+| Agent spawning, MCP tools | |
+
+### MCP-сервер
+
+MCP конфигурация в `.mcp.json` (Claude Code автоматически обнаруживает):
+
+```json
+{
+  "mcpServers": {
+    "dev-workflow": {
+      "command": "node",
+      "args": ["/path/to/dist/cli/index.js", "serve"]
+    }
+  }
+}
+```
+
+Путь вычисляется автоматически при `init` — абсолютный, работает для npm link, глобальной установки и локальной зависимости.
 
 ## Проверка
 

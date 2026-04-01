@@ -1,6 +1,6 @@
 ---
 title: Хуки
-description: Автоматика Claude Code — session, post-edit, post-task, pre-compact
+description: Автоматика Claude Code — session, post-edit, task completed, pre-compact
 ---
 
 # Хуки
@@ -9,17 +9,60 @@ description: Автоматика Claude Code — session, post-edit, post-task,
 
 ## Список хуков
 
-| Хук | Когда | Что делает |
-|-----|-------|-----------|
+| Event name | Когда | Что делает |
+|------------|-------|-----------|
 | **SessionStart** | Начало сессии | Загружает vault-контекст, intelligence, задачи, workflow |
 | **SessionEnd** | Конец сессии | Сохраняет daily log, обновляет intelligence, паузит workflow |
-| **PostEdit** | После редактирования файла | Трекает редактирование в intelligence |
-| **PostTask** | После завершения задачи | Записывает в daily log |
+| **PostToolUse** | После Write/Edit/MultiEdit | Трекает редактирование файлов в intelligence |
+| **TaskCompleted** | После завершения задачи | Записывает в daily log с названием задачи |
 | **PreCompact** | Перед сжатием контекста | Сохраняет маркер для восстановления |
+
+## Stdin JSON
+
+Все хуки получают данные от Claude Code через **stdin в JSON-формате**, не через env variables:
+
+```json
+{
+  "session_id": "abc123",
+  "cwd": "/path/to/project",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/path/to/file.ts"
+  }
+}
+```
+
+Каждый хук парсит stdin и извлекает нужные поля:
+
+| Хук | Что читает из stdin |
+|-----|---|
+| SessionStart | `cwd`, `source` |
+| SessionEnd | `cwd` |
+| PostToolUse | `cwd`, `tool_input.file_path` |
+| TaskCompleted | `cwd`, `task_subject` |
+| PreCompact | `cwd`, `compaction_trigger` |
+
+## Формат ответа
+
+Хуки возвращают JSON в stdout:
+
+```json
+{
+  "continue": true,
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "vault context injected here"
+  }
+}
+```
+
+- `continue: true` — Claude Code продолжает работу
+- `hookSpecificOutput.additionalContext` — для SessionStart: vault-контекст инжектится в сессию
 
 ## SessionStart
 
-Самый важный хук. При каждом старте сессии Claude Code получает:
+Самый важный хук. При каждом старте сессии Claude Code получает через `additionalContext`:
 
 - Имя проекта и текущую ветку
 - Содержимое vault (stack, conventions, knowledge, gameplan)
@@ -37,10 +80,17 @@ description: Автоматика Claude Code — session, post-edit, post-task,
 - Обновляет intelligence: co-edited файлы, данные сессии
 - Если workflow был running — ставит на паузу
 
+## PostToolUse (Write/Edit/MultiEdit)
+
+Трекает каждый отредактированный файл:
+
+- Извлекает `tool_input.file_path` из stdin JSON
+- Записывает в `.dev-vault/.edit-log.json`
+- Обновляет intelligence store (file-edit паттерн)
+
 ## Ручной запуск (для тестирования)
 
 ```bash
-node node_modules/dev-workflow/dist/hooks/session-start.js
-node node_modules/dev-workflow/dist/hooks/session-end.js
-CLAUDE_FILE_PATH="src/file.ts" node node_modules/dev-workflow/dist/hooks/post-edit.js
+echo '{}' | node /path/to/dist/hooks/session-start.js
+echo '{"tool_input":{"file_path":"src/file.ts"}}' | node /path/to/dist/hooks/post-edit.js
 ```

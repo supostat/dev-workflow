@@ -77,6 +77,15 @@ Planner обязан включить в план:
 
 Каждый получает реальный `git diff`, а не самоотчёт coder-а.
 
+## Plan persistence
+
+После утверждения плана (PLAN_REVIEW APPROVED) — полный план сохраняется в vault:
+
+- **Phase mode:** `.dev-vault/phases/<phase-file>.plan.md` (рядом с файлом фазы)
+- **Normal mode:** `.dev-vault/plans/<date>-<slug>.plan.md`
+
+Зачем: resume при обрыве сессии, аудит план vs реализация, context recovery.
+
 ## CODER: test-first
 
 1. Пишет тесты (из секции Tests плана)
