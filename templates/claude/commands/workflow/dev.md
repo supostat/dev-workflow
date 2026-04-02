@@ -58,6 +58,9 @@ Step 7:  Read steps/test.md        → run build + lint + tests
 Step 8:  Read steps/verify.md      → launch Explore agent → COMPLETE / INCOMPLETE
 Step 9:  Read steps/commit.md      → stage + commit (interactive or autonomous)
 Step 9b: Read steps/vault-updates.md → update daily log, task status
+
+ON STOP (pipeline aborted at any step):
+  Read steps/vault-updates.md → record findings, ADR, debt BEFORE stopping
 ```
 
 ### Phase mode

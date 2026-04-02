@@ -1,7 +1,11 @@
-# Step 9b: Vault updates (after commit)
+# Step 9b: Vault updates (after commit OR pipeline stop)
 
-Orchestrator writes directly to vault after successful commit.
+Orchestrator writes to vault after successful commit AND when pipeline stops/aborts.
 Use **Edit tool** to append — **never overwrite** existing vault files.
+
+**IMPORTANT:** Vault writes MUST happen even if pipeline did not reach COMMIT.
+If pipeline stopped at REVIEW (blocker), TEST (fail), or VERIFY (incomplete) —
+still record findings, decisions, and deferred work before stopping.
 
 ## 1. Daily log
 

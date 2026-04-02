@@ -195,6 +195,19 @@ Project knowledge is stored in \`.dev-vault/\`:
 4. Review: \`/session:review\`
 5. Handover: \`/session:handover\`
 
+### Vault write rules (ALWAYS ACTIVE)
+
+When the user agrees to a scope change, architecture decision, or deferred work — record IMMEDIATELY:
+
+- **Architecture/scope decision** (user says "yes" to a proposal) → \`vault_record(type: "adr", title, content)\`
+- **Work deferred** (user agrees to postpone something) → \`vault_record(type: "debt", title, content)\`
+- **New gotcha discovered** → append to \`.dev-vault/knowledge.md\` section "Gotchas" (Edit tool, APPEND)
+- **Gameplan changed** (phases reordered, tasks moved) → update \`.dev-vault/gameplan.md\` (Edit tool)
+
+This applies in ALL contexts: during /workflow:dev (including aborted pipelines), free conversation, /vault:arch. Do NOT wait for pipeline completion. Record when user confirms.
+
+Use Edit tool to APPEND to existing vault files. NEVER use Write tool on existing files.
+
 ## Project
 
 <!-- Add project-specific instructions below -->
