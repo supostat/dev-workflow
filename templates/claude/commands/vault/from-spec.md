@@ -300,12 +300,15 @@ After creation:
 
 ## Rules
 
-- **Gate criteria:** each phase requires explicit user approval before writing
-- **Preserve existing content** — never overwrite filled sections, only append
-- **Be specific** — "TypeScript 5.x with strict mode" not "typed language"
-- **Derive when implicit** — if spec says "REST API" but not "Express", propose based on stack
+- **Gate criteria:** each phase REQUIRES explicit user approval before writing. Do NOT skip approval.
+- **APPEND ONLY** — use Edit tool to append. NEVER use Write tool on existing vault files.
+- **Be specific** — "TypeScript 5.x with strict mode" not "typed language". Vague = rewrite.
+- **Verify versions** — MUST use context7 MCP for library versions. No guessing from training data.
+- **Derive when implicit** — if spec says "REST API" but not "Express", MUST research and propose with rationale
 - **Skip empty phases** — if spec has no data model, skip 3b entirely
-- **No secrets** — never include API keys, passwords, or credentials
-- **Reference spec** — cite which part of the spec each item comes from
+- **No secrets** — NEVER include API keys, passwords, or credentials
+- **Reference spec** — MUST cite which part of the spec each item comes from
+- **No "best-effort"** — every item MUST be verified against spec or codebase
 - **Multi-perspective on architecture only** — other phases use single-pass analysis
+- **Gameplan phases are coarse** — detailed task breakdown happens in `/task` and `/workflow`
 - **Gameplan phases are coarse** — detailed task breakdown happens in `/task` and `/workflow`

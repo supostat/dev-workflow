@@ -100,11 +100,12 @@ For each phase:
 
 ## Rules
 
-- **Gate criteria:** each phase requires explicit user approval
-- **Preserve existing content** — never overwrite, only append
-- **Be specific** — "functions use snake_case" not "standard naming"
-- **Reference files** — "error handling in cli/src/main.rs uses anyhow"
+- **Gate criteria:** each phase REQUIRES explicit user approval. Do NOT skip.
+- **APPEND ONLY** — use Edit tool. NEVER use Write tool on existing vault files.
+- **Be specific** — "functions use snake_case" not "standard naming". Vague = rewrite.
+- **Reference files** — MUST include file path: "error handling in cli/src/main.rs uses anyhow"
 - **Skip gameplan.md** — roadmap is human-authored
 - **Don't add utility crates/packages to stack.md** — only frameworks, ORMs, test runners
-- Read max 15 files
-- Never include secrets or credentials
+- **MUST read minimum 10 files, maximum 15** — not fewer, not "a few"
+- **Verification:** after each phase, verify no contradictions with existing vault content
+- NEVER include secrets or credentials

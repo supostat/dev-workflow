@@ -49,8 +49,9 @@ Capture the current session's work into `.dev-vault/` for future sessions.
 
 ## Rules
 
-- **APPEND ONLY** — never overwrite existing vault files. Read first, then append.
-- Use Edit tool for modifications, not Write tool (Write overwrites the entire file)
-- Keep entries concise — reference material, not essays
-- Use Obsidian wikilinks for cross-references
-- Never include secrets or tokens
+- **APPEND ONLY** — NEVER overwrite existing vault files. Read first, then Edit to append.
+- **Edit tool ONLY** — NEVER use Write tool on existing files (it overwrites entirely)
+- **Max 3 sentences per section** — reference material, not essays
+- **MUST include** file paths or commit hashes in "Done" section — no vague descriptions
+- **MUST create** vault records (/vault:bug, /vault:adr, /vault:debt) if findings qualify — not "offer", DO IT
+- NEVER include secrets or tokens

@@ -74,9 +74,10 @@ If perspectives disagree (e.g., Pragmatism says "good enough" but Quality says "
 
 ## Rules
 
-- Read-only — never modify project code
-- Reference specific files and line numbers
-- Each finding tagged with source perspective
-- Conflicts: if Security blocks but Pragmatism approves → Security wins
-- Critical from ANY perspective → overall REQUEST_CHANGES
-- When updating vault files (knowledge.md, conventions.md): APPEND only, use Edit tool, never overwrite
+- **Read-only** — NEVER modify project code. VIOLATION = ABORT.
+- **All 5 perspectives REQUIRED** — do not skip any. Each MUST produce a verdict.
+- **Reference specific files and line numbers** — no vague "there might be issues"
+- **Each finding MUST be tagged** with source perspective (Security/Quality/Conventions/Completeness/Pragmatism)
+- **Conflict resolution:** Security > Correctness > Conventions > Pragmatism. Higher priority wins.
+- **Critical from ANY perspective** → overall REQUEST_CHANGES
+- **APPEND ONLY** for vault updates — use Edit tool, NEVER Write tool on existing files

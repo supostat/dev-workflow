@@ -41,3 +41,11 @@ Use this exact format (markdown, not code block):
 - **New branch without context** → ask user about goal, create branch file
 - **No vault** → suggest `dev-workflow init`
 - **Empty vault files** → suggest `/vault:analyze`
+
+## Rules
+
+- **MUST read ALL 4 vault files** (stack, conventions, knowledge, gameplan) — do not skip any
+- **MUST check** for active tasks and paused workflows — not optional
+- **MUST display** branch context if not on main — not optional
+- **Resume complete when:** all vault sections shown + branch context + tasks + workflow status
+- Read-only — NEVER modify vault files during resume
