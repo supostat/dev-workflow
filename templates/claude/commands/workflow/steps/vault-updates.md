@@ -47,21 +47,52 @@ After each subtask complete:
 - Re-read `.dev-vault/knowledge.md` (may have new gotchas from review)
 - Pass updated vault content to next subtask's CODER and REVIEW agents
 
-## 5. Suggest vault records
+## 5. Auto-create vault records
 
-If the pipeline produced notable findings, suggest (do not auto-create):
+Create records automatically using MCP tool `vault_record(type, title, content)`.
+Data is already in pipeline context — no need to ask the user.
 
-- **Architecture decision made** (e.g., chose pattern, changed layer structure) → suggest `/vault:adr`
-- **Non-trivial bug fixed** (root cause worth remembering) → suggest `/vault:bug`
-- **Work deferred** (known issue left for later) → suggest `/vault:debt`
+### ADR (architecture decisions)
 
-Display:
+Create if PLAN contained:
+- DEVIATION from conventions (with justification)
+- Architecture section with alternatives considered
+- Dependency direction change or new layer introduced
 
 ```
-Suggest vault records:
-  → /vault:adr — "<decision title>"
-  → /vault:bug — "<bug title>"
-  → /vault:debt — "<deferred work>"
+vault_record(type: "adr", title: "<decision>", content: "Context: <from PLAN>\nDecision: <what was chosen>\nAlternatives: <from PLAN Architecture section>\nConsequences: <trade-offs>")
 ```
 
-Only suggest if there are actual findings. Do not suggest if pipeline was clean.
+### Bug (fixed issues)
+
+Create if REVIEW found CRITICAL or HIGH and CODER fixed it:
+- Root cause was non-obvious
+- Fix required understanding of system internals
+
+```
+vault_record(type: "bug", title: "<issue summary>", content: "Symptoms: <from REVIEW issue>\nRoot cause: <from CODE_FIX>\nFix: <what was changed>\nPrevention: <how to avoid>")
+```
+
+### Debt (deferred work)
+
+Create if CODER skipped MEDIUM review issues:
+- Issue acknowledged but not fixed
+- Reason documented in CODE_FIX Skipped section
+
+```
+vault_record(type: "debt", title: "<deferred issue>", content: "Problem: <from REVIEW issue>\nWhy deferred: <from CODE_FIX Skipped reason>\nProposal: <suggested fix>\nRisk if ignored: <impact>")
+```
+
+### Rules
+
+- Only create if data exists in pipeline context (PLAN, REVIEW, CODE_FIX blocks)
+- Do NOT create for: LOW/style issues, clean pipelines with no findings, trivial bugs
+- One record per significant finding, not one per REVIEW issue
+- Display created records in summary:
+
+```
+Vault records created:
+  ADR: .dev-vault/architecture/<date>-<slug>.md
+  Bug: .dev-vault/bugs/<date>-<slug>.md
+  Debt: .dev-vault/debt/<date>-<slug>.md
+```
