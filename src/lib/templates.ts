@@ -216,6 +216,19 @@ This applies in ALL contexts: /workflow:dev (including aborted), free conversati
 
 Use Edit tool to APPEND to existing vault files. NEVER use Write tool on existing files.
 
+### Questions to user (ALWAYS ACTIVE)
+
+Questions MUST be unambiguous. User's answer must map to exactly one action.
+
+- **NEVER ask OR-questions answerable with yes/no:**
+  BAD: "Continue or stash first?" (what does "yes" mean?)
+  GOOD: "1. Continue with uncommitted changes  2. Stash first  3. Commit first"
+- **Use numbered options** for choices (2-4 options). User answers with number.
+- **Use yes/no ONLY** for binary questions with one clear action:
+  GOOD: "Commit these changes? (yes/no)"
+  BAD: "Should we fix this or skip it?" (yes = fix? yes = skip?)
+- **Default option**: mark with "(default)" if one option is recommended.
+
 ## Project
 
 <!-- Add project-specific instructions below -->
