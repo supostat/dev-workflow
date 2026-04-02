@@ -98,6 +98,8 @@ Violation = immediate pipeline abort.
 | `/vault:bug` | Record a resolved bug |
 | `/vault:adr` | Record an architecture decision |
 | `/vault:debt` | Record tech debt |
+| `/vault:arch` | Architecture analysis: 2-3 options with trade-offs |
+| `/vault:project-review` | Full project audit: 7 perspectives, A-F scoring |
 | `/vault:deps` | Map module dependencies |
 | `/vault:security-scan` | Security audit |
 | `/vault:test-gaps` | Find untested code |
