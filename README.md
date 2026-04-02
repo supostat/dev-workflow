@@ -145,7 +145,7 @@ dev-workflow serve                       # Start MCP server
 
 ## MCP Tools
 
-13 tools available via MCP server:
+14 tools available via MCP server:
 
 | Tool | Description |
 |------|------------|
@@ -159,6 +159,7 @@ dev-workflow serve                       # Start MCP server
 | `task_list` | List tasks |
 | `task_update` | Update task |
 | `task_start` | Start task (link to branch) |
+| `task_create_from_phase` | Parse phase file and create missing tasks |
 | `workflow_status` | Current workflow status |
 | `agent_list` | List agents with permissions |
 | `agent_run` | Generate agent prompt with vault context |
