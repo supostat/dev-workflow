@@ -197,14 +197,22 @@ Project knowledge is stored in \`.dev-vault/\`:
 
 ### Vault write rules (ALWAYS ACTIVE)
 
-When the user agrees to a scope change, architecture decision, or deferred work — record IMMEDIATELY:
+When a scope change, architecture decision, deferred work, or new gotcha is **mentioned, confirmed, or implied** — record IMMEDIATELY. Do NOT wait for explicit "yes". Triggers:
 
-- **Architecture/scope decision** (user says "yes" to a proposal) → \`vault_record(type: "adr", title, content)\`
-- **Work deferred** (user agrees to postpone something) → \`vault_record(type: "debt", title, content)\`
-- **New gotcha discovered** → append to \`.dev-vault/knowledge.md\` section "Gotchas" (Edit tool, APPEND)
-- **Gameplan changed** (phases reordered, tasks moved) → update \`.dev-vault/gameplan.md\` (Edit tool)
+- User writes "defer X", "move X to phase Y", "postpone", "skip for now" → **debt** + **gameplan update**
+- User writes "let's use X instead of Y", "chose X", "decided on X" → **ADR**
+- User writes "X doesn't work because Y", "blocker: X" → **gotcha** in knowledge.md
+- User writes "change phase scope", "reduce phase", "add to phase" → **gameplan update** + **ADR**
+- Pipeline REVIEW finds blocker → **ADR** (decision to stop/change) + **debt** (deferred work)
+- User updates task status with reason → **debt** if blocked/deferred, **ADR** if scope change
 
-This applies in ALL contexts: during /workflow:dev (including aborted pipelines), free conversation, /vault:arch. Do NOT wait for pipeline completion. Record when user confirms.
+Actions:
+- **Architecture/scope decision** → \`vault_record(type: "adr", title, content)\`
+- **Work deferred** → \`vault_record(type: "debt", title, content)\`
+- **New gotcha** → append to \`.dev-vault/knowledge.md\` section "Gotchas" (Edit tool, APPEND)
+- **Gameplan changed** → update \`.dev-vault/gameplan.md\` (Edit tool)
+
+This applies in ALL contexts: /workflow:dev (including aborted), free conversation, /vault:arch, task updates. Do NOT wait for pipeline completion. Record the moment the decision becomes clear.
 
 Use Edit tool to APPEND to existing vault files. NEVER use Write tool on existing files.
 
