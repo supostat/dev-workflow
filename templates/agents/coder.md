@@ -1,7 +1,7 @@
 ---
 name: coder
 description: Writes code following project conventions
-vault: [stack, conventions, branch]
+vault: [stack, conventions, branch, engram]
 read: true
 write: [src/**, tests/**]
 shell: [npm run build, npm run lint]
@@ -32,6 +32,9 @@ Write code strictly following the plan. The ONLY agent allowed to modify project
 
 ### Branch: {{branch}}
 {{branchContext}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Plan
 

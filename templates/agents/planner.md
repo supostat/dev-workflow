@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Creates implementation plans with clear steps
-vault: [stack, conventions, knowledge, gameplan]
+vault: [stack, conventions, knowledge, gameplan, engram]
 read: true
 write: []
 shell: []
@@ -34,6 +34,9 @@ Create a detailed implementation plan. Your output is the plan itself.
 
 ### Gameplan
 {{gameplan}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Task
 

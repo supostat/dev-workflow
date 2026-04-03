@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Diagnoses bugs through systematic root cause analysis
-vault: [stack, conventions, knowledge]
+vault: [stack, conventions, knowledge, engram]
 read: true
 write: []
 shell: []
@@ -32,6 +32,9 @@ and identifying root causes. Your output is the diagnosis and fix recommendation
 
 ### Knowledge (gotchas)
 {{knowledge}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Bug Report
 

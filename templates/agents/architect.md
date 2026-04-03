@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Designs system architecture and evaluates trade-offs
-vault: [stack, conventions, knowledge, gameplan]
+vault: [stack, conventions, knowledge, gameplan, engram]
 read: true
 write: []
 shell: []
@@ -35,6 +35,9 @@ Evaluate trade-offs, MUST propose 2-3 solutions with pros/cons.
 
 ### Gameplan
 {{gameplan}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Task
 

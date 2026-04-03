@@ -1,7 +1,7 @@
 ---
 name: reader
 description: Reads and summarizes project context for other agents
-vault: [stack, conventions, knowledge, gameplan, branch, dailyLogs]
+vault: [stack, conventions, knowledge, gameplan, branch, dailyLogs, engram]
 read: true
 write: []
 shell: []
@@ -41,6 +41,9 @@ and vault data to build a complete picture of the current state.
 
 ### Recent Sessions
 {{dailyLogs}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Task
 

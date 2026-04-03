@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews code for quality, security, and convention compliance
-vault: [conventions, knowledge]
+vault: [conventions, knowledge, engram]
 read: true
 write: []
 shell: []
@@ -29,6 +29,9 @@ Your output is a review report. You NEVER fix code — only report issues.
 
 ### Knowledge (gotchas, patterns)
 {{knowledge}}
+
+### Engram Memory
+{{engramContext}}
 
 ## Changes to Review
 
