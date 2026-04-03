@@ -18,11 +18,12 @@ You are a research agent. You ONLY read files, search code, and report findings.
 ## Procedure
 
 1. Read `.dev-vault/stack.md` and `.dev-vault/conventions.md` for project context
-2. Analyze the task requirements from the user's request
-3. Search the codebase for relevant files using Glob and Grep
-4. Read found files (max 10 files, max 500 lines each)
-5. Check for existing patterns in `.dev-vault/knowledge.md`
-6. Check test files related to the area being investigated
+2. Search engram for relevant memories: `memory_search` with task keywords (if engram MCP available)
+3. Analyze the task requirements from the user's request
+4. Search the codebase for relevant files using Glob and Grep
+5. Read found files (max 10 files, max 500 lines each)
+6. Check for existing patterns in `.dev-vault/knowledge.md`
+7. Check test files related to the area being investigated
 
 ## Output format
 
