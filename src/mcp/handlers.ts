@@ -337,9 +337,9 @@ export class ToolHandlers {
     return current;
   }
 
-  private agentRun(agentName: string, task: string): unknown {
+  private async agentRun(agentName: string, task: string): Promise<unknown> {
     const agent = this.agentRegistry.get(agentName);
-    const prepared = this.contextBuilder.prepare(agent, { taskDescription: task });
+    const prepared = await this.contextBuilder.prepare(agent, { taskDescription: task });
     return {
       prompt: prepared.resolvedPrompt,
       permissions: agent.permissions,

@@ -7,6 +7,7 @@ import { VaultWriter } from "../lib/writer.js";
 import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { Collector } from "../intelligence/collector.js";
+import { engramStore } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 function git(args: string[], cwd: string): string {
@@ -73,6 +74,18 @@ async function run(): Promise<void> {
     collector.recordSession(context.branch, changedFiles);
     collector.recordCoEditedFiles(changedFiles);
     intelligenceStore.save();
+  }
+
+  const fileCount = changedFiles.length;
+  if (fileCount > 0) {
+    await engramStore(
+      `Session on ${context.branch}: ${fileCount} files changed`,
+      `Changed: ${changedFiles.slice(0, 10).join(", ")}`,
+      statusShort ? `Status: ${statusShort.split("\n").length} uncommitted` : "Clean",
+      "context",
+      `${context.projectName},${context.branch},session`,
+      context.projectName,
+    );
   }
 
   const workflowState = new WorkflowState(context.vaultPath);

@@ -162,7 +162,7 @@ export class WorkflowEngine {
         taskDescription: run.taskDescription,
         ...previousOutputs,
       };
-      const prepared = this.contextBuilder.prepare(agent, variables);
+      const prepared = await this.contextBuilder.prepare(agent, variables);
 
       stepState.status = "running";
       stepState.startedAt = nowISO();

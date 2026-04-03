@@ -223,7 +223,7 @@ describe("AgentContextBuilder", () => {
     rmSync(context.projectRoot, { recursive: true, force: true });
   });
 
-  it("substitutes vault data into prompt", () => {
+  it("substitutes vault data into prompt", async () => {
     const reader = new VaultReader(context);
     const builder = new AgentContextBuilder(reader, context);
 
@@ -232,7 +232,7 @@ describe("AgentContextBuilder", () => {
     const registry = new AgentRegistry(agentDir);
     const agent = registry.get("coder");
 
-    const prepared = builder.prepare(agent, { taskDescription: "Add login page" });
+    const prepared = await builder.prepare(agent, { taskDescription: "Add login page" });
 
     expect(prepared.resolvedPrompt).toContain("test-project");
     expect(prepared.resolvedPrompt).toContain("Add login page");
@@ -242,7 +242,7 @@ describe("AgentContextBuilder", () => {
     rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it("substitutes user-provided variables", () => {
+  it("substitutes user-provided variables", async () => {
     const reader = new VaultReader(context);
     const builder = new AgentContextBuilder(reader, context);
 
@@ -251,14 +251,14 @@ describe("AgentContextBuilder", () => {
     const registry = new AgentRegistry(agentDir);
     const agent = registry.get("minimal");
 
-    const prepared = builder.prepare(agent, { taskDescription: "Fix the bug" });
+    const prepared = await builder.prepare(agent, { taskDescription: "Fix the bug" });
 
     expect(prepared.resolvedPrompt).toContain("Fix the bug");
 
     rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it("skips absent vault sections gracefully", () => {
+  it("skips absent vault sections gracefully", async () => {
     const reader = new VaultReader(context);
     const builder = new AgentContextBuilder(reader, context);
 
@@ -275,13 +275,13 @@ describe("AgentContextBuilder", () => {
       },
     };
 
-    const prepared = builder.prepare(agent, {});
+    const prepared = await builder.prepare(agent, {});
 
     expect(prepared.resolvedPrompt).toContain("Context: ");
     expect(prepared.resolvedPrompt).toContain("Logs: ");
   });
 
-  it("injects projectName and branch automatically", () => {
+  it("injects projectName and branch automatically", async () => {
     const reader = new VaultReader(context);
     const builder = new AgentContextBuilder(reader, context);
 
@@ -298,7 +298,7 @@ describe("AgentContextBuilder", () => {
       },
     };
 
-    const prepared = builder.prepare(agent);
+    const prepared = await builder.prepare(agent);
 
     expect(prepared.resolvedPrompt).toBe(
       "Project: test-project, Branch: feature/auth, Parent: main",

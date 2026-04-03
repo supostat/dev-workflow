@@ -8,6 +8,7 @@ import { WorkflowState } from "../workflow/state.js";
 import { IntelligenceStore } from "../intelligence/store.js";
 import { syncFromVault } from "../intelligence/sync.js";
 import { topN, formatRelevantContext } from "../intelligence/ranker.js";
+import { engramSearch, formatEngramResults } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -113,6 +114,13 @@ async function run(): Promise<void> {
   const relevantContext = formatRelevantContext(ranked);
   if (relevantContext) {
     sections.push("\n" + relevantContext);
+  }
+
+  const engramQuery = [context.branch, currentTask?.title].filter(Boolean).join(" ");
+  const engramMemories = await engramSearch(engramQuery, context.projectName, 5);
+  const engramSection = formatEngramResults(engramMemories);
+  if (engramSection) {
+    sections.push("\n" + engramSection);
   }
 
   const message = sections.join("\n");

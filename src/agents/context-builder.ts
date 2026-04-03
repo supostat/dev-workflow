@@ -1,6 +1,7 @@
 import type { VaultReader } from "../lib/reader.js";
 import type { ProjectContext } from "../lib/types.js";
 import { interpolate } from "../lib/interpolate.js";
+import { engramSearch, formatEngramResults } from "../lib/engram.js";
 import type { AgentDefinition, PreparedAgent, VaultSection } from "./types.js";
 
 export class AgentContextBuilder {
@@ -12,11 +13,11 @@ export class AgentContextBuilder {
     this.context = context;
   }
 
-  prepare(
+  async prepare(
     agent: AgentDefinition,
     variables: Record<string, string> = {},
-  ): PreparedAgent {
-    const vaultVariables = this.collectVaultSections(agent.vaultSections);
+  ): Promise<PreparedAgent> {
+    const vaultVariables = await this.collectVaultSections(agent.vaultSections);
 
     const mergedVariables: Record<string, string> = {
       projectName: this.context.projectName,
@@ -34,10 +35,10 @@ export class AgentContextBuilder {
     };
   }
 
-  private collectVaultSections(sections: VaultSection[]): Record<string, string> {
+  private async collectVaultSections(sections: VaultSection[]): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
 
-    const sectionReaders: Record<VaultSection, () => string | null> = {
+    const sectionReaders: Record<VaultSection, () => string | null | Promise<string | null>> = {
       stack: () => this.vaultReader.readStack(),
       conventions: () => this.vaultReader.readConventions(),
       knowledge: () => this.vaultReader.readKnowledge(),
@@ -52,6 +53,11 @@ export class AgentContextBuilder {
         if (logs.length === 0) return null;
         return logs.map((log) => `### ${log.date}\n${log.content}`).join("\n\n");
       },
+      engram: async () => {
+        const query = this.context.branch;
+        const memories = await engramSearch(query, this.context.projectName, 5);
+        return formatEngramResults(memories) || null;
+      },
     };
 
     const variableNames: Record<VaultSection, string> = {
@@ -61,11 +67,12 @@ export class AgentContextBuilder {
       gameplan: "gameplan",
       branch: "branchContext",
       dailyLogs: "dailyLogs",
+      engram: "engramContext",
     };
 
     for (const section of sections) {
       const reader = sectionReaders[section];
-      const content = reader();
+      const content = await reader();
       if (content) {
         result[variableNames[section]] = content;
       }

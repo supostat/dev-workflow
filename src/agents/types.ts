@@ -4,7 +4,8 @@ export type VaultSection =
   | "knowledge"
   | "gameplan"
   | "branch"
-  | "dailyLogs";
+  | "dailyLogs"
+  | "engram";
 
 export type GitOperation = "add" | "commit" | "status" | "diff";
 

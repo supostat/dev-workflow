@@ -3,6 +3,7 @@
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { VaultWriter } from "../lib/writer.js";
+import { engramStore } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -31,6 +32,15 @@ async function run(): Promise<void> {
   ].join("\n");
 
   writer.writeDailyLog(marker, today);
+
+  await engramStore(
+    `Pre-compact snapshot on ${context.branch} (${trigger})`,
+    `Context compressed at ${time}`,
+    `Project: ${context.projectName}, branch: ${context.branch}`,
+    "context",
+    `${context.projectName},${context.branch},pre-compact`,
+    context.projectName,
+  );
 
   hookSuccess("Pre-compact save done.");
 }

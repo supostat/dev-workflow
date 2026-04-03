@@ -83,13 +83,13 @@ describe("Full integration cycle", () => {
     expect(existsSync(join(vaultPath, "architecture"))).toBe(true);
   });
 
-  it("agent prompt contains vault data", () => {
+  it("agent prompt contains vault data", async () => {
     const reader = new VaultReader(context);
     const registry = new AgentRegistry(agentsDir);
     const contextBuilder = new AgentContextBuilder(reader, context);
 
     const agent = registry.get("coder");
-    const prepared = contextBuilder.prepare(agent, { taskDescription: "Add JWT auth" });
+    const prepared = await contextBuilder.prepare(agent, { taskDescription: "Add JWT auth" });
 
     expect(prepared.resolvedPrompt).toContain("integration-test");
     expect(prepared.resolvedPrompt).toContain("TypeScript 6.0");

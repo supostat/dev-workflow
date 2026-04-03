@@ -90,7 +90,7 @@ function agentShow(name: string | undefined): void {
   }
 }
 
-function agentRun(name: string | undefined, taskDescription: string): void {
+async function agentRun(name: string | undefined, taskDescription: string): Promise<void> {
   if (!name || !taskDescription) {
     console.error("Usage: dev-workflow agent run <name> \"task description\"");
     process.exitCode = 1;
@@ -102,7 +102,7 @@ function agentRun(name: string | undefined, taskDescription: string): void {
 
   try {
     const agentDef = services.registry.get(name);
-    const prepared = services.contextBuilder.prepare(agentDef, { taskDescription });
+    const prepared = await services.contextBuilder.prepare(agentDef, { taskDescription });
     console.log(prepared.resolvedPrompt);
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : "Agent not found");
