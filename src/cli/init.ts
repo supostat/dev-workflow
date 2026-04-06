@@ -7,6 +7,7 @@ import { detectStack, renderStackMarkdown } from "../lib/stack-detect.js";
 import { detectConventions, renderConventionsMarkdown } from "../lib/conventions-detect.js";
 import { icon, section, keyValue } from "../lib/output.js";
 import { renderTemplate } from "../lib/templates.js";
+import { isEngramAvailable } from "../lib/engram.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -189,6 +190,16 @@ export function init(options: InitOptions): void {
   const claudeMdPath = join(projectRoot, "CLAUDE.md");
   if (writeIfMissing(claudeMdPath, renderTemplate("project/claude-md", { projectName: context.projectName }), options.force)) {
     console.log(keyValue("\u2713 CLAUDE.md", "project instructions for Claude Code"));
+  }
+
+  // 0b. Append Engram Protocol if engram is available
+  if (isEngramAvailable()) {
+    const claudeContent = readFileSync(claudeMdPath, "utf-8");
+    if (!claudeContent.includes("Engram Memory Protocol")) {
+      const protocol = renderTemplate("records/engram-protocol", {});
+      writeFileSync(claudeMdPath, claudeContent.trimEnd() + "\n\n" + protocol + "\n", "utf-8");
+      console.log(keyValue("\u2713 Engram Protocol", "mid-work memory rules appended to CLAUDE.md"));
+    }
   }
 
   // 1. Merge .claude/settings.json (hooks + permissions + statusLine)

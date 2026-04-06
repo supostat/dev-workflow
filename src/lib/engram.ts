@@ -8,6 +8,10 @@ const DEFAULT_SOCKET_PATH = join(
   ".engram",
   "engram.sock",
 );
+
+export function isEngramAvailable(): boolean {
+  return existsSync(DEFAULT_SOCKET_PATH);
+}
 const CONNECT_TIMEOUT_MS = 500;
 const REQUEST_TIMEOUT_MS = 2000;
 

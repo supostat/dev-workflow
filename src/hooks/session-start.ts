@@ -5,7 +5,9 @@ import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
-import { engramSearch, formatEngramResults } from "../lib/engram.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { engramSearch, formatEngramResults, isEngramAvailable } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -102,6 +104,15 @@ async function run(): Promise<void> {
   const engramSection = formatEngramResults(engramMemories);
   if (engramSection) {
     sections.push("\n" + engramSection);
+  }
+
+  if (isEngramAvailable()) {
+    const claudeMdPath = join(context.projectRoot, "CLAUDE.md");
+    const hasProtocol = existsSync(claudeMdPath)
+      && readFileSync(claudeMdPath, "utf-8").includes("Engram Memory Protocol");
+    if (!hasProtocol) {
+      sections.push("\n> **Engram detected but Protocol not in CLAUDE.md.** Run `dev-workflow init` to add it.");
+    }
   }
 
   const message = sections.join("\n");

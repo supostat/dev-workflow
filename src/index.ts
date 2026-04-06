@@ -21,7 +21,7 @@ export { parseWorkflowYaml, loadCustomWorkflows } from "./workflow/loader.js";
 export { McpServer } from "./mcp/server.js";
 export { ToolHandlers } from "./mcp/handlers.js";
 export { getToolDefinitions } from "./mcp/tools.js";
-export { engramSearch, engramStore, engramJudge, formatEngramResults, EngramBridge } from "./lib/engram.js";
+export { engramSearch, engramStore, engramJudge, formatEngramResults, EngramBridge, isEngramAvailable } from "./lib/engram.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
