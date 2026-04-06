@@ -29,6 +29,7 @@ export interface StepState {
   completedAt: string | null;
   durationMs: number | null;
   attempt: number;
+  engramMemoryId: string | null;
 }
 
 export interface WorkflowRun {

@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Creates implementation plans with clear steps
-vault: [stack, conventions, knowledge, gameplan, engram]
+vault: [stack, conventions, knowledge, gameplan]
 read: true
 write: []
 shell: []

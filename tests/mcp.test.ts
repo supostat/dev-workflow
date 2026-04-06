@@ -11,7 +11,6 @@ import { AgentRegistry } from "../src/agents/registry.js";
 import { AgentContextBuilder } from "../src/agents/context-builder.js";
 import { TaskManager } from "../src/tasks/manager.js";
 import { TaskTracker } from "../src/tasks/tracker.js";
-import { IntelligenceStore } from "../src/intelligence/store.js";
 import type { ProjectContext } from "../src/lib/types.js";
 
 function createTestEnv() {
@@ -46,11 +45,10 @@ Agent {{projectName}}: {{taskDescription}}
   const registry = new AgentRegistry(agentsDir);
   const contextBuilder = new AgentContextBuilder(vaultReader, context);
   const taskManager = new TaskManager(vaultPath);
-  const intelligenceStore = new IntelligenceStore(vaultPath);
   const taskTracker = new TaskTracker(projectRoot, taskManager);
   const handlers = new ToolHandlers(
     vaultReader, writer, context, registry, contextBuilder, taskManager,
-    intelligenceStore, taskTracker,
+    taskTracker,
   );
 
   return { projectRoot, context, handlers, taskManager, agentsDir };
@@ -174,7 +172,6 @@ describe("ToolHandlers", () => {
       branch: string;
       sections: Record<string, { filled: boolean; lines: number }>;
       tasks: { total: number };
-      intelligence: { patterns: number; edges: number };
     };
 
     expect(result.project).toBe("test-project");
@@ -184,7 +181,6 @@ describe("ToolHandlers", () => {
     expect(result.sections.knowledge).toBeDefined();
     expect(result.sections.gameplan).toBeDefined();
     expect(result.tasks.total).toBe(0);
-    expect(result.intelligence.patterns).toBeGreaterThanOrEqual(0);
   });
 
   it("intelligence_query returns scored patterns", async () => {

@@ -1,7 +1,6 @@
 import type { VaultReader } from "../lib/reader.js";
 import type { ProjectContext } from "../lib/types.js";
 import { interpolate } from "../lib/interpolate.js";
-import { engramSearch, formatEngramResults } from "../lib/engram.js";
 import type { AgentDefinition, PreparedAgent, VaultSection } from "./types.js";
 
 export class AgentContextBuilder {
@@ -53,11 +52,6 @@ export class AgentContextBuilder {
         if (logs.length === 0) return null;
         return logs.map((log) => `### ${log.date}\n${log.content}`).join("\n\n");
       },
-      engram: async () => {
-        const query = this.context.branch;
-        const memories = await engramSearch(query, this.context.projectName, 5);
-        return formatEngramResults(memories) || null;
-      },
     };
 
     const variableNames: Record<VaultSection, string> = {
@@ -67,7 +61,6 @@ export class AgentContextBuilder {
       gameplan: "gameplan",
       branch: "branchContext",
       dailyLogs: "dailyLogs",
-      engram: "engramContext",
     };
 
     for (const section of sections) {

@@ -5,8 +5,6 @@ import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { VaultWriter } from "../lib/writer.js";
 import { WorkflowState } from "../workflow/state.js";
-import { IntelligenceStore } from "../intelligence/store.js";
-import { Collector } from "../intelligence/collector.js";
 import { engramStore } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
@@ -65,17 +63,9 @@ async function run(): Promise<void> {
   const marker = markerLines.join("\n");
   writer.writeDailyLog(marker, today);
 
-  const intelligenceStore = new IntelligenceStore(context.vaultPath);
-  const collector = new Collector(intelligenceStore);
   const changedFiles = statusShort
     ? statusShort.split("\n").map((line) => line.slice(3).trim()).filter(Boolean)
     : [];
-  if (changedFiles.length > 0) {
-    collector.recordSession(context.branch, changedFiles);
-    collector.recordCoEditedFiles(changedFiles);
-    intelligenceStore.save();
-  }
-
   const fileCount = changedFiles.length;
   if (fileCount > 0) {
     await engramStore(

@@ -1,7 +1,7 @@
 ---
 name: coder
 description: Writes code following project conventions
-vault: [stack, conventions, branch, engram]
+vault: [stack, conventions, branch]
 read: true
 write: [src/**, tests/**]
 shell: [npm run build, npm run lint]

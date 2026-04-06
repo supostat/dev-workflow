@@ -5,9 +5,6 @@ import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
-import { IntelligenceStore } from "../intelligence/store.js";
-import { syncFromVault } from "../intelligence/sync.js";
-import { topN, formatRelevantContext } from "../intelligence/ranker.js";
 import { engramSearch, formatEngramResults } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
@@ -100,24 +97,8 @@ async function run(): Promise<void> {
     );
   }
 
-  const intelligenceStore = new IntelligenceStore(context.vaultPath);
-  syncFromVault(intelligenceStore, context.vaultPath);
-
-  const scoringContext = {
-    branch: context.branch,
-    taskTitle: currentTask?.title ?? null,
-    recentFiles: [],
-    query: null,
-  };
-
-  const ranked = topN(intelligenceStore.allNodes(), scoringContext, 15);
-  const relevantContext = formatRelevantContext(ranked);
-  if (relevantContext) {
-    sections.push("\n" + relevantContext);
-  }
-
   const engramQuery = [context.branch, currentTask?.title].filter(Boolean).join(" ");
-  const engramMemories = await engramSearch(engramQuery, context.projectName, 5);
+  const engramMemories = await engramSearch(engramQuery, context.projectName, 10);
   const engramSection = formatEngramResults(engramMemories);
   if (engramSection) {
     sections.push("\n" + engramSection);

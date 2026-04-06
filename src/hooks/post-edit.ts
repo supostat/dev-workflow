@@ -4,8 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { writeFileSafe } from "../lib/fs-helpers.js";
-import { IntelligenceStore } from "../intelligence/store.js";
-import { Collector } from "../intelligence/collector.js";
+import { engramStore } from "../lib/engram.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -40,10 +39,14 @@ async function run(): Promise<void> {
 
   writeFileSafe(editLogPath, JSON.stringify(editLog, null, 2));
 
-  const intelligenceStore = new IntelligenceStore(context.vaultPath);
-  const collector = new Collector(intelligenceStore);
-  collector.recordFileEdit(filePath);
-  intelligenceStore.save();
+  await engramStore(
+    `File edited: ${filePath}`,
+    `Edit on branch ${context.branch}`,
+    `Session file #${editLog.length}`,
+    "context",
+    `${context.projectName},${context.branch},edit`,
+    context.projectName,
+  );
 
   hookSuccess(`Tracked: ${filePath} (${editLog.length} files this session)`);
 }

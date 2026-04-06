@@ -4,6 +4,7 @@ import type { PreparedAgent } from "../agents/types.js";
 import type { TaskManager } from "../tasks/manager.js";
 import type { WorkflowDefinition, WorkflowRun, StepDefinition } from "./types.js";
 import type { WorkflowState } from "./state.js";
+import type { EngramBridge } from "../lib/engram.js";
 import { todayDate } from "../lib/fs-helpers.js";
 
 export interface WorkflowResolver {
@@ -37,6 +38,7 @@ export class WorkflowEngine {
   private readonly executor: StepExecutor;
   private readonly gateChecker: GateChecker;
   private readonly workflowResolver: WorkflowResolver;
+  private readonly engramBridge: EngramBridge | null;
 
   constructor(
     registry: AgentRegistry,
@@ -46,6 +48,7 @@ export class WorkflowEngine {
     executor: StepExecutor,
     gateChecker: GateChecker,
     workflowResolver?: WorkflowResolver,
+    engramBridge?: EngramBridge | null,
   ) {
     this.registry = registry;
     this.contextBuilder = contextBuilder;
@@ -54,6 +57,7 @@ export class WorkflowEngine {
     this.executor = executor;
     this.gateChecker = gateChecker;
     this.workflowResolver = workflowResolver ?? { resolve: () => { throw new Error("No workflow resolver"); } };
+    this.engramBridge = engramBridge ?? null;
   }
 
   async start(
@@ -72,6 +76,7 @@ export class WorkflowEngine {
         completedAt: null,
         durationMs: null,
         attempt: 0,
+        engramMemoryId: null,
       };
     }
 
@@ -156,10 +161,15 @@ export class WorkflowEngine {
 
       const stepState = run.steps[run.currentStep]!;
 
+      const engramContext = await this.engramBridge?.beforeStep(
+        stepDef.name, run.taskDescription,
+      ) ?? "";
+
       const previousOutputs = this.collectInputs(stepDef, run);
       const agent = this.registry.get(stepDef.agent);
       const variables: Record<string, string> = {
         taskDescription: run.taskDescription,
+        engramContext,
         ...previousOutputs,
       };
       const prepared = await this.contextBuilder.prepare(agent, variables);
@@ -172,11 +182,19 @@ export class WorkflowEngine {
 
       const gateResult = await this.checkGate(stepDef, output, agent);
 
+      const previousStepName = this.getPreviousStep(workflow, run.currentStep);
+      const parentMemoryId = previousStepName
+        ? run.steps[previousStepName]?.engramMemoryId ?? null
+        : null;
+
       if (gateResult === "passed") {
         stepState.status = "completed";
         stepState.output = output;
         stepState.completedAt = nowISO();
         stepState.durationMs = computeDurationMs(stepState.startedAt);
+        stepState.engramMemoryId = await this.engramBridge?.afterStep(
+          stepDef.name, output, "completed", parentMemoryId,
+        ) ?? null;
 
         const nextStep = this.getNextStep(workflow, run.currentStep);
         if (nextStep) {
@@ -189,6 +207,10 @@ export class WorkflowEngine {
           }
         }
       } else if (gateResult === "failed") {
+        stepState.engramMemoryId = await this.engramBridge?.afterStep(
+          stepDef.name, output, "failed", parentMemoryId,
+        ) ?? null;
+
         stepState.attempt++;
         if (stepState.attempt >= stepDef.maxAttempts) {
           stepState.status = "failed";
@@ -277,6 +299,15 @@ export class WorkflowEngine {
     const index = workflow.steps.findIndex((s) => s.name === currentStepName);
     if (index === -1 || index >= workflow.steps.length - 1) return null;
     return workflow.steps[index + 1]!.name;
+  }
+
+  private getPreviousStep(
+    workflow: WorkflowDefinition,
+    currentStepName: string,
+  ): string | null {
+    const index = workflow.steps.findIndex((s) => s.name === currentStepName);
+    if (index <= 0) return null;
+    return workflow.steps[index - 1]!.name;
   }
 
   private findWorkflowDefinition(run: WorkflowRun): WorkflowDefinition {

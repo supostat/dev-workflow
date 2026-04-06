@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Designs system architecture and evaluates trade-offs
-vault: [stack, conventions, knowledge, gameplan, engram]
+vault: [stack, conventions, knowledge, gameplan]
 read: true
 write: []
 shell: []

@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Diagnoses bugs through systematic root cause analysis
-vault: [stack, conventions, knowledge, engram]
+vault: [stack, conventions, knowledge]
 read: true
 write: []
 shell: []

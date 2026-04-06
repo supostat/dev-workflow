@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews code for quality, security, and convention compliance
-vault: [conventions, knowledge, engram]
+vault: [conventions, knowledge]
 read: true
 write: []
 shell: []

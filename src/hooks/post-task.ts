@@ -2,6 +2,7 @@
 
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
+import { engramStore } from "../lib/engram.js";
 import { existsSync } from "node:fs";
 import { readStdin, hookSuccess } from "./stdin.js";
 
@@ -27,6 +28,15 @@ async function run(): Promise<void> {
   writer.writeDailyLog(
     `> Task completed at ${time} on branch ${context.branch}: ${subject}`,
     today,
+  );
+
+  await engramStore(
+    `Task completed: ${subject}`,
+    `Branch: ${context.branch}`,
+    `Completed at ${time}`,
+    "context",
+    `${context.projectName},${context.branch},task`,
+    context.projectName,
   );
 
   hookSuccess("Post-task recorded.");

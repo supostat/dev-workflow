@@ -8,8 +8,8 @@ const DEFAULT_SOCKET_PATH = join(
   ".engram",
   "engram.sock",
 );
-const CONNECT_TIMEOUT_MS = 3000;
-const REQUEST_TIMEOUT_MS = 5000;
+const CONNECT_TIMEOUT_MS = 500;
+const REQUEST_TIMEOUT_MS = 2000;
 
 interface EngramMemory {
   id: string;
@@ -136,6 +136,22 @@ export async function engramStore(
   }
 }
 
+export async function engramJudge(
+  memoryId: string,
+  score: number,
+  explanation: string,
+): Promise<void> {
+  try {
+    await socketCall(DEFAULT_SOCKET_PATH, "memory_judge", {
+      memory_id: memoryId,
+      score,
+      explanation,
+    });
+  } catch {
+    // fail-safe: daemon unavailable
+  }
+}
+
 export function formatEngramResults(memories: EngramMemory[]): string {
   if (memories.length === 0) return "";
 
@@ -149,4 +165,66 @@ export function formatEngramResults(memories: EngramMemory[]): string {
     }
   }
   return lines.join("\n");
+}
+
+const STEP_MEMORY_TYPES: Record<string, string> = {
+  read: "context",
+  plan: "decision",
+  code: "pattern",
+  review: "pattern",
+  test: "context",
+  commit: "context",
+};
+
+export class EngramBridge {
+  private readonly project: string;
+  private readonly branch: string;
+
+  constructor(project: string, branch: string) {
+    this.project = project;
+    this.branch = branch;
+  }
+
+  async beforeStep(stepName: string, taskDescription: string): Promise<string> {
+    const query = `${stepName} ${taskDescription} ${this.branch}`;
+    const memories = await engramSearch(query, this.project, 5);
+    return formatEngramResults(memories);
+  }
+
+  async afterStep(
+    stepName: string,
+    output: string,
+    status: "completed" | "failed",
+    parentId: string | null,
+  ): Promise<string | null> {
+    const memoryType = status === "failed"
+      ? "antipattern"
+      : STEP_MEMORY_TYPES[stepName] ?? "context";
+
+    const truncatedOutput = output.length > 500
+      ? output.slice(0, 500) + "..."
+      : output;
+
+    const tags = [this.project, this.branch, stepName, status].join(",");
+    const params: Record<string, unknown> = {
+      context: `Workflow step [${stepName}]: ${status}`,
+      action: truncatedOutput,
+      result: `Step ${stepName} ${status} on ${this.branch}`,
+      memory_type: memoryType,
+      tags,
+    };
+    if (this.project) params["project"] = this.project;
+    if (parentId) params["parent_id"] = parentId;
+
+    try {
+      const response = (await socketCall(
+        DEFAULT_SOCKET_PATH,
+        "memory_store",
+        params,
+      )) as { id?: string } | null;
+      return response?.id ?? null;
+    } catch {
+      return null;
+    }
+  }
 }

@@ -10,9 +10,7 @@ import type { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
-import { IntelligenceStore } from "../intelligence/store.js";
-import { topN } from "../intelligence/ranker.js";
-import { syncFromVault } from "../intelligence/sync.js";
+import { engramSearch, engramStore } from "../lib/engram.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
@@ -83,7 +81,6 @@ export class ToolHandlers {
   private readonly agentRegistry: AgentRegistry;
   private readonly contextBuilder: AgentContextBuilder;
   private readonly taskManager: TaskManager;
-  private readonly intelligenceStore: IntelligenceStore;
   private readonly taskTracker: TaskTracker;
 
   constructor(
@@ -93,7 +90,6 @@ export class ToolHandlers {
     agentRegistry: AgentRegistry,
     contextBuilder: AgentContextBuilder,
     taskManager: TaskManager,
-    intelligenceStore: IntelligenceStore,
     taskTracker: TaskTracker,
   ) {
     this.vaultReader = vaultReader;
@@ -102,7 +98,6 @@ export class ToolHandlers {
     this.agentRegistry = agentRegistry;
     this.contextBuilder = contextBuilder;
     this.taskManager = taskManager;
-    this.intelligenceStore = intelligenceStore;
     this.taskTracker = taskTracker;
   }
 
@@ -204,11 +199,17 @@ export class ToolHandlers {
     return { filepath };
   }
 
-  private vaultKnowledge(section: string, content: string): { success: boolean } {
+  private async vaultKnowledge(section: string, content: string): Promise<{ success: boolean }> {
     this.vaultWriter.appendKnowledge(section, content);
 
-    syncFromVault(this.intelligenceStore, this.context.vaultPath);
-    this.intelligenceStore.save();
+    await engramStore(
+      `Knowledge updated: ${section}`,
+      content.slice(0, 300),
+      `Section "${section}" appended in ${this.context.projectName}`,
+      "context",
+      `${this.context.projectName},knowledge,${section}`,
+      this.context.projectName,
+    );
 
     return { success: true };
   }
@@ -264,28 +265,18 @@ export class ToolHandlers {
         step: currentRun.currentStep,
         status: currentRun.status,
       } : null,
-      intelligence: {
-        patterns: this.intelligenceStore.nodeCount(),
-        edges: this.intelligenceStore.edgeCount(),
-      },
     };
   }
 
-  private intelligenceQuery(branch?: string, task?: string, limit?: number): unknown {
-    const scoringContext = {
-      branch: branch ?? this.context.branch,
-      taskTitle: task ?? null,
-      recentFiles: [],
-      query: task ?? null,
-    };
-
-    const scored = topN(this.intelligenceStore.allNodes(), scoringContext, limit ?? 15);
-    return scored.map((entry) => ({
-      id: entry.node.id,
-      category: entry.node.category,
-      content: entry.node.content,
-      score: Math.round(entry.score * 1000) / 1000,
-      lastAccessed: entry.node.lastAccessed,
+  private async intelligenceQuery(branch?: string, task?: string, limit?: number): Promise<unknown> {
+    const query = [branch ?? this.context.branch, task].filter(Boolean).join(" ");
+    const memories = await engramSearch(query, this.context.projectName, limit ?? 15);
+    return memories.map((memory) => ({
+      id: memory.id,
+      category: memory.memory_type,
+      content: memory.context,
+      score: memory.score,
+      action: memory.action,
     }));
   }
 

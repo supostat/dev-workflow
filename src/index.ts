@@ -21,10 +21,7 @@ export { parseWorkflowYaml, loadCustomWorkflows } from "./workflow/loader.js";
 export { McpServer } from "./mcp/server.js";
 export { ToolHandlers } from "./mcp/handlers.js";
 export { getToolDefinitions } from "./mcp/tools.js";
-export { IntelligenceStore } from "./intelligence/store.js";
-export { Collector } from "./intelligence/collector.js";
-export { scoreNodes, topN, formatRelevantContext } from "./intelligence/ranker.js";
-export { syncFromVault } from "./intelligence/sync.js";
+export { engramSearch, engramStore, engramJudge, formatEngramResults, EngramBridge } from "./lib/engram.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";

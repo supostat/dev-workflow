@@ -7,7 +7,6 @@ import { AgentRegistry } from "../agents/registry.js";
 import { AgentContextBuilder } from "../agents/context-builder.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
-import { IntelligenceStore } from "../intelligence/store.js";
 import { ToolHandlers } from "../mcp/handlers.js";
 import { McpServer } from "../mcp/server.js";
 
@@ -30,11 +29,10 @@ export function serve(): void {
   const taskManager = new TaskManager(context.vaultPath);
 
   const taskTracker = new TaskTracker(context.projectRoot, taskManager);
-  const intelligenceStore = new IntelligenceStore(context.vaultPath);
 
   const handlers = new ToolHandlers(
     vaultReader, vaultWriter, context, registry, contextBuilder, taskManager,
-    intelligenceStore, taskTracker,
+    taskTracker,
   );
 
   const server = new McpServer(handlers);
