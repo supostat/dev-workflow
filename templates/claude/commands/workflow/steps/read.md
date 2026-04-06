@@ -1,5 +1,11 @@
 # Step 1: READ
 
+## Engram (orchestrator — before launching subagent)
+Search for relevant memories and pass results to the reader agent:
+1. memory_search(query="<task keywords — module, feature, technology>")
+2. memory_search(query="<affected files or patterns> antipattern bugfix")
+Include results as "Engram memories" section in the subagent prompt below.
+
 Launch **Explore** subagent with this prompt:
 
 ```
@@ -10,6 +16,9 @@ You are a reader agent. Gather context for the task below.
 
 ## Project Context
 [vault sections: stack.md, conventions.md, knowledge.md, gameplan.md]
+
+## Engram memories (from orchestrator search)
+[paste memory_search results here, or "none"]
 
 ## Procedure
 1. Read CLAUDE.md for project instructions
@@ -32,6 +41,7 @@ Relevant code: [key fragments]
 Related ADRs: [from .dev-vault/architecture/ or "none"]
 Known bugs: [from .dev-vault/bugs/ or "none"]
 Known debt: [from .dev-vault/debt/ or "none"]
+Engram memories: [from orchestrator or "none"]
 END_CONTEXT
 ```
 

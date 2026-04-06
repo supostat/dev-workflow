@@ -3,6 +3,10 @@
 Before launching reviewers, orchestrator runs `git diff` to capture actual changes.
 Pass BOTH the CODE_DONE summary AND the real diff to each reviewer.
 
+## Engram (orchestrator — before launching reviewers)
+Search for known antipatterns in affected modules:
+memory_search(query="<changed modules> antipattern review")
+Pass relevant antipatterns to reviewers as additional context in their prompts.
 
 Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
 
@@ -144,6 +148,10 @@ Merge all 3 REVIEW blocks into one verdict:
 - Architecture concerns → append to `.dev-vault/knowledge.md` section "Architecture"
 - New conventions → append to `.dev-vault/conventions.md` section "Patterns"
 Only findings useful for future sessions. Not bugs (fixed by coder), not style nits.
+
+**Engram store (after aggregate):**
+- CRITICAL/HIGH findings → memory_store(type: "antipattern", context: "<file:line — issue>", action: "<what was wrong>", result: "<how to fix>", tags: "<module>,review")
+- Discovered gotchas → memory_store(type: "pattern", context: "<gotcha>", action: "<why it matters>", result: "<how to avoid>", tags: "<module>,review")
 
 Display:
 
