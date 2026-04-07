@@ -14,6 +14,29 @@ export function isEngramAvailable(): boolean {
 }
 const CONNECT_TIMEOUT_MS = 500;
 const REQUEST_TIMEOUT_MS = 2000;
+const RETRY_BACKOFF_MS = 300;
+
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message;
+    return message === "connect timeout" || message === "request timeout";
+  }
+  return false;
+}
+
+async function socketCallWithRetry(
+  socketPath: string,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  try {
+    return await socketCall(socketPath, method, params);
+  } catch (error) {
+    if (!isRetryableError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+    return socketCall(socketPath, method, params);
+  }
+}
 
 interface EngramMemory {
   id: string;
@@ -104,7 +127,7 @@ export async function engramSearch(
   try {
     const params: Record<string, unknown> = { query, limit };
     if (project) params["project"] = project;
-    const result = await socketCall(DEFAULT_SOCKET_PATH, "memory_search", params);
+    const result = await socketCallWithRetry(DEFAULT_SOCKET_PATH, "memory_search", params);
     if (!Array.isArray(result)) return [];
     return result as EngramMemory[];
   } catch {
@@ -129,7 +152,7 @@ export async function engramStore(
       tags,
     };
     if (project) params["project"] = project;
-    const response = (await socketCall(
+    const response = (await socketCallWithRetry(
       DEFAULT_SOCKET_PATH,
       "memory_store",
       params,
@@ -180,6 +203,12 @@ const STEP_MEMORY_TYPES: Record<string, string> = {
   commit: "context",
 };
 
+export interface EngramBeforeStepResult {
+  context: string;
+  isDegraded: boolean;
+  memoryIds: string[];
+}
+
 export class EngramBridge {
   private readonly project: string;
   private readonly branch: string;
@@ -189,10 +218,23 @@ export class EngramBridge {
     this.branch = branch;
   }
 
-  async beforeStep(stepName: string, taskDescription: string): Promise<string> {
+  async beforeStep(
+    stepName: string,
+    taskDescription: string,
+  ): Promise<EngramBeforeStepResult> {
+    if (!isEngramAvailable()) {
+      return { context: "", isDegraded: true, memoryIds: [] };
+    }
     const query = `${stepName} ${taskDescription} ${this.branch}`;
     const memories = await engramSearch(query, this.project, 5);
-    return formatEngramResults(memories);
+    if (memories.length === 0) {
+      return { context: "", isDegraded: false, memoryIds: [] };
+    }
+    return {
+      context: formatEngramResults(memories),
+      isDegraded: false,
+      memoryIds: memories.map((m) => m.id),
+    };
   }
 
   async afterStep(
@@ -230,5 +272,13 @@ export class EngramBridge {
     } catch {
       return null;
     }
+  }
+
+  async judge(
+    memoryId: string,
+    score: number,
+    explanation: string,
+  ): Promise<void> {
+    await engramJudge(memoryId, score, explanation);
   }
 }

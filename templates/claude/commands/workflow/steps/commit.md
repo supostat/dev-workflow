@@ -40,10 +40,6 @@ Auto-committed: [hash]
 
 `git add` relevant files, `git commit` immediately. No user prompt.
 
-## Engram (if available)
-After successful commit, store a summary:
-memory_store(type: "context", context: "Committed: <commit message summary>", action: "Branch: <branch>, files: <count>", result: "<commit hash>", tags: "<project>,<branch>,commit")
-
 **Autonomous safety — will NOT auto-commit if any of these occurred:**
 - TEST failed and fix limit reached
 - VERIFY incomplete and fix limit reached

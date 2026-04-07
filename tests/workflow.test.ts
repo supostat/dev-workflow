@@ -14,7 +14,8 @@ import { TaskManager } from "../src/tasks/manager.js";
 import type { ProjectContext } from "../src/lib/types.js";
 import type { PreparedAgent } from "../src/agents/types.js";
 import type { WorkflowResolver } from "../src/workflow/engine.js";
-import type { WorkflowRun, WorkflowDefinition } from "../src/workflow/types.js";
+import type { WorkflowRun, WorkflowDefinition, StepState } from "../src/workflow/types.js";
+import type { EngramBridge, EngramBeforeStepResult } from "../src/lib/engram.js";
 
 function createTestEnv() {
   const projectRoot = join(tmpdir(), `dev-vault-workflow-test-${Date.now()}`);
@@ -443,5 +444,189 @@ describe("Builtin workflows", () => {
     const hotfix = getBuiltinWorkflow("hotfix");
     const names = hotfix.steps.map((s) => s.name);
     expect(names).toEqual(["read", "code", "test", "commit"]);
+  });
+});
+
+function createMockEngramBridge(overrides: Partial<{
+  beforeStep: EngramBridge["beforeStep"];
+  afterStep: EngramBridge["afterStep"];
+  judge: EngramBridge["judge"];
+}> = {}): EngramBridge {
+  return {
+    beforeStep: overrides.beforeStep ?? (async () => ({
+      context: "", isDegraded: false, memoryIds: [],
+    })),
+    afterStep: overrides.afterStep ?? (async () => null),
+    judge: overrides.judge ?? (async () => {}),
+  } as unknown as EngramBridge;
+}
+
+describe("WorkflowEngine with Engram", () => {
+  let env: ReturnType<typeof createTestEnv>;
+
+  beforeEach(() => {
+    env = createTestEnv();
+  });
+
+  afterEach(() => {
+    rmSync(env.projectRoot, { recursive: true, force: true });
+  });
+
+  function createEngineWithEngram(
+    bridge: EngramBridge,
+    executor?: StepExecutor,
+    gateChecker?: GateChecker,
+  ): WorkflowEngine {
+    return new WorkflowEngine(
+      env.registry,
+      env.contextBuilder,
+      env.state,
+      env.taskManager,
+      executor ?? createMockExecutor(),
+      gateChecker ?? createMockGateChecker(),
+      undefined,
+      bridge,
+    );
+  }
+
+  it("stores engramMemoryId after successful step", async () => {
+    const bridge = createMockEngramBridge({
+      afterStep: async () => "memory-abc-123",
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "engram-store",
+      description: "Test engram store",
+      steps: [
+        { name: "read", agent: "reader", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngineWithEngram(bridge);
+    const run = await engine.start(workflow, "Test task");
+
+    expect(run.status).toBe("completed");
+    expect(run.steps["read"]!.engramMemoryId).toBe("memory-abc-123");
+  });
+
+  it("judges found memories with 0.7 on step success", async () => {
+    const judgeCalls: Array<{ memoryId: string; score: number; explanation: string }> = [];
+
+    const bridge = createMockEngramBridge({
+      beforeStep: async () => ({
+        context: "## Engram Memory\n- [PATTERN] auth pattern",
+        isDegraded: false,
+        memoryIds: ["mem-001", "mem-002"],
+      }),
+      judge: async (memoryId, score, explanation) => {
+        judgeCalls.push({ memoryId, score, explanation });
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "engram-judge",
+      description: "Test auto-judge",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngineWithEngram(bridge);
+    await engine.start(workflow, "Test task");
+
+    expect(judgeCalls).toHaveLength(2);
+    expect(judgeCalls[0].memoryId).toBe("mem-001");
+    expect(judgeCalls[0].score).toBe(0.7);
+    expect(judgeCalls[0].explanation).toContain("plan");
+    expect(judgeCalls[0].explanation).toContain("completed successfully");
+    expect(judgeCalls[1].memoryId).toBe("mem-002");
+  });
+
+  it("judges found memories with 0.3 on step failure", async () => {
+    const judgeCalls: Array<{ memoryId: string; score: number; explanation: string }> = [];
+
+    const bridge = createMockEngramBridge({
+      beforeStep: async () => ({
+        context: "some context",
+        isDegraded: false,
+        memoryIds: ["mem-fail"],
+      }),
+      afterStep: async () => "mem-stored",
+      judge: async (memoryId, score, explanation) => {
+        judgeCalls.push({ memoryId, score, explanation });
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "engram-judge-fail",
+      description: "Test judge on failure",
+      steps: [
+        { name: "test", agent: "tester", input: [], gate: "tests-pass", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const gateChecker = createMockGateChecker({
+      checkTestsPass: async () => false,
+    });
+
+    const engine = createEngineWithEngram(bridge, undefined, gateChecker);
+    const run = await engine.start(workflow, "Test task");
+
+    expect(run.status).toBe("failed");
+    expect(judgeCalls).toHaveLength(1);
+    expect(judgeCalls[0].memoryId).toBe("mem-fail");
+    expect(judgeCalls[0].score).toBe(0.3);
+    expect(judgeCalls[0].explanation).toContain("test");
+    expect(judgeCalls[0].explanation).toContain("failed gate check");
+  });
+
+  it("skips judge when no memories found", async () => {
+    const judgeCalls: string[] = [];
+
+    const bridge = createMockEngramBridge({
+      beforeStep: async () => ({
+        context: "", isDegraded: false, memoryIds: [],
+      }),
+      judge: async (memoryId) => {
+        judgeCalls.push(memoryId);
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "engram-no-judge",
+      description: "No memories to judge",
+      steps: [
+        { name: "read", agent: "reader", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngineWithEngram(bridge);
+    await engine.start(workflow, "Test task");
+
+    expect(judgeCalls).toHaveLength(0);
+  });
+
+  it("continues in degraded mode when engram unavailable", async () => {
+    const bridge = createMockEngramBridge({
+      beforeStep: async () => ({
+        context: "", isDegraded: true, memoryIds: [],
+      }),
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "engram-degraded",
+      description: "Test degraded mode",
+      steps: [
+        { name: "read", agent: "reader", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "code", agent: "coder", input: ["read.output"], gate: "none", onFail: null, maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngineWithEngram(bridge);
+    const run = await engine.start(workflow, "Test task");
+
+    expect(run.status).toBe("completed");
+    expect(run.steps["read"]!.status).toBe("completed");
+    expect(run.steps["code"]!.status).toBe("completed");
   });
 });

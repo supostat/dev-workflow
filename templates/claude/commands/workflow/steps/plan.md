@@ -1,14 +1,5 @@
 # Step 2: PLAN
 
-## Engram (orchestrator — before launching subagent)
-Search for architecture decisions and antipatterns:
-1. memory_search(query="<module> architecture decision")
-2. memory_search(query="<technology> antipattern")
-Pass results as "Engram memories" section in the subagent prompt below.
-
-After subagent returns PLAN, store key decisions:
-memory_store(type: "decision", context: "<what was decided>", action: "<options considered, why chosen>", result: "<trade-offs, revisit conditions>", tags: "<module>,<technology>,plan")
-
 Launch **Explore** subagent:
 
 ```
@@ -43,10 +34,6 @@ You are a planner agent. Create a detailed implementation plan.
 - Max 300 lines/file, 30 lines/function
 - Composition over inheritance, no god objects
 - Test behaviour not implementation, cover happy+edge+error paths
-
-## Engram memories (from orchestrator search)
-[paste memory_search results here, or "none"]
-If antipatterns found — address them in the plan. Explain why your approach avoids the issue.
 
 ## Rules
 - STRICTLY follow project conventions (naming, structure, error handling)

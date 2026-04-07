@@ -19,6 +19,7 @@ dist/
 
 .claude/
 .claude-flow/
+.dev-vault/
 .swarm/
 .mcp.json
 CLAUDE.md

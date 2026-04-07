@@ -4,7 +4,7 @@ import type { PreparedAgent } from "../agents/types.js";
 import type { TaskManager } from "../tasks/manager.js";
 import type { WorkflowDefinition, WorkflowRun, StepDefinition } from "./types.js";
 import type { WorkflowState } from "./state.js";
-import type { EngramBridge } from "../lib/engram.js";
+import type { EngramBridge, EngramBeforeStepResult } from "../lib/engram.js";
 import { todayDate } from "../lib/fs-helpers.js";
 
 export interface WorkflowResolver {
@@ -161,9 +161,16 @@ export class WorkflowEngine {
 
       const stepState = run.steps[run.currentStep]!;
 
-      const engramContext = await this.engramBridge?.beforeStep(
+      const defaultBeforeStep: EngramBeforeStepResult = {
+        context: "", isDegraded: false, memoryIds: [],
+      };
+      const engramResult = await this.engramBridge?.beforeStep(
         stepDef.name, run.taskDescription,
-      ) ?? "";
+      ) ?? defaultBeforeStep;
+
+      const engramContext = engramResult.isDegraded
+        ? "\u26a0\ufe0f Engram unavailable. Working without cross-session memory."
+        : engramResult.context;
 
       const previousOutputs = this.collectInputs(stepDef, run);
       const agent = this.registry.get(stepDef.agent);
@@ -196,6 +203,11 @@ export class WorkflowEngine {
           stepDef.name, output, "completed", parentMemoryId,
         ) ?? null;
 
+        await this.judgeFoundMemories(
+          engramResult.memoryIds, 0.7,
+          `Memories retrieved before step [${stepDef.name}] which completed successfully`,
+        );
+
         const nextStep = this.getNextStep(workflow, run.currentStep);
         if (nextStep) {
           run.currentStep = nextStep;
@@ -210,6 +222,11 @@ export class WorkflowEngine {
         stepState.engramMemoryId = await this.engramBridge?.afterStep(
           stepDef.name, output, "failed", parentMemoryId,
         ) ?? null;
+
+        await this.judgeFoundMemories(
+          engramResult.memoryIds, 0.3,
+          `Memories retrieved before step [${stepDef.name}] which failed gate check`,
+        );
 
         stepState.attempt++;
         if (stepState.attempt >= stepDef.maxAttempts) {
@@ -240,6 +257,18 @@ export class WorkflowEngine {
 
     this.state.save(run);
     return run;
+  }
+
+  private async judgeFoundMemories(
+    memoryIds: string[],
+    score: number,
+    explanation: string,
+  ): Promise<void> {
+    if (memoryIds.length === 0 || !this.engramBridge) return;
+    const idsToJudge = memoryIds.slice(0, 20);
+    for (const id of idsToJudge) {
+      await this.engramBridge.judge(id, score, explanation);
+    }
   }
 
   private collectInputs(
