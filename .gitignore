@@ -24,3 +24,8 @@ dist/
 .mcp.json
 CLAUDE.md
 /docs/
+
+# Build artifacts
+coverage/
+*.tsbuildinfo
+out/
