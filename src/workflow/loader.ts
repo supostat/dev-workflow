@@ -23,6 +23,7 @@ export function parseWorkflowYaml(content: string): WorkflowDefinition {
 
   let name = "";
   let description = "";
+  let match: string[] = [];
   const steps: StepDefinition[] = [];
   let currentStep: Partial<StepDefinition> | null = null;
 
@@ -76,6 +77,9 @@ export function parseWorkflowYaml(content: string): WorkflowDefinition {
       case "description":
         description = parsed.value;
         break;
+      case "match":
+        match = parseYamlArray(parsed.value);
+        break;
     }
   }
 
@@ -86,7 +90,7 @@ export function parseWorkflowYaml(content: string): WorkflowDefinition {
   if (!name) throw new Error("Workflow yaml missing 'name' field");
   if (steps.length === 0) throw new Error("Workflow yaml has no steps");
 
-  return { name, description, steps };
+  return { name, description, match, steps };
 }
 
 function finalizeStep(partial: Partial<StepDefinition>): StepDefinition {

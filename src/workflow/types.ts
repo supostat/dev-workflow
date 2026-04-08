@@ -18,6 +18,7 @@ export interface StepDefinition {
 export interface WorkflowDefinition {
   name: string;
   description: string;
+  match: string[];
   steps: StepDefinition[];
 }
 

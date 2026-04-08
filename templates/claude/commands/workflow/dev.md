@@ -8,8 +8,43 @@ Internal protocol blocks (CONTEXT, PLAN, CODE_DONE, REVIEW, VERIFY) stay in Engl
 ## Arguments
 
 `/workflow:dev <task>` — interactive mode (default, asks before commit).
+`/workflow:dev <pipeline> <task>` — use specific pipeline from `.dev-vault/workflows/`.
 `/workflow:dev <path>` — task from file (.md, .txt).
 `/workflow:dev <task> --auto-commit` — autonomous mode (commits automatically, for swarm use).
+
+## Pipeline routing
+
+**Priority order:**
+
+1. **Explicit pipeline:** if first argument matches a YAML file in `.dev-vault/workflows/<name>.yaml` → use it
+2. **Match by files:** read all `.dev-vault/workflows/*.yaml`, check `match` field (glob patterns). If task mentions files matching a pipeline's `match` → use it. If multiple match → ask user.
+3. **Fallback:** no custom pipelines found → use built-in Normal/Phase mode (hardcoded steps below)
+
+**When using a custom pipeline:**
+- Read the YAML to get step order, agents, gates, gateCommands, onFail, maxAttempts
+- For each step, determine how to execute based on agent name:
+
+| Agent name | Step file | Subagent | Notes |
+|------------|-----------|----------|-------|
+| reader | steps/read.md | Explore | Context gathering |
+| planner | steps/plan.md | Explore | Architecture + pseudo-code |
+| coder | steps/coder.md | Full | Implementation |
+| reviewer | steps/review.md | Explore x3 | 3 parallel reviewers |
+| tester | steps/test.md | bash | Build + test gate |
+| committer | steps/commit.md | Full | Git operations |
+| *custom agent* | read `.dev-vault/agents/<name>.md` | Explore (read-only) or Full (if write: non-empty) | Use agent's system prompt as instructions |
+
+- Apply gate from YAML:
+  - `none` → auto-advance
+  - `user-approve` → show output, ask user
+  - `tests-pass` → run build+test commands
+  - `review-pass` → check for CRITICAL/HIGH in output
+  - `custom-command` → run `gateCommand` from YAML, exit 0 = pass
+
+- Apply `onFail` → redirect to specified step on gate failure
+- Apply `maxAttempts` → limit retries, then ask user (interactive) or stop (autonomous)
+
+**Always run PREFLIGHT (Step 0) and VAULT-UPDATES (Step 9b) regardless of pipeline.**
 
 ## Mode detection
 

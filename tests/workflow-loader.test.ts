@@ -81,6 +81,33 @@ steps:
     expect(workflow.steps[0]!.input).toEqual([]);
   });
 
+  it("parses match field as glob patterns", () => {
+    const yaml = `
+name: contracts
+description: Contracts pipeline
+match: [packages/contracts/**, *.sol]
+steps:
+  - name: read
+    agent: reader
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.match).toEqual(["packages/contracts/**", "*.sol"]);
+  });
+
+  it("defaults match to empty array", () => {
+    const yaml = `
+name: simple
+description: No match field
+steps:
+  - name: read
+    agent: reader
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.match).toEqual([]);
+  });
+
   it("parses custom-command gate with gateCommand", () => {
     const yaml = `
 name: custom

@@ -3,13 +3,14 @@ import type { WorkflowDefinition, StepDefinition } from "./types.js";
 function step(
   name: string,
   agent: string,
-  options: Partial<Pick<StepDefinition, "input" | "gate" | "onFail" | "maxAttempts">> = {},
+  options: Partial<Pick<StepDefinition, "input" | "gate" | "gateCommand" | "onFail" | "maxAttempts">> = {},
 ): StepDefinition {
   return {
     name,
     agent,
     input: options.input ?? [],
     gate: options.gate ?? "none",
+    gateCommand: options.gateCommand,
     onFail: options.onFail ?? null,
     maxAttempts: options.maxAttempts ?? 3,
   };
@@ -18,6 +19,7 @@ function step(
 const DEV: WorkflowDefinition = {
   name: "dev",
   description: "Full development workflow: read, plan, code, review, test, commit",
+  match: [],
   steps: [
     step("read", "reader"),
     step("plan", "planner", {
@@ -46,6 +48,7 @@ const DEV: WorkflowDefinition = {
 const HOTFIX: WorkflowDefinition = {
   name: "hotfix",
   description: "Quick fix workflow: read, code, test, commit",
+  match: [],
   steps: [
     step("read", "reader"),
     step("code", "coder", {
@@ -65,6 +68,7 @@ const HOTFIX: WorkflowDefinition = {
 const REVIEW: WorkflowDefinition = {
   name: "review",
   description: "Code review only",
+  match: [],
   steps: [
     step("read", "reader"),
     step("review", "reviewer", {
@@ -76,6 +80,7 @@ const REVIEW: WorkflowDefinition = {
 const TEST: WorkflowDefinition = {
   name: "test",
   description: "Run tests only",
+  match: [],
   steps: [
     step("read", "reader"),
     step("test", "tester", {
