@@ -2,13 +2,15 @@ export type GateType =
   | "none"
   | "user-approve"
   | "tests-pass"
-  | "review-pass";
+  | "review-pass"
+  | "custom-command";
 
 export interface StepDefinition {
   name: string;
   agent: string;
   input: string[];
   gate: GateType;
+  gateCommand?: string;
   onFail: string | null;
   maxAttempts: number;
 }

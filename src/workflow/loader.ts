@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { WorkflowDefinition, StepDefinition, GateType } from "./types.js";
 
-const VALID_GATES: ReadonlySet<string> = new Set(["none", "user-approve", "tests-pass", "review-pass"]);
+const VALID_GATES: ReadonlySet<string> = new Set(["none", "user-approve", "tests-pass", "review-pass", "custom-command"]);
 
 function parseYamlLine(line: string): { key: string; value: string } | null {
   const match = line.match(/^(\s*)(\w[\w-]*):\s*(.*)$/);
@@ -50,6 +50,9 @@ export function parseWorkflowYaml(content: string): WorkflowDefinition {
             currentStep.gate = parsed.value as GateType;
           }
           break;
+        case "gateCommand":
+          currentStep.gateCommand = parsed.value || undefined;
+          break;
         case "onFail":
           currentStep.onFail = parsed.value || null;
           break;
@@ -92,6 +95,7 @@ function finalizeStep(partial: Partial<StepDefinition>): StepDefinition {
     agent: partial.agent ?? partial.name ?? "",
     input: partial.input ?? [],
     gate: partial.gate ?? "none",
+    gateCommand: partial.gateCommand,
     onFail: partial.onFail ?? null,
     maxAttempts: partial.maxAttempts ?? 3,
   };

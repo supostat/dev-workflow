@@ -71,6 +71,7 @@ function createMockGateChecker(overrides: Partial<GateChecker> = {}): GateChecke
     checkTestsPass: overrides.checkTestsPass ?? (async () => true),
     checkReviewPass: overrides.checkReviewPass ?? (() => true),
     requestUserApproval: overrides.requestUserApproval ?? (async () => true),
+    checkCustomCommand: overrides.checkCustomCommand ?? (async () => true),
   };
 }
 
@@ -394,6 +395,93 @@ describe("WorkflowEngine", () => {
     const updated = env.taskManager.get(task.id);
     expect(updated.status).toBe("done");
     expect(updated.workflowRun).toContain("run-");
+  });
+
+  it("gate custom-command passes when checker returns true", async () => {
+    const workflow: WorkflowDefinition = {
+      name: "custom-gate",
+      description: "Has custom command gate",
+      steps: [
+        { name: "lint", agent: "tester", input: [], gate: "custom-command", gateCommand: "npm run lint", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const gateChecker = createMockGateChecker({
+      checkCustomCommand: async () => true,
+    });
+    const engine = createEngine(undefined, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(run.steps["lint"]!.status).toBe("completed");
+  });
+
+  it("gate custom-command fails when checker returns false", async () => {
+    const workflow: WorkflowDefinition = {
+      name: "custom-gate-fail",
+      description: "Custom command fails",
+      steps: [
+        { name: "lint", agent: "tester", input: [], gate: "custom-command", gateCommand: "slither .", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const gateChecker = createMockGateChecker({
+      checkCustomCommand: async () => false,
+    });
+    const engine = createEngine(undefined, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("failed");
+    expect(run.steps["lint"]!.status).toBe("failed");
+  });
+
+  it("gate custom-command fails when gateCommand is missing", async () => {
+    const workflow: WorkflowDefinition = {
+      name: "custom-gate-no-cmd",
+      description: "Missing gateCommand",
+      steps: [
+        { name: "check", agent: "tester", input: [], gate: "custom-command", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const engine = createEngine();
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("failed");
+  });
+
+  it("gate custom-command works with onFail retry", async () => {
+    let codeCallCount = 0;
+    const executor: StepExecutor = {
+      async execute(agent: PreparedAgent): Promise<string> {
+        if (agent.definition.name === "coder") codeCallCount++;
+        return "output";
+      },
+    };
+
+    let checkCount = 0;
+    const gateChecker = createMockGateChecker({
+      checkCustomCommand: async () => {
+        checkCount++;
+        return checkCount > 1;
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "custom-retry",
+      description: "Custom command with retry",
+      steps: [
+        { name: "code", agent: "coder", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "check", agent: "tester", input: [], gate: "custom-command", gateCommand: "forge test --fuzz", onFail: "code", maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(codeCallCount).toBe(2);
+    expect(checkCount).toBe(2);
   });
 
   it("abort sets failed status", async () => {

@@ -19,6 +19,7 @@ export interface GateChecker {
   checkTestsPass(command: string): Promise<boolean>;
   checkReviewPass(reviewOutput: string): boolean;
   requestUserApproval(stepName: string, context: string): Promise<boolean>;
+  checkCustomCommand(command: string): Promise<boolean>;
 }
 
 function nowISO(): string {
@@ -316,6 +317,14 @@ export class WorkflowEngine {
 
       case "review-pass": {
         const passed = this.gateChecker.checkReviewPass(output);
+        return passed ? "passed" : "failed";
+      }
+
+      case "custom-command": {
+        if (!stepDef.gateCommand) {
+          return "failed";
+        }
+        const passed = await this.gateChecker.checkCustomCommand(stepDef.gateCommand);
         return passed ? "passed" : "failed";
       }
     }

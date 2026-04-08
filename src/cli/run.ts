@@ -46,6 +46,15 @@ class CliGateChecker implements GateChecker {
     console.log(context);
     return true;
   }
+
+  async checkCustomCommand(command: string): Promise<boolean> {
+    try {
+      execSync(command, { stdio: "inherit" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 function createEngine(vaultPath: string, projectRoot: string) {
@@ -164,7 +173,7 @@ export function validate(args: string[]): void {
     for (const step of workflow.steps) {
       const issues: string[] = [];
       if (!step.agent) issues.push("missing agent");
-      if (step.gate !== "none" && step.gate !== "user-approve" && step.gate !== "tests-pass" && step.gate !== "review-pass") {
+      if (step.gate !== "none" && step.gate !== "user-approve" && step.gate !== "tests-pass" && step.gate !== "review-pass" && step.gate !== "custom-command") {
         issues.push(`unknown gate: ${step.gate}`);
       }
       const status = issues.length > 0 ? ` — ${issues.join(", ")}` : "";

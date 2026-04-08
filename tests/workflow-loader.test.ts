@@ -81,6 +81,26 @@ steps:
     expect(workflow.steps[0]!.input).toEqual([]);
   });
 
+  it("parses custom-command gate with gateCommand", () => {
+    const yaml = `
+name: custom
+description: Custom command gate
+steps:
+  - name: lint
+    agent: tester
+    gate: custom-command
+    gateCommand: npm run lint
+  - name: code
+    agent: coder
+    gate: none
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.gate).toBe("custom-command");
+    expect(workflow.steps[0]!.gateCommand).toBe("npm run lint");
+    expect(workflow.steps[1]!.gateCommand).toBeUndefined();
+  });
+
   it("throws for missing name", () => {
     const yaml = `
 description: No name
