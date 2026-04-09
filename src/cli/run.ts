@@ -94,7 +94,7 @@ export async function run(args: string[]): Promise<void> {
   const workflowName = args[0];
   if (!workflowName) {
     console.error("Usage: dev-workflow run <workflow> \"task description\" [--task <id>]");
-    console.error("Workflows: dev, hotfix, review, test");
+    console.error("Workflows: dev, hotfix, review, test, intake");
     process.exitCode = 1;
     return;
   }
@@ -111,7 +111,7 @@ export async function run(args: string[]): Promise<void> {
     if (!workflow) {
       const customNames = custom.map((w) => w.name);
       console.error(`Unknown workflow: ${workflowName}`);
-      console.error("Builtin: dev, hotfix, review, test");
+      console.error("Builtin: dev, hotfix, review, test, intake");
       if (customNames.length > 0) {
         console.error(`Custom: ${customNames.join(", ")}`);
       }

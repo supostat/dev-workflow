@@ -172,12 +172,21 @@ This project uses [dev-workflow](https://github.com/supostat/dev-workflow) for s
 
 | Command | Description |
 |---------|------------|
+| \`/intake "prompt"\` | Classify free-form input and recommend a workflow |
 | \`/vault:from-spec\` | Fill vault from SPEC.md (new project) |
 | \`/vault:analyze\` | Fill vault from codebase (existing project) |
 | \`/workflow:dev "task"\` | Full 10-step pipeline: plan, code, review, test, verify, commit |
 | \`/session:resume\` | Restore session context |
 | \`/session:review\` | Multi-perspective code review |
 | \`/session:handover\` | Save session context |
+
+### Routing free-form input
+
+When the user drops a loose idea, file, or copy/paste content (not a clearly scoped task), start with \`/intake "<request>"\` or \`/intake --file <path>\`. The intake agent classifies the request, proposes 2-3 workflow options with trade-offs, and recommends one. **Do not start coding immediately on free-form input.**
+
+The intake agent ends its output with an exact next command, e.g. \`Next step: /workflow:dev dev "refined task description"\`. Run that command verbatim once the user confirms — or pick a different option from the proposed list if the user prefers.
+
+Use \`/intake\` for: vague feature requests, exploratory questions, "should we X or Y?" decisions, files or specs to analyse before acting.
 
 ### Vault
 

@@ -507,9 +507,9 @@ describe("WorkflowEngine", () => {
 });
 
 describe("Builtin workflows", () => {
-  it("returns 4 builtin workflows", () => {
+  it("returns 5 builtin workflows", () => {
     const workflows = getBuiltinWorkflows();
-    expect(workflows).toHaveLength(4);
+    expect(workflows).toHaveLength(5);
   });
 
   it("gets workflow by name", () => {
@@ -532,6 +532,22 @@ describe("Builtin workflows", () => {
     const hotfix = getBuiltinWorkflow("hotfix");
     const names = hotfix.steps.map((s) => s.name);
     expect(names).toEqual(["read", "code", "test", "commit"]);
+  });
+
+  it("intake workflow has single classify step with user-approve gate", () => {
+    const intake = getBuiltinWorkflow("intake");
+    expect(intake.name).toBe("intake");
+    expect(intake.match).toEqual([]);
+    expect(intake.steps).toHaveLength(1);
+    expect(intake.steps[0]!.name).toBe("classify");
+    expect(intake.steps[0]!.agent).toBe("intake");
+    expect(intake.steps[0]!.gate).toBe("user-approve");
+  });
+
+  it("intake workflow is included in builtin workflows list", () => {
+    const workflows = getBuiltinWorkflows();
+    const intake = workflows.find((w) => w.name === "intake");
+    expect(intake?.steps[0]?.agent).toBe("intake");
   });
 });
 

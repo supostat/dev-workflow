@@ -90,11 +90,21 @@ const TEST: WorkflowDefinition = {
   ],
 };
 
+const INTAKE: WorkflowDefinition = {
+  name: "intake",
+  description: "Classify free-form input and recommend a workflow",
+  match: [],
+  steps: [
+    step("classify", "intake", { gate: "user-approve" }),
+  ],
+};
+
 const BUILTIN_WORKFLOWS: ReadonlyMap<string, WorkflowDefinition> = new Map([
   ["dev", DEV],
   ["hotfix", HOTFIX],
   ["review", REVIEW],
   ["test", TEST],
+  ["intake", INTAKE],
 ]);
 
 export function getBuiltinWorkflows(): WorkflowDefinition[] {
