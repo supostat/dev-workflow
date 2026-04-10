@@ -179,6 +179,40 @@ export async function engramJudge(
   }
 }
 
+export const PENDING_JUDGMENTS_THRESHOLD = 50;
+
+export interface EngramHealthStatus {
+  pendingJudgments: number;
+  modelsStale: boolean;
+}
+
+export async function engramHealth(
+  socketPath: string = DEFAULT_SOCKET_PATH,
+): Promise<EngramHealthStatus | null> {
+  if (!existsSync(socketPath)) {
+    return null;
+  }
+  try {
+    const response = await socketCall(socketPath, "memory_health", {});
+    if (
+      response === null ||
+      typeof response !== "object" ||
+      !("pending_judgments" in response) ||
+      !("models_stale" in response)
+    ) {
+      return null;
+    }
+    const record = response as Record<string, unknown>;
+    const pendingRaw = Number(record["pending_judgments"]);
+    return {
+      pendingJudgments: Number.isFinite(pendingRaw) ? pendingRaw : 0,
+      modelsStale: Boolean(record["models_stale"]),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function formatEngramResults(memories: EngramMemory[]): string {
   if (memories.length === 0) return "";
 

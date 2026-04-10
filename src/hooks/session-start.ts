@@ -7,7 +7,8 @@ import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { engramSearch, formatEngramResults, isEngramAvailable } from "../lib/engram.js";
+import { engramSearch, formatEngramResults, isEngramAvailable, engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../lib/engram.js";
+import { formatEngramHealthWarning } from "./engram-health-warning.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -104,6 +105,11 @@ async function run(): Promise<void> {
   const engramSection = formatEngramResults(engramMemories);
   if (engramSection) {
     sections.push("\n" + engramSection);
+  }
+
+  const healthWarning = formatEngramHealthWarning(await engramHealth(), PENDING_JUDGMENTS_THRESHOLD);
+  if (healthWarning) {
+    sections.push(healthWarning);
   }
 
   if (isEngramAvailable()) {
