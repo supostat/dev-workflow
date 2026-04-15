@@ -29,3 +29,12 @@ CLAUDE.md
 coverage/
 *.tsbuildinfo
 out/
+
+# dev-workflow (session data)
+.dev-vault/daily/
+.dev-vault/branches/
+.dev-vault/.edit-log.json
+.dev-vault/.intelligence.json
+# dev-workflow (stack-detected)
+.turbo/
+.next/
