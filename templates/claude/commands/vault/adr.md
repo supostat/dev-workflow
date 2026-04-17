@@ -17,6 +17,8 @@ Context, Decision, Alternatives, Consequences.
 
 ### Step 2: Show summary before saving
 
+Display as plain markdown (NOT in a code fence):
+
 📋 **New ADR**
 
 - **Title:** \<decision title\>
@@ -40,6 +42,8 @@ Context, Decision, Alternatives, Consequences.
 If yes → use MCP tool `vault_record` type "adr" or create file directly in `.dev-vault/architecture/<date>-<slug>.md`.
 
 ### Step 4: Confirm
+
+Display as plain markdown (NOT in a code fence):
 
 ✅ **Saved** → `.dev-vault/architecture/<date>-<slug>.md`
 
