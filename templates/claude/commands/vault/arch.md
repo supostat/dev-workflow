@@ -21,6 +21,16 @@ Examples:
 
 ## Procedure
 
+### Step 0: Engram search — MANDATORY
+
+Before loading vault context or researching codebase:
+1. `memory_search` with a query capturing the architecture question (key concepts, modules, technologies involved).
+2. `memory_judge` EACH returned memory (score 0.0-1.0 + explanation). No silent judges.
+3. If search returns `antipattern` records — each option you propose MUST explicitly address whether it triggers the antipattern. Silent ignore = protocol violation.
+4. Use search results to inform the 2-3 options you'll propose in Step 4. Memories of rejected approaches are especially valuable.
+
+No Write step in `/vault:arch` (read-only), so no `memory_store` is required. But if the analysis reveals a non-obvious finding worth preserving, agent may `memory_store` as `pattern` or `antipattern` per CLAUDE.md mid-work rules.
+
 ### Step 1: Load context
 
 MUST read:
