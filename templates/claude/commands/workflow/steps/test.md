@@ -12,14 +12,13 @@ Detect test command from `.dev-vault/stack.md` or `package.json` / `Cargo.toml` 
 
 **Compare against BASELINE from Step 0:** if a test was already failing before pipeline started, it is NOT a new failure. Only count failures that are NOT in BASELINE as coder's responsibility.
 
-**If any command fails:**
+**If any command fails**, display as plain markdown (NOT in a code fence):
 
-```
-── TEST ──
-FAIL: [command]
-[error output — last 50 lines]
-Sending to CODER for fix...
-```
+## TEST
+
+- **FAIL:** [command]
+- **Error:** [error output — last 50 lines, inline or in a child code fence]
+- Sending to CODER for fix...
 
 Pass error output to CODER as a fix iteration (same as REVIEW CHANGES_REQUESTED).
 After CODER fix → re-run TEST. **Max 3 TEST iterations.**
@@ -28,11 +27,10 @@ After limit:
 - **Interactive:** show error, ask user whether to commit anyway or stop
 - **Autonomous:** stop without commit. Failing tests = no commit.
 
-**If all pass:**
+**If all pass**, display as plain markdown (NOT in a code fence):
 
-```
-── TEST ──
-Build: passed
-Lint: passed (or skipped)
-Tests: passed (N tests)
-```
+## TEST
+
+- **Build:** passed
+- **Lint:** passed (or skipped)
+- **Tests:** passed (N tests)

@@ -133,11 +133,10 @@ Subtasks:
    Depends on: [previous subtask number or "none"]
 ```
 
-Save PLAN block. Display:
+Save PLAN block. Display as plain markdown (NOT in a code fence):
 
-```
-── PLAN ──
-[Summary]
-Files: [N] change, [N] create, [N] tests
-Scope: [small / large]
-```
+## PLAN
+
+- **Summary:** [Summary]
+- **Files:** [N] change, [N] create, [N] tests
+- **Scope:** small / large

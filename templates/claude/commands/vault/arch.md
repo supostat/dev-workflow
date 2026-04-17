@@ -90,63 +90,60 @@ Pick ONE solution. MUST justify with:
 
 ## Output format
 
-MUST use this exact format:
+Display as plain markdown (NOT in a code fence). Use the structure below:
 
-```
-══════════════════════════════════
-    ARCH: <question short form>
-══════════════════════════════════
+## ARCH: \<question short form\>
 
-Context:
-  Project: <name> | Branch: <branch> | Phase: <current from gameplan>
-  Related files: <N> analyzed
-  Existing patterns: <relevant conventions/patterns found>
-  Related ADRs: <list or "none">
+**Context**
+- Project: \<name\> | Branch: \<branch\> | Phase: \<current from gameplan\>
+- Related files: \<N\> analyzed
+- Existing patterns: \<relevant conventions/patterns found\>
+- Related ADRs: \<list or "none"\>
 
-── Option A: <name> ──
+### Option A: \<name\>
 
-<summary>
+\<summary\>
 
-How: <concrete description>
-Pros:
-  + <specific pro>
-  + <specific pro>
-Cons:
-  - <specific con>
-  - <specific con>
-Conventions: matches / deviates (<what>)
-Effort: small / medium / large
-Risk: <what could go wrong>
+**How:** \<concrete description\>
 
-── Option B: <name> ──
+**Pros:**
+- \<specific pro\>
+- \<specific pro\>
 
-<same structure>
+**Cons:**
+- \<specific con\>
+- \<specific con\>
 
-── Option C: <name> (if applicable) ──
+**Conventions:** matches / deviates (\<what\>)
+**Effort:** small / medium / large
+**Risk:** \<what could go wrong\>
 
-<same structure>
+### Option B: \<name\>
 
-── Perspective conflicts ──
+\<same structure\>
 
-<if perspectives disagree — describe the conflict and how recommendation resolves it>
+### Option C: \<name\> (if applicable)
 
-── RECOMMENDATION ──
+\<same structure\>
 
-Option <A/B/C>: <name>
+### Perspective conflicts
 
-Justification:
-  <why this one>
-  <which perspective it optimizes for>
-  <what trade-offs accepted>
+\<if perspectives disagree — describe the conflict and how recommendation resolves it\>
 
-Next steps:
-  1. <concrete action>
-  2. <concrete action>
+### RECOMMENDATION
 
-Record this decision? → /vault:adr
+**Option \<A/B/C\>: \<name\>**
 
-══════════════════════════════════
-```
+**Justification:**
+- \<why this one\>
+- \<which perspective it optimizes for\>
+- \<what trade-offs accepted\>
+
+**Next steps:**
+1. \<concrete action\>
+2. \<concrete action\>
+
+Record this decision? → `/vault:adr`
 
 ## Rules
 

@@ -77,39 +77,33 @@ Pick exactly one option. Justify the choice with concrete references to the proj
 
 ## Output format
 
-MUST use this exact format:
+Display as plain markdown (NOT in a code fence). Use the structure below:
 
-```
-══════════════════════════════════
-    INTAKE: <short request summary>
-══════════════════════════════════
+## INTAKE: \<short request summary\>
 
-Classification: <1-2 sentences describing what the user is asking for>
+**Classification:** \<1-2 sentences describing what the user is asking for\>
 
-── Option A: <workflow name> ──
+### Option A: \<workflow name\>
 
-Best for: <when this fits>
-Steps: <brief pipeline>
-Trade-off: <gain vs skip>
+- **Best for:** \<when this fits\>
+- **Steps:** \<brief pipeline\>
+- **Trade-off:** \<gain vs skip\>
 
-── Option B: <workflow name> ──
+### Option B: \<workflow name\>
 
-<same structure>
+\<same structure\>
 
-── Option C: <workflow name> (if applicable) ──
+### Option C: \<workflow name\> (if applicable)
 
-<same structure>
+\<same structure\>
 
-── RECOMMENDATION ──
+### RECOMMENDATION
 
-Option <A/B/C>: <workflow name>
+**Option \<A/B/C\>: \<workflow name\>**
 
-Why: <justification grounded in stack, conventions, knowledge, or gameplan>
+**Why:** \<justification grounded in stack, conventions, knowledge, or gameplan\>
 
-Next step: /workflow:dev <workflow-name> "<refined task description>"
-
-══════════════════════════════════
-```
+**Next step:** `/workflow:dev <workflow-name> "<refined task description>"`
 
 ## Rules
 

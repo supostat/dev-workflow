@@ -13,30 +13,37 @@ Files:
 
 Stage changes and show diff.
 
-**Interactive mode (default):**
+**Interactive mode (default)** — display as plain markdown (NOT in a code fence). The commit message itself goes in a code fence as it's a literal string; the surrounding layout is markdown:
 
+## COMMIT
+
+**Message:**
 ```
-── COMMIT ──
-[commit message]
+[commit message here]
+```
 
-Staged:
+**Staged:**
+```
 [abbreviated diff]
+```
 
 Commit? (yes / no / edit message)
-```
 
 - **yes** → `git add` relevant files, `git commit`
 - **no** → cancel, changes remain staged
 - **edit** → user edits, then commit
 
-**Autonomous mode (--auto-commit):**
+**Autonomous mode (--auto-commit)** — display as plain markdown (NOT in a code fence):
 
+## COMMIT (auto)
+
+**Message:**
 ```
-── COMMIT (auto) ──
 [commit message]
-Staged: [abbreviated diff]
-Auto-committed: [hash]
 ```
+
+- **Staged:** [abbreviated diff]
+- **Auto-committed:** `[hash]`
 
 `git add` relevant files, `git commit` immediately. No user prompt.
 

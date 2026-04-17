@@ -152,40 +152,37 @@ steps/
 
 ## Summary format
 
-After pipeline completes:
+After pipeline completes, display as plain markdown (NOT in a code fence). Do NOT wrap the summary in ``` fences — it renders as a horizontally-scrolling monospace block. Use markdown headings, bold, bullets.
 
-```
-═══════════════════════════════
-          DEV COMPLETE
-═══════════════════════════════
+Example layout:
 
-Task: [description]
-Mode: [interactive / autonomous]
-Scope: [small / large]
+## DEV COMPLETE
 
-Agents:
-  PREFLIGHT       [bash]         — [baseline]
-  READ            [Explore]      — [N] files
-  PLAN            [Explore]      — [N] files, pseudo-code
-  PLAN_REVIEW     [Explore]      — [verdict]
-  CODER           [Full]         — [N] changed, [N] created
-  REVIEW:security [Explore]      — [verdict]
-  REVIEW:quality  [Explore]      — [verdict]
-  REVIEW:coverage [Explore]      — [verdict]
-  TEST            [bash]         — [N] tests passed
-  VERIFY          [Explore]      — [verdict]
-  COMMIT          [git]          — [hash]
+- **Task:** [description]
+- **Mode:** interactive / autonomous
+- **Scope:** small / large
 
-[If review found gotchas:]     Gotchas → knowledge.md
-[If architecture concerns:]    Concerns → knowledge.md
+### Agents
+- **PREFLIGHT** [bash] — [baseline]
+- **READ** [Explore] — [N] files
+- **PLAN** [Explore] — [N] files, pseudo-code
+- **PLAN_REVIEW** [Explore] — [verdict]
+- **CODER** [Full] — [N] changed, [N] created
+- **REVIEW:security** [Explore] — [verdict]
+- **REVIEW:quality** [Explore] — [verdict]
+- **REVIEW:coverage** [Explore] — [verdict]
+- **TEST** [bash] — [N] tests passed
+- **VERIFY** [Explore] — [verdict]
+- **COMMIT** [git] — `[hash]`
 
-Vault records auto-created:
-  [If PLAN had deviations:]         ADR → .dev-vault/architecture/<slug>.md
-  [If REVIEW CRITICAL/HIGH fixed:]  Bug → .dev-vault/bugs/<slug>.md
-  [If CODER skipped MEDIUM:]        Debt → .dev-vault/debt/<slug>.md
+### Findings (if any)
+- Gotchas → `knowledge.md`
+- Architecture concerns → `knowledge.md`
 
-═══════════════════════════════
-```
+### Vault records (auto-created, if any)
+- ADR → `.dev-vault/architecture/<slug>.md` (if PLAN had deviations)
+- Bug → `.dev-vault/bugs/<slug>.md` (if REVIEW CRITICAL/HIGH fixed)
+- Debt → `.dev-vault/debt/<slug>.md` (if CODER skipped MEDIUM)
 
 ## Rules
 

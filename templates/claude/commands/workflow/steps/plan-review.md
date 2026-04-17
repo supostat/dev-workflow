@@ -58,10 +58,9 @@ END_PLAN_REVIEW
 - **Phase mode:** save next to phase file as `<phase-file>.plan.md`
 - **Normal mode:** save to `.dev-vault/plans/<date>-<slug>.md`
 
-Display:
+Display as plain markdown (NOT in a code fence):
 
-```
-── PLAN_REVIEW ──
-Verdict: APPROVED / NEEDS_REVISION
-[If approved:] Plan saved → <path>
-```
+## PLAN_REVIEW
+
+- **Verdict:** APPROVED / NEEDS_REVISION
+- **If approved:** Plan saved → `<path>`

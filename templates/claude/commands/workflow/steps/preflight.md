@@ -34,14 +34,13 @@ Lint: [pass / N warnings / no lint command]
 END_BASELINE
 ```
 
-Display:
+Display as plain markdown (NOT in a code fence):
 
-```
-── PREFLIGHT ──
-Git: clean / N uncommitted files
-Build: pass / fail (baseline)
-Tests: N passed / M already failing
-```
+## PREFLIGHT
+
+- **Git:** clean / N uncommitted files
+- **Build:** pass / fail (baseline)
+- **Tests:** N passed / M already failing
 
 **If uncommitted changes:**
 - **Interactive:** ask: stash / continue / abort

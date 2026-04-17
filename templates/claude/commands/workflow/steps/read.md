@@ -80,11 +80,10 @@ After subagent returns `output`:
    `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
 4. **Fail-safe:** if any tool unavailable, log `[engram] feedback skipped for Step 1` to stderr. Continue — do not abort pipeline.
 
-Save CONTEXT block (without the `## Engram Feedback` section) for the next step. Display:
+Save CONTEXT block (without the `## Engram Feedback` section) for the next step. Display as plain markdown (NOT in a code fence):
 
-```
-── READ ──
-Files to change: [N]
-Dependencies: [N]
-Tests: [N]
-```
+## READ
+
+- **Files to change:** [N]
+- **Dependencies:** [N]
+- **Tests:** [N]

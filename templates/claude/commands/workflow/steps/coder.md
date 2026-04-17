@@ -134,9 +134,8 @@ Skipped:
 END_CODE_FIX
 ```
 
-Display:
+Display as plain markdown (NOT in a code fence):
 
-```
-── CODER (iteration [N]) ──
+## CODER (iteration [N])
+
 Changed: [N], Created: [N], Tests: [N]
-```

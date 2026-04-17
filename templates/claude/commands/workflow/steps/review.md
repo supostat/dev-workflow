@@ -200,15 +200,14 @@ Merge all 3 REVIEW blocks into one verdict:
 - New conventions → append to `.dev-vault/conventions.md` section "Patterns"
 Only findings useful for future sessions. Not bugs (fixed by coder), not style nits.
 
-Display:
+Display as plain markdown (NOT in a code fence):
 
-```
-── REVIEW (iteration [N]) ──
-  Security: PASS / FAIL [Critical: N, High: N]
-  Quality:  PASS / FAIL [Critical: N, High: N]
-  Coverage: PASS / FAIL [Critical: N, High: N]
-Verdict: APPROVED / CHANGES_REQUESTED
-```
+## REVIEW (iteration [N])
+
+- **Security:** PASS / FAIL [Critical: N, High: N]
+- **Quality:** PASS / FAIL [Critical: N, High: N]
+- **Coverage:** PASS / FAIL [Critical: N, High: N]
+- **Verdict:** APPROVED / CHANGES_REQUESTED
 
 ## CODER↔REVIEW loop
 

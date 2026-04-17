@@ -89,73 +89,67 @@ MUST evaluate ALL 7 — do not skip any.
 
 ## Output format
 
-MUST use this exact format:
+Display as plain markdown (NOT in a code fence). Use the structure below:
 
-```
-══════════════════════════════════
-      PROJECT REVIEW: <name>
-══════════════════════════════════
+## PROJECT REVIEW: \<name\>
 
-Branch: <branch>
-Date: <today>
-Files scanned: <N>
-Tests: <N passed> / <N total>
-Build: pass / fail
+- **Branch:** \<branch\>
+- **Date:** \<today\>
+- **Files scanned:** \<N\>
+- **Tests:** \<N passed\> / \<N total\>
+- **Build:** pass / fail
 
-── SCORES ──
+### Scores
 
-| Perspective          | Score | Issues |
-|---------------------|-------|--------|
-| Vault completeness  | A/B/C/D/F | <N> |
-| Architecture        | A/B/C/D/F | <N> |
-| Test coverage       | A/B/C/D/F | <N> |
-| Security            | A/B/C/D/F | <N> |
-| Tech debt           | A/B/C/D/F | <N> |
-| Production readiness| A/B/C/D/F | <N> |
-| Convention compliance| A/B/C/D/F | <N> |
+| Perspective           | Score     | Issues |
+|----------------------|-----------|--------|
+| Vault completeness   | A/B/C/D/F | \<N\>  |
+| Architecture         | A/B/C/D/F | \<N\>  |
+| Test coverage        | A/B/C/D/F | \<N\>  |
+| Security             | A/B/C/D/F | \<N\>  |
+| Tech debt            | A/B/C/D/F | \<N\>  |
+| Production readiness | A/B/C/D/F | \<N\>  |
+| Convention compliance| A/B/C/D/F | \<N\>  |
 
-Overall: <weighted average> / A
+**Overall:** \<weighted average\> / A
 
-── CRITICAL (must fix) ──
+### CRITICAL (must fix)
 
-- [SEVERITY] [perspective] <file:line> — <issue>
-  Fix: <concrete suggestion>
+- **[SEVERITY]** [perspective] `<file:line>` — \<issue\>
+  - **Fix:** \<concrete suggestion\>
 
-── HIGH (should fix) ──
+### HIGH (should fix)
 
-- [SEVERITY] [perspective] <file:line> — <issue>
-  Fix: <suggestion>
+- **[SEVERITY]** [perspective] `<file:line>` — \<issue\>
+  - **Fix:** \<suggestion\>
 
-── MEDIUM (consider) ──
+### MEDIUM (consider)
 
-- [perspective] <issue summary>
+- [perspective] \<issue summary\>
 
-── VAULT GAPS ──
+### Vault gaps
 
-- <what's missing or outdated in vault>
+- \<what's missing or outdated in vault\>
 
-── TECH DEBT INVENTORY ──
+### Tech debt inventory
 
-Recorded: <N> items in .dev-vault/debt/
-Unrecorded: <N> items found in code
-- <file:line> — <debt description>
+- **Recorded:** \<N\> items in `.dev-vault/debt/`
+- **Unrecorded:** \<N\> items found in code
+  - `<file:line>` — \<debt description\>
 
-── RECOMMENDATIONS ──
+### Recommendations
 
-1. <highest priority action>
-2. <second priority>
-3. <third priority>
+1. \<highest priority action\>
+2. \<second priority\>
+3. \<third priority\>
 
-── GAMEPLAN vs REALITY ──
+### Gameplan vs reality
 
-| Phase | Gameplan status | Actual status | Match |
-|-------|----------------|---------------|-------|
-| Phase 1 | done | <code evidence> | yes/no |
-| Phase 2 | done | <code evidence> | yes/no |
-| ... | ... | ... | ... |
-
-══════════════════════════════════
-```
+| Phase   | Gameplan status | Actual status     | Match  |
+|---------|----------------|-------------------|--------|
+| Phase 1 | done           | \<code evidence\> | yes/no |
+| Phase 2 | done           | \<code evidence\> | yes/no |
+| ...     | ...            | ...               | ...    |
 
 ## Scoring criteria
 

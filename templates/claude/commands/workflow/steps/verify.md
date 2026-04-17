@@ -69,10 +69,9 @@ After subagent returns `output`:
 - **Interactive:** show gaps, ask user whether to commit partial or stop
 - **Autonomous:** stop without commit. Incomplete implementation = no commit.
 
-Display:
+Display as plain markdown (NOT in a code fence):
 
-```
-── VERIFY ──
-Verdict: COMPLETE / INCOMPLETE
-[If incomplete:] Missing: [N] requirements
-```
+## VERIFY
+
+- **Verdict:** COMPLETE / INCOMPLETE
+- **If incomplete:** Missing [N] requirements
