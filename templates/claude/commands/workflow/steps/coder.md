@@ -1,5 +1,16 @@
 # Step 4: CODER
 
+## Step 4.0: Engram search (orchestrator, BEFORE subagent)
+
+Before launching the subagent, orchestrator MUST:
+
+1. Call `mcp__engram__memory_search({ query: "code " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock` (bullet list or `"(none)"`).
+3. Address any `antipattern` records — the coder MUST note why the approach differs or change approach.
+4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 4` to stderr, set `engramMemoryIds = []`, `engramContextBlock = "(engram unavailable)"`. Continue.
+
+## Step 4.1: Launch subagent
+
 Launch **Full** subagent:
 
 ```
@@ -66,7 +77,33 @@ Tests written:
 Notes:
 - [notes if any]
 END_CODE_DONE
+
+## Engram Memory
+[engramContextBlock — memories retrieved before this step]
+
+## Engram Feedback (MANDATORY — at end of output, after END_CODE_DONE)
+
+For each retrieved memory below, judge how useful it was for coding.
+Format (one memory per line, single-line explanation):
+
+`- <memory_id>: <score 0.0-1.0> — <brief explanation>`
+
+Score scale: 0.8-1.0 applied, 0.5-0.7 relevant, 0.2-0.4 marginal, 0.0-0.1 not useful.
+
+Retrieved memories:
+[engramMemoryIds as bullet list, or "(none)"]
+
+Judgments:
 ```
+
+## Step 4.2: Parse feedback + judge (orchestrator, AFTER subagent)
+
+After subagent returns `output`:
+
+1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
+2. For each judgment: `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
+3. For each fallback id: `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 4` to stderr. Continue.
 
 **Fix mode** (when called from REVIEW loop):
 

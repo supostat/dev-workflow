@@ -1,7 +1,16 @@
 # Step 5: REVIEW (3 specialized reviewers in parallel)
 
-Before launching reviewers, orchestrator runs `git diff` to capture actual changes.
-Pass BOTH the CODE_DONE summary AND the real diff to each reviewer.
+## Step 5.0: Engram search (orchestrator, BEFORE subagents)
+
+Before launching reviewers, orchestrator MUST:
+
+1. Call `mcp__engram__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock`.
+3. The SAME memory set is shared across all 3 reviewers — each reviewer provides their own judgments in their own output.
+4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemoryIds = []`, continue.
+
+Then run `git diff` to capture actual changes.
+Pass CODE_DONE summary + diff + `engramContextBlock` + `engramMemoryIds` to each reviewer.
 
 Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
 
@@ -41,6 +50,16 @@ Verdict: [PASS / FAIL]
 Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_SECURITY
+
+## Engram Memory
+[engramContextBlock]
+
+## Engram Feedback (MANDATORY — AFTER END_REVIEW_SECURITY marker)
+
+Retrieved memories:
+[engramMemoryIds as bullets, or "(none)"]
+
+Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
 
 ## REVIEW:quality
@@ -93,6 +112,16 @@ Verdict: [PASS / FAIL]
 Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_QUALITY
+
+## Engram Memory
+[engramContextBlock]
+
+## Engram Feedback (MANDATORY — AFTER END_REVIEW_QUALITY marker)
+
+Retrieved memories:
+[engramMemoryIds as bullets, or "(none)"]
+
+Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
 
 ## REVIEW:coverage
@@ -130,7 +159,34 @@ Verdict: [PASS / FAIL]
 Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_COVERAGE
+
+## Engram Memory
+[engramContextBlock]
+
+## Engram Feedback (MANDATORY — AFTER END_REVIEW_COVERAGE marker)
+
+Retrieved memories:
+[engramMemoryIds as bullets, or "(none)"]
+
+Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
+
+## Step 5.2: Parse feedback + judge (orchestrator, AFTER all 3 reviewers)
+
+After all 3 reviewers return their outputs (security, quality, coverage):
+
+1. For EACH reviewer output, call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
+2. Three reviewers × same memory set = 3 judgments per memory. Apply each: `mcp__engram__memory_judge({ memory_id, score, explanation })`. Engram daemon will aggregate.
+3. For IDs in `fallbackIds` of ALL 3 reviewers (i.e., no reviewer judged): `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback from any reviewer" })`.
+4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 5`. Continue.
+
+## Step 5.3: Extract gate body (orchestrator, BEFORE gate check)
+
+Before running review-pass gate check on the aggregated review output:
+- For EACH reviewer output, strip its `## Engram Feedback` section (split on `/^##\s+Engram Feedback/im`, keep body before).
+- Run `checkReviewPass` only on the combined bodies (no engram sections).
+
+This prevents explanation text like "severity: high" inside Engram judgments from failing gate.
 
 ## Aggregate
 

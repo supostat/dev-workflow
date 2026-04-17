@@ -1,5 +1,17 @@
 # Step 1: READ
 
+## Step 1.0: Engram search (orchestrator, BEFORE subagent)
+
+Before launching the subagent, orchestrator MUST:
+
+1. Call `mcp__engram__memory_search({ query: "read " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+2. Save the returned array of memory objects. Extract `engramMemoryIds = results.map(m => m.id)`.
+3. Build a human-readable `engramContextBlock`: for each memory, a bullet `- [<type>] <context> — <action>`. If no results, set `engramContextBlock = "(none)"`.
+4. Note any `antipattern` records — they MUST be addressed explicitly by the subagent.
+5. **Fail-safe:** if `mcp__engram__memory_search` unavailable (engram daemon down, dev-workflow MCP not connected), log `[engram] search skipped for Step 1` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+
+## Step 1.1: Launch subagent
+
 Launch **Explore** subagent with this prompt:
 
 ```
@@ -11,6 +23,9 @@ You are a reader agent. Gather context for the task below.
 ## Project Context
 [vault sections: stack.md, conventions.md, knowledge.md, gameplan.md]
 
+## Engram Memory
+[engramContextBlock — memories retrieved before this step]
+
 ## Procedure
 1. Read CLAUDE.md for project instructions
 2. Find files relevant to the task (Glob/Grep)
@@ -20,6 +35,7 @@ You are a reader agent. Gather context for the task below.
 6. Scan .dev-vault/architecture/ for ADR records related to this task
 7. Scan .dev-vault/bugs/ for known bugs in affected areas
 8. Scan .dev-vault/debt/ for known debt in affected areas
+9. Address any antipattern records from Engram Memory explicitly
 
 ## Output Format
 CONTEXT:
@@ -33,9 +49,38 @@ Related ADRs: [from .dev-vault/architecture/ or "none"]
 Known bugs: [from .dev-vault/bugs/ or "none"]
 Known debt: [from .dev-vault/debt/ or "none"]
 END_CONTEXT
+
+## Engram Feedback (MANDATORY — at end of output, after END_CONTEXT)
+
+For each retrieved memory below, judge how useful it was for this step.
+Format (one memory per line, single-line explanation):
+
+`- <memory_id>: <score 0.0-1.0> — <brief explanation>`
+
+Score scale:
+- 0.8-1.0: directly useful, applied
+- 0.5-0.7: relevant context
+- 0.2-0.4: marginally relevant
+- 0.0-0.1: not useful or misleading
+
+Retrieved memories:
+[engramMemoryIds as bullet list, or "(none)"]
+
+Judgments:
 ```
 
-Save CONTEXT block. Display:
+## Step 1.2: Parse feedback + judge (orchestrator, AFTER subagent)
+
+After subagent returns `output`:
+
+1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
+2. For each `{id, score, explanation}` in `result.judgments`:
+   `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
+3. For each `id` in `result.fallbackIds`:
+   `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+4. **Fail-safe:** if any tool unavailable, log `[engram] feedback skipped for Step 1` to stderr. Continue — do not abort pipeline.
+
+Save CONTEXT block (without the `## Engram Feedback` section) for the next step. Display:
 
 ```
 ── READ ──

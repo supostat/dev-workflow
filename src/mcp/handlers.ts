@@ -11,6 +11,7 @@ import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
 import { engramSearch, engramStore } from "../lib/engram.js";
+import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
@@ -164,6 +165,12 @@ export class ToolHandlers {
         return this.agentRun(
           requireString(params, "agent"),
           requireString(params, "task"),
+        );
+
+      case "parse_engram_feedback":
+        return this.parseEngramFeedback(
+          requireString(params, "output"),
+          params["expectedMemoryIds"],
         );
 
       default:
@@ -334,6 +341,24 @@ export class ToolHandlers {
     return {
       prompt: prepared.resolvedPrompt,
       permissions: agent.permissions,
+    };
+  }
+
+  private parseEngramFeedback(output: string, expectedMemoryIdsRaw: unknown): {
+    judgments: Array<{ id: string; score: number; explanation: string }>;
+    fallbackIds: string[];
+  } {
+    const expectedMemoryIds = Array.isArray(expectedMemoryIdsRaw)
+      ? expectedMemoryIdsRaw.filter((id): id is string => typeof id === "string")
+      : [];
+    const result = parseEngramFeedbackFn(output, expectedMemoryIds);
+    return {
+      judgments: Array.from(result.judgments.entries()).map(([id, judgment]) => ({
+        id,
+        score: judgment.score,
+        explanation: judgment.explanation,
+      })),
+      fallbackIds: result.fallbackIds,
     };
   }
 }

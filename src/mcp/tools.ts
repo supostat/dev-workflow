@@ -164,5 +164,21 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["agent", "task"],
       },
     },
+    {
+      name: "parse_engram_feedback",
+      description: "Parse '## Engram Feedback' section from agent output. Returns per-memory judgments + fallback ids. Used by command-path workflow orchestrator to convert agent output into memory_judge calls.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          output: { type: "string", description: "Full agent output text (may include ## Engram Feedback section)" },
+          expectedMemoryIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Memory IDs retrieved before the step (from memory_search). Judgments for unknown IDs are ignored; missing IDs end up in fallbackIds.",
+          },
+        },
+        required: ["output", "expectedMemoryIds"],
+      },
+    },
   ];
 }

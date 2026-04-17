@@ -55,9 +55,9 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 14 tool definitions", () => {
+  it("returns 15 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(14);
+    expect(tools).toHaveLength(15);
   });
 
   it("each tool has name, description, and inputSchema", () => {
@@ -166,6 +166,46 @@ describe("ToolHandlers", () => {
     expect(result.permissions).toBeTruthy();
   });
 
+  it("parse_engram_feedback converts Map to Array for JSON", async () => {
+    const output = [
+      "findings body",
+      "",
+      "## Engram Feedback",
+      "- mem-1: 0.8 — applied pattern",
+      "- mem-2: 0.2 — not useful",
+    ].join("\n");
+    const result = await env.handlers.handle("parse_engram_feedback", {
+      output,
+      expectedMemoryIds: ["mem-1", "mem-2"],
+    }) as {
+      judgments: Array<{ id: string; score: number; explanation: string }>;
+      fallbackIds: string[];
+    };
+    expect(result.judgments).toEqual([
+      { id: "mem-1", score: 0.8, explanation: "applied pattern" },
+      { id: "mem-2", score: 0.2, explanation: "not useful" },
+    ]);
+    expect(result.fallbackIds).toEqual([]);
+  });
+
+  it("parse_engram_feedback returns fallbackIds when section missing", async () => {
+    const result = await env.handlers.handle("parse_engram_feedback", {
+      output: "just a body, no Engram Feedback section",
+      expectedMemoryIds: ["mem-a", "mem-b"],
+    }) as { judgments: unknown[]; fallbackIds: string[] };
+    expect(result.judgments).toEqual([]);
+    expect(result.fallbackIds).toEqual(["mem-a", "mem-b"]);
+  });
+
+  it("parse_engram_feedback tolerates non-array expectedMemoryIds", async () => {
+    const result = await env.handlers.handle("parse_engram_feedback", {
+      output: "## Engram Feedback\n- x: 0.5 — y",
+      expectedMemoryIds: "not-an-array" as unknown,
+    }) as { judgments: unknown[]; fallbackIds: string[] };
+    expect(result.judgments).toEqual([]);
+    expect(result.fallbackIds).toEqual([]);
+  });
+
   it("vault_status returns structured status", async () => {
     const result = await env.handlers.handle("vault_status", {}) as {
       project: string;
@@ -263,7 +303,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(14);
+    expect(result.tools).toHaveLength(15);
   });
 
   it("handles tools/call", async () => {

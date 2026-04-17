@@ -1,5 +1,16 @@
 # Step 2: PLAN
 
+## Step 2.0: Engram search (orchestrator, BEFORE subagent)
+
+Before launching the subagent, orchestrator MUST:
+
+1. Call `mcp__engram__memory_search({ query: "plan " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock` (bullet list `- [<type>] <context> — <action>`, or `"(none)"`).
+3. Note any `antipattern` records — the planner MUST address them explicitly.
+4. **Fail-safe:** if `mcp__engram__memory_search` unavailable, log `[engram] search skipped for Step 2` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+
+## Step 2.1: Launch subagent
+
 Launch **Explore** subagent:
 
 ```
@@ -80,7 +91,33 @@ Order:
 Deviations:
 - [deviation + justification, or "None"]
 END_PLAN
+
+## Engram Memory
+[engramContextBlock — memories retrieved before this step]
+
+## Engram Feedback (MANDATORY — at end of output, after END_PLAN)
+
+For each retrieved memory below, judge how useful it was for planning.
+Format (one memory per line, single-line explanation):
+
+`- <memory_id>: <score 0.0-1.0> — <brief explanation>`
+
+Score scale: 0.8-1.0 applied, 0.5-0.7 relevant, 0.2-0.4 marginal, 0.0-0.1 not useful.
+
+Retrieved memories:
+[engramMemoryIds as bullet list, or "(none)"]
+
+Judgments:
 ```
+
+## Step 2.2: Parse feedback + judge (orchestrator, AFTER subagent)
+
+After subagent returns `output`:
+
+1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
+2. For each `{id, score, explanation}` in `result.judgments`: `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
+3. For each `id` in `result.fallbackIds`: `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 2` to stderr. Continue.
 
 **Phase mode addition:** if task is a phase file, add to prompt:
 ```
