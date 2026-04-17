@@ -61,3 +61,21 @@ Risk: <what else might break>
 Prevention: <how to avoid this in the future>
 END_DIAGNOSIS
 ```
+
+## Engram Feedback
+
+For each retrieved memory below, judge how useful it was for this diagnosis.
+Format (one memory per line, single-line explanation):
+
+`- <memory_id>: <score 0.0-1.0> — <brief explanation>`
+
+Score scale:
+- 0.8-1.0: directly useful, applied
+- 0.5-0.7: relevant context
+- 0.2-0.4: marginally relevant
+- 0.0-0.1: not useful or misleading
+
+Retrieved memories:
+{{engramMemoryIds}}
+
+Judgments:

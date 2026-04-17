@@ -1,0 +1,79 @@
+export interface EngramFeedbackJudgment {
+  score: number;
+  explanation: string;
+}
+
+export interface EngramFeedbackResult {
+  judgments: Map<string, EngramFeedbackJudgment>;
+  fallbackIds: string[];
+}
+
+interface SectionSplit {
+  bodyForGate: string;
+  feedbackSection: string | null;
+}
+
+const HEADING_REGEX = /^##\s+Engram Feedback\s*$/im;
+const NEXT_HEADING_REGEX = /^##\s+\S/m;
+const LINE_REGEX = /^\s*-\s*([^\s:]+)\s*:\s*([+\-]?\d+(?:\.\d+)?)\s*[—–-]\s?(.*)$/;
+
+export function extractEngramFeedbackSection(output: string): SectionSplit {
+  const headingMatch = HEADING_REGEX.exec(output);
+  if (!headingMatch) {
+    return { bodyForGate: output, feedbackSection: null };
+  }
+
+  const headingStart = headingMatch.index;
+  const afterHeading = headingStart + headingMatch[0].length;
+  const sectionTail = output.slice(afterHeading);
+
+  const nextHeadingMatch = NEXT_HEADING_REGEX.exec(sectionTail);
+  const sectionEndInTail = nextHeadingMatch ? nextHeadingMatch.index : sectionTail.length;
+  const feedbackSection = sectionTail
+    .slice(0, sectionEndInTail)
+    .replace(/^\n+/, "")
+    .replace(/\s+$/, "");
+
+  return {
+    bodyForGate: output.slice(0, headingStart),
+    feedbackSection,
+  };
+}
+
+export function parseEngramFeedback(
+  output: string,
+  expectedMemoryIds: readonly string[],
+): EngramFeedbackResult {
+  const judgments = new Map<string, EngramFeedbackJudgment>();
+  const expectedSet = new Set(expectedMemoryIds);
+
+  const { feedbackSection } = extractEngramFeedbackSection(output);
+  if (feedbackSection !== null && feedbackSection.length > 0) {
+    for (const rawLine of feedbackSection.split("\n")) {
+      const parsed = parseOneLine(rawLine);
+      if (!parsed) continue;
+      if (!expectedSet.has(parsed.id)) continue;
+      if (judgments.has(parsed.id)) continue;
+      judgments.set(parsed.id, { score: parsed.score, explanation: parsed.explanation });
+    }
+  }
+
+  const fallbackIds = expectedMemoryIds.filter((id) => !judgments.has(id));
+  return { judgments, fallbackIds };
+}
+
+function parseOneLine(
+  line: string,
+): { id: string; score: number; explanation: string } | null {
+  const match = LINE_REGEX.exec(line);
+  if (!match) return null;
+
+  const id = match[1]!;
+  const scoreRaw = Number.parseFloat(match[2]!);
+  if (!Number.isFinite(scoreRaw) || scoreRaw < 0 || scoreRaw > 1) {
+    return null;
+  }
+
+  const explanation = match[3]!.trim();
+  return { id, score: scoreRaw, explanation };
+}

@@ -5,6 +5,11 @@ import type { TaskManager } from "../tasks/manager.js";
 import type { WorkflowDefinition, WorkflowRun, StepDefinition } from "./types.js";
 import type { WorkflowState } from "./state.js";
 import type { EngramBridge, EngramBeforeStepResult } from "../lib/engram.js";
+import {
+  extractEngramFeedbackSection,
+  parseEngramFeedback,
+} from "../lib/engram-feedback.js";
+import type { EngramFeedbackResult } from "../lib/engram-feedback.js";
 import { todayDate } from "../lib/fs-helpers.js";
 
 export interface WorkflowResolver {
@@ -175,9 +180,13 @@ export class WorkflowEngine {
 
       const previousOutputs = this.collectInputs(stepDef, run);
       const agent = this.registry.get(stepDef.agent);
+      const engramMemoryIdsList = engramResult.memoryIds.length === 0
+        ? "(none)"
+        : engramResult.memoryIds.map((id) => `- ${id}`).join("\n");
       const variables: Record<string, string> = {
         taskDescription: run.taskDescription,
         engramContext,
+        engramMemoryIds: engramMemoryIdsList,
         ...previousOutputs,
       };
       const prepared = await this.contextBuilder.prepare(agent, variables);
@@ -187,8 +196,10 @@ export class WorkflowEngine {
       this.state.save(run);
 
       const output = await this.executor.execute(prepared);
+      const { bodyForGate } = extractEngramFeedbackSection(output);
+      const feedbackResult = parseEngramFeedback(output, engramResult.memoryIds);
 
-      const gateResult = await this.checkGate(stepDef, output, agent);
+      const gateResult = await this.checkGate(stepDef, bodyForGate, agent);
 
       const previousStepName = this.getPreviousStep(workflow, run.currentStep);
       const parentMemoryId = previousStepName
@@ -204,10 +215,7 @@ export class WorkflowEngine {
           stepDef.name, output, "completed", parentMemoryId,
         ) ?? null;
 
-        await this.judgeFoundMemories(
-          engramResult.memoryIds, 0.7,
-          `Memories retrieved before step [${stepDef.name}] which completed successfully`,
-        );
+        await this.applyEngramFeedback(feedbackResult, 0.7, stepDef.name, "completed");
 
         const nextStep = this.getNextStep(workflow, run.currentStep);
         if (nextStep) {
@@ -224,10 +232,7 @@ export class WorkflowEngine {
           stepDef.name, output, "failed", parentMemoryId,
         ) ?? null;
 
-        await this.judgeFoundMemories(
-          engramResult.memoryIds, 0.3,
-          `Memories retrieved before step [${stepDef.name}] which failed gate check`,
-        );
+        await this.applyEngramFeedback(feedbackResult, 0.3, stepDef.name, "failed");
 
         stepState.attempt++;
         if (stepState.attempt >= stepDef.maxAttempts) {
@@ -260,15 +265,37 @@ export class WorkflowEngine {
     return run;
   }
 
-  private async judgeFoundMemories(
-    memoryIds: string[],
-    score: number,
-    explanation: string,
+  private async applyEngramFeedback(
+    feedbackResult: EngramFeedbackResult,
+    fallbackScore: number,
+    stepName: string,
+    status: "completed" | "failed",
   ): Promise<void> {
-    if (memoryIds.length === 0 || !this.engramBridge) return;
-    const idsToJudge = memoryIds.slice(0, 20);
-    for (const id of idsToJudge) {
-      await this.engramBridge.judge(id, score, explanation);
+    if (!this.engramBridge) return;
+    if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length === 0) {
+      return;
+    }
+
+    const fallbackExplanation = status === "completed"
+      ? `Memories retrieved before step [${stepName}] which completed successfully (no agent feedback)`
+      : `Memories retrieved before step [${stepName}] which failed gate check (no agent feedback)`;
+
+    const JUDGE_CAP = 20;
+    let budget = JUDGE_CAP;
+
+    for (const [id, judgment] of feedbackResult.judgments.entries()) {
+      if (budget-- <= 0) break;
+      await this.engramBridge.judge(id, judgment.score, judgment.explanation);
+    }
+    for (const id of feedbackResult.fallbackIds) {
+      if (budget-- <= 0) break;
+      await this.engramBridge.judge(id, fallbackScore, fallbackExplanation);
+    }
+
+    if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length > 0) {
+      process.stderr.write(
+        `[engram] feedback section missing for step [${stepName}], applied blanket ${fallbackScore} to ${feedbackResult.fallbackIds.length} memories\n`,
+      );
     }
   }
 

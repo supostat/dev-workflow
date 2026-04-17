@@ -23,6 +23,8 @@ export { ToolHandlers } from "./mcp/handlers.js";
 export { getToolDefinitions } from "./mcp/tools.js";
 export { engramSearch, engramStore, engramJudge, engramHealth, formatEngramResults, EngramBridge, isEngramAvailable } from "./lib/engram.js";
 export type { EngramBeforeStepResult, EngramHealthStatus } from "./lib/engram.js";
+export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-feedback.js";
+export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
