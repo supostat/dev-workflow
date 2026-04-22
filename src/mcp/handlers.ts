@@ -13,6 +13,7 @@ import { WorkflowState } from "../workflow/state.js";
 import { engramSearch, engramStore } from "../lib/engram.js";
 import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
+import { createWorkflow, type WorkflowCreateInput } from "./workflow-create.js";
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -172,6 +173,9 @@ export class ToolHandlers {
           requireString(params, "output"),
           params["expectedMemoryIds"],
         );
+
+      case "workflow_create":
+        return this.workflowCreate(params as unknown as WorkflowCreateInput);
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);
@@ -360,5 +364,9 @@ export class ToolHandlers {
       })),
       fallbackIds: result.fallbackIds,
     };
+  }
+
+  private workflowCreate(input: WorkflowCreateInput): { filepath: string } {
+    return createWorkflow(input, this.context.vaultPath);
   }
 }

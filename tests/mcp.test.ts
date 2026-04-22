@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { McpServer } from "../src/mcp/server.js";
@@ -11,6 +11,7 @@ import { AgentRegistry } from "../src/agents/registry.js";
 import { AgentContextBuilder } from "../src/agents/context-builder.js";
 import { TaskManager } from "../src/tasks/manager.js";
 import { TaskTracker } from "../src/tasks/tracker.js";
+import { parseWorkflowYaml } from "../src/workflow/loader.js";
 import type { ProjectContext } from "../src/lib/types.js";
 
 function createTestEnv() {
@@ -55,9 +56,9 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 15 tool definitions", () => {
+  it("returns 16 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(16);
   });
 
   it("each tool has name, description, and inputSchema", () => {
@@ -254,6 +255,152 @@ describe("ToolHandlers", () => {
       .rejects.toThrow();
   });
 
+  it("workflow_create writes YAML to .dev-vault/workflows/<name>.yaml on valid input", async () => {
+    const result = await env.handlers.handle("workflow_create", {
+      name: "my-flow",
+      description: "Custom pipeline",
+      steps: [
+        { name: "read", agent: "reader" },
+        { name: "code", agent: "coder", input: ["read.output"] },
+      ],
+    }) as { filepath: string };
+
+    const expectedPath = join(env.context.vaultPath, "workflows", "my-flow.yaml");
+    expect(result.filepath).toBe(expectedPath);
+
+    const content = readFileSync(expectedPath, "utf-8");
+    expect(content).toContain("name: my-flow");
+    expect(content).toContain("description: Custom pipeline");
+    expect(content).toContain("- name: read");
+    expect(content).toContain("agent: reader");
+    expect(content).toContain("input: [read.output]");
+  });
+
+  it("workflow_create throws on invalid name (uppercase or special chars)", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "MyFlow",
+      description: "Invalid",
+      steps: [{ name: "read", agent: "reader" }],
+    })).rejects.toThrow(/Invalid workflow name/);
+
+    await expect(env.handlers.handle("workflow_create", {
+      name: "bad name!",
+      description: "Invalid",
+      steps: [{ name: "read", agent: "reader" }],
+    })).rejects.toThrow(/Invalid workflow name/);
+  });
+
+  it("workflow_create throws when file already exists", async () => {
+    await env.handlers.handle("workflow_create", {
+      name: "dupe-flow",
+      description: "First write",
+      steps: [{ name: "read", agent: "reader" }],
+    });
+
+    await expect(env.handlers.handle("workflow_create", {
+      name: "dupe-flow",
+      description: "Second write",
+      steps: [{ name: "read", agent: "reader" }],
+    })).rejects.toThrow(/already exists/);
+  });
+
+  it("workflow_create throws when onFail references non-existent step", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "bad-onfail",
+      description: "Broken onFail",
+      steps: [
+        { name: "read", agent: "reader" },
+        { name: "code", agent: "coder", onFail: "nonexistent" },
+      ],
+    })).rejects.toThrow(/onFail references unknown step "nonexistent"/);
+  });
+
+  it("workflow_create throws on empty steps array", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "empty-flow",
+      description: "No steps",
+      steps: [],
+    })).rejects.toThrow(/at least 1 step/);
+  });
+
+  it("workflow_create serializes + round-trips correctly (full step with gate/input/outputBlock)", async () => {
+    const result = await env.handlers.handle("workflow_create", {
+      name: "full-flow",
+      description: "Full round-trip",
+      match: ["src/**/*.ts"],
+      steps: [
+        { name: "read", agent: "reader" },
+        {
+          name: "plan",
+          agent: "planner",
+          input: ["read.output"],
+          gate: "user-approve",
+        },
+        {
+          name: "code",
+          agent: "coder",
+          input: ["read.output", "plan.output"],
+          gate: "review-pass",
+          onFail: "plan",
+          maxAttempts: 5,
+          subagent: "Full",
+          outputBlock: "CODE_DONE",
+        },
+      ],
+    }) as { filepath: string };
+
+    const content = readFileSync(result.filepath, "utf-8");
+    const parsed = parseWorkflowYaml(content);
+
+    expect(parsed.name).toBe("full-flow");
+    expect(parsed.description).toBe("Full round-trip");
+    expect(parsed.match).toEqual(["src/**/*.ts"]);
+    expect(parsed.steps).toHaveLength(3);
+    expect(parsed.steps[2]!.gate).toBe("review-pass");
+    expect(parsed.steps[2]!.onFail).toBe("plan");
+    expect(parsed.steps[2]!.maxAttempts).toBe(5);
+    expect(parsed.steps[2]!.subagent).toBe("Full");
+    expect(parsed.steps[2]!.outputBlock).toBe("CODE_DONE");
+    expect(parsed.steps[2]!.input).toEqual(["read.output", "plan.output"]);
+  });
+
+  it("workflow_create throws on invalid gate enum value", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "bad-gate-flow",
+      description: "Test workflow",
+      steps: [{ name: "x", agent: "reader", gate: "invalid-gate" }],
+    })).rejects.toThrow(/invalid gate/);
+  });
+
+  it("workflow_create throws on invalid subagent enum value", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "bad-subagent-flow",
+      description: "Test workflow",
+      steps: [{ name: "x", agent: "reader", subagent: "Unknown" }],
+    })).rejects.toThrow(/invalid subagent/);
+  });
+
+  it("workflow_create throws on step name containing newline (YAML injection defense)", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "injection-flow",
+      description: "Test",
+      steps: [{ name: "step1\ninjected: true", agent: "reader" }],
+    })).rejects.toThrow(/must match \^\[a-z0-9\]/);
+  });
+
+  it("workflow_create throws on gateCommand containing newline", async () => {
+    await expect(env.handlers.handle("workflow_create", {
+      name: "injection-gatecmd",
+      description: "Test",
+      steps: [{
+        name: "check",
+        agent: "tester",
+        gate: "custom-command",
+        gateCommand: "true\nname: pwned",
+      }],
+    })).rejects.toThrow(/gateCommand must not contain line breaks/);
+  });
+
   it("throws for unknown tool", async () => {
     await expect(env.handlers.handle("nonexistent", {}))
       .rejects.toThrow("Unknown tool: nonexistent");
@@ -303,7 +450,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(15);
+    expect(result.tools).toHaveLength(16);
   });
 
   it("handles tools/call", async () => {

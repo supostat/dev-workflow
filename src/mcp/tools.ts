@@ -180,5 +180,48 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["output", "expectedMemoryIds"],
       },
     },
+    {
+      name: "workflow_create",
+      description: "Create a custom workflow YAML in .dev-vault/workflows/<name>.yaml. Vault-only — does NOT write to .claude/commands/ (session-start hook auto-generates shims on next session restart).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Workflow name: lowercase kebab-case, must match ^[a-z0-9][a-z0-9_-]{0,63}$",
+          },
+          description: {
+            type: "string",
+            description: "1-sentence human-readable purpose",
+          },
+          match: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional: glob patterns for auto-routing free-form input",
+          },
+          steps: {
+            type: "array",
+            minItems: 1,
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Step identifier (kebab-case)" },
+                agent: { type: "string", description: "Agent name (reader, planner, coder, etc. — builtin or custom via .dev-vault/agents/)" },
+                input: { type: "array", items: { type: "string" }, description: "Optional refs to prior step outputs, e.g. ['read.output']" },
+                gate: { type: "string", enum: ["none", "user-approve", "tests-pass", "review-pass", "custom-command"], description: "Gate type (default: none)" },
+                gateCommand: { type: "string", description: "Optional shell command for custom-command gate" },
+                onFail: { type: "string", description: "Optional step.name to retry on gate failure" },
+                maxAttempts: { type: "number", description: "Retry cap (default: 3)" },
+                stepFile: { type: "string", description: "Optional explicit step prompt path (relative, inside .dev-vault/workflow-steps/ or templates/)" },
+                subagent: { type: "string", enum: ["Explore", "Full", "bash"], description: "Optional subagent type override" },
+                outputBlock: { type: "string", description: "Optional named block identifier (UPPER_SNAKE_CASE)" },
+              },
+              required: ["name", "agent"],
+            },
+          },
+        },
+        required: ["name", "description", "steps"],
+      },
+    },
   ];
 }
