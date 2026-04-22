@@ -9,6 +9,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { engramSearch, formatEngramResults, isEngramAvailable, engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../lib/engram.js";
 import { formatEngramHealthWarning } from "./engram-health-warning.js";
+import { loadCustomWorkflows } from "../workflow/loader.js";
+import { syncWorkflowShims } from "./workflow-shim-sync.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
 async function run(): Promise<void> {
@@ -97,6 +99,23 @@ async function run(): Promise<void> {
       `Step: ${pausedRun.currentStep}\n` +
       `Run: ${pausedRun.id}\n\n` +
       `> Resume with: dev-workflow resume`,
+    );
+  }
+
+  const customWorkflows = loadCustomWorkflows(context.vaultPath);
+  const shimSync = syncWorkflowShims(
+    customWorkflows,
+    join(context.projectRoot, ".claude", "commands"),
+  );
+  for (const err of shimSync.errors) {
+    process.stderr.write(`[session-start] ${err}\n`);
+  }
+  if (customWorkflows.length > 0) {
+    const errSuffix = shimSync.errors.length > 0
+      ? `, ${shimSync.errors.length} errors (see stderr)`
+      : "";
+    sections.push(
+      `\n> Custom workflows: ${customWorkflows.length} defined, ${shimSync.synced} synced, ${shimSync.skipped} skipped${errSuffix}.`,
     );
   }
 
