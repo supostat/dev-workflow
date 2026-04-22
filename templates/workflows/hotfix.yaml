@@ -1,6 +1,8 @@
 name: hotfix
-description: Quick fix workflow: read, code, test, commit
+description: Quick fix workflow: preflight, read, code, test, verify, commit, vault-updates
 steps:
+  - name: preflight
+    agent: preflight
   - name: read
     agent: reader
   - name: code
@@ -11,6 +13,13 @@ steps:
     input: [code.output]
     gate: tests-pass
     onFail: code
+  - name: verify
+    agent: verifier
+    input: [code.output]
+    gate: user-approve
+    onFail: code
   - name: commit
     agent: committer
     input: [code.output]
+  - name: vault-updates
+    agent: vault-updates

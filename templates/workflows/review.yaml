@@ -1,8 +1,10 @@
 name: review
-description: Code review only
+description: Code review with vault findings record
 steps:
   - name: read
     agent: reader
   - name: review
     agent: reviewer
     input: [read.output]
+  - name: vault-updates
+    agent: vault-updates

@@ -41,23 +41,35 @@ describe("builtin workflow parity", () => {
   it("preserves gate types across YAML parse", () => {
     const dev = loadYaml("dev");
     expect(findStep(dev, "plan")?.gate).toBe("user-approve");
+    expect(findStep(dev, "plan-review")?.gate).toBe("user-approve");
     expect(findStep(dev, "review")?.gate).toBe("review-pass");
     expect(findStep(dev, "test")?.gate).toBe("tests-pass");
+    expect(findStep(dev, "verify")?.gate).toBe("user-approve");
     expect(findStep(dev, "read")?.gate).toBe("none");
+    expect(findStep(dev, "preflight")?.gate).toBe("none");
   });
 
   it("preserves onFail values across YAML parse", () => {
     const dev = loadYaml("dev");
+    expect(findStep(dev, "plan-review")?.onFail).toBe("plan");
     expect(findStep(dev, "review")?.onFail).toBe("code");
     expect(findStep(dev, "test")?.onFail).toBe("code");
+    expect(findStep(dev, "verify")?.onFail).toBe("code");
     expect(findStep(dev, "read")?.onFail).toBeNull();
     expect(findStep(dev, "plan")?.onFail).toBeNull();
+
+    const hotfix = loadYaml("hotfix");
+    expect(findStep(hotfix, "verify")?.onFail).toBe("code");
   });
 
   it("preserves input arrays across YAML parse", () => {
     const dev = loadYaml("dev");
     expect(findStep(dev, "code")?.input).toEqual(["read.output", "plan.output"]);
+    expect(findStep(dev, "plan-review")?.input).toEqual(["read.output", "plan.output"]);
+    expect(findStep(dev, "verify")?.input).toEqual(["code.output", "plan.output"]);
+    expect(findStep(dev, "commit")?.input).toEqual(["plan.output", "code.output"]);
     expect(findStep(dev, "read")?.input).toEqual([]);
+    expect(findStep(dev, "preflight")?.input).toEqual([]);
   });
 
   it("defaults maxAttempts to 3 when omitted in YAML", () => {

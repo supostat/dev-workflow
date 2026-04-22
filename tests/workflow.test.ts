@@ -515,7 +515,7 @@ describe("Builtin workflows", () => {
   it("gets workflow by name", () => {
     const dev = getBuiltinWorkflow("dev");
     expect(dev.name).toBe("dev");
-    expect(dev.steps.length).toBe(6);
+    expect(dev.steps.length).toBe(10);
   });
 
   it("throws for unknown workflow", () => {
@@ -525,13 +525,38 @@ describe("Builtin workflows", () => {
   it("dev workflow has correct step order", () => {
     const dev = getBuiltinWorkflow("dev");
     const names = dev.steps.map((s) => s.name);
-    expect(names).toEqual(["read", "plan", "code", "review", "test", "commit"]);
+    expect(names).toEqual([
+      "preflight",
+      "read",
+      "plan",
+      "plan-review",
+      "code",
+      "review",
+      "test",
+      "verify",
+      "commit",
+      "vault-updates",
+    ]);
   });
 
   it("hotfix workflow skips plan and review", () => {
     const hotfix = getBuiltinWorkflow("hotfix");
     const names = hotfix.steps.map((s) => s.name);
-    expect(names).toEqual(["read", "code", "test", "commit"]);
+    expect(names).toEqual([
+      "preflight",
+      "read",
+      "code",
+      "test",
+      "verify",
+      "commit",
+      "vault-updates",
+    ]);
+  });
+
+  it("review workflow has correct step order", () => {
+    const review = getBuiltinWorkflow("review");
+    const names = review.steps.map((s) => s.name);
+    expect(names).toEqual(["read", "review", "vault-updates"]);
   });
 
   it("intake workflow has single classify step with user-approve gate", () => {

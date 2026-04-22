@@ -1,12 +1,19 @@
 name: dev
-description: Full development workflow: read, plan, code, review, test, commit
+description: Full development workflow: preflight, read, plan, plan-review, code, review, test, verify, commit, vault-updates
 steps:
+  - name: preflight
+    agent: preflight
   - name: read
     agent: reader
   - name: plan
     agent: planner
     input: [read.output]
     gate: user-approve
+  - name: plan-review
+    agent: plan-reviewer
+    input: [read.output, plan.output]
+    gate: user-approve
+    onFail: plan
   - name: code
     agent: coder
     input: [read.output, plan.output]
@@ -20,6 +27,13 @@ steps:
     input: [code.output]
     gate: tests-pass
     onFail: code
+  - name: verify
+    agent: verifier
+    input: [code.output, plan.output]
+    gate: user-approve
+    onFail: code
   - name: commit
     agent: committer
     input: [plan.output, code.output]
+  - name: vault-updates
+    agent: vault-updates

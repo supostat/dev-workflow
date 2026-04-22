@@ -18,13 +18,19 @@ function step(
 
 const DEV: WorkflowDefinition = {
   name: "dev",
-  description: "Full development workflow: read, plan, code, review, test, commit",
+  description: "Full development workflow: preflight, read, plan, plan-review, code, review, test, verify, commit, vault-updates",
   match: [],
   steps: [
+    step("preflight", "preflight"),
     step("read", "reader"),
     step("plan", "planner", {
       input: ["read.output"],
       gate: "user-approve",
+    }),
+    step("plan-review", "plan-reviewer", {
+      input: ["read.output", "plan.output"],
+      gate: "user-approve",
+      onFail: "plan",
     }),
     step("code", "coder", {
       input: ["read.output", "plan.output"],
@@ -39,17 +45,24 @@ const DEV: WorkflowDefinition = {
       gate: "tests-pass",
       onFail: "code",
     }),
+    step("verify", "verifier", {
+      input: ["code.output", "plan.output"],
+      gate: "user-approve",
+      onFail: "code",
+    }),
     step("commit", "committer", {
       input: ["plan.output", "code.output"],
     }),
+    step("vault-updates", "vault-updates"),
   ],
 };
 
 const HOTFIX: WorkflowDefinition = {
   name: "hotfix",
-  description: "Quick fix workflow: read, code, test, commit",
+  description: "Quick fix workflow: preflight, read, code, test, verify, commit, vault-updates",
   match: [],
   steps: [
+    step("preflight", "preflight"),
     step("read", "reader"),
     step("code", "coder", {
       input: ["read.output"],
@@ -59,21 +72,28 @@ const HOTFIX: WorkflowDefinition = {
       gate: "tests-pass",
       onFail: "code",
     }),
+    step("verify", "verifier", {
+      input: ["code.output"],
+      gate: "user-approve",
+      onFail: "code",
+    }),
     step("commit", "committer", {
       input: ["code.output"],
     }),
+    step("vault-updates", "vault-updates"),
   ],
 };
 
 const REVIEW: WorkflowDefinition = {
   name: "review",
-  description: "Code review only",
+  description: "Code review with vault findings record",
   match: [],
   steps: [
     step("read", "reader"),
     step("review", "reviewer", {
       input: ["read.output"],
     }),
+    step("vault-updates", "vault-updates"),
   ],
 };
 
