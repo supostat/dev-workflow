@@ -1,0 +1,16 @@
+name: hotfix
+description: Quick fix workflow: read, code, test, commit
+steps:
+  - name: read
+    agent: reader
+  - name: code
+    agent: coder
+    input: [read.output]
+  - name: test
+    agent: tester
+    input: [code.output]
+    gate: tests-pass
+    onFail: code
+  - name: commit
+    agent: committer
+    input: [code.output]

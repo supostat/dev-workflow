@@ -1,0 +1,8 @@
+name: review
+description: Code review only
+steps:
+  - name: read
+    agent: reader
+  - name: review
+    agent: reviewer
+    input: [read.output]

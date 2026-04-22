@@ -1,0 +1,25 @@
+name: dev
+description: Full development workflow: read, plan, code, review, test, commit
+steps:
+  - name: read
+    agent: reader
+  - name: plan
+    agent: planner
+    input: [read.output]
+    gate: user-approve
+  - name: code
+    agent: coder
+    input: [read.output, plan.output]
+  - name: review
+    agent: reviewer
+    input: [code.output]
+    gate: review-pass
+    onFail: code
+  - name: test
+    agent: tester
+    input: [code.output]
+    gate: tests-pass
+    onFail: code
+  - name: commit
+    agent: committer
+    input: [plan.output, code.output]

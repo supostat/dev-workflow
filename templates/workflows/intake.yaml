@@ -1,0 +1,6 @@
+name: intake
+description: Classify free-form input and recommend a workflow
+steps:
+  - name: classify
+    agent: intake
+    gate: user-approve

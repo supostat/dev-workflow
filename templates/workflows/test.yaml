@@ -1,0 +1,9 @@
+name: test
+description: Run tests only
+steps:
+  - name: read
+    agent: reader
+  - name: test
+    agent: tester
+    input: [read.output]
+    gate: tests-pass
