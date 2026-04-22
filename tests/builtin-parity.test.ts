@@ -80,4 +80,14 @@ describe("builtin workflow parity", () => {
       }
     }
   });
+
+  it("leaves stepFile, subagent, and outputBlock undefined for all builtin steps", () => {
+    for (const name of WORKFLOW_NAMES) {
+      for (const step of loadYaml(name).steps) {
+        expect(step.stepFile).toBeUndefined();
+        expect(step.subagent).toBeUndefined();
+        expect(step.outputBlock).toBeUndefined();
+      }
+    }
+  });
 });

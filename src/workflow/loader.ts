@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { WorkflowDefinition, StepDefinition, GateType } from "./types.js";
+import type { WorkflowDefinition, StepDefinition, GateType, SubagentType } from "./types.js";
 
 const VALID_GATES: ReadonlySet<string> = new Set(["none", "user-approve", "tests-pass", "review-pass", "custom-command"]);
+const VALID_SUBAGENTS: ReadonlySet<string> = new Set(["Explore", "Full", "bash"]);
 
 function parseYamlLine(line: string): { key: string; value: string } | null {
   const match = line.match(/^(\s*)(\w[\w-]*):\s*(.*)$/);
@@ -63,6 +64,17 @@ export function parseWorkflowYaml(content: string): WorkflowDefinition {
         case "input":
           currentStep.input = parseYamlArray(parsed.value);
           break;
+        case "stepFile":
+          currentStep.stepFile = parsed.value || undefined;
+          break;
+        case "subagent":
+          if (VALID_SUBAGENTS.has(parsed.value)) {
+            currentStep.subagent = parsed.value as SubagentType;
+          }
+          break;
+        case "outputBlock":
+          currentStep.outputBlock = parsed.value || undefined;
+          break;
       }
       continue;
     }
@@ -102,6 +114,9 @@ function finalizeStep(partial: Partial<StepDefinition>): StepDefinition {
     gateCommand: partial.gateCommand,
     onFail: partial.onFail ?? null,
     maxAttempts: partial.maxAttempts ?? 3,
+    stepFile: partial.stepFile,
+    subagent: partial.subagent,
+    outputBlock: partial.outputBlock,
   };
 }
 

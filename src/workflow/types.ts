@@ -5,6 +5,8 @@ export type GateType =
   | "review-pass"
   | "custom-command";
 
+export type SubagentType = "Explore" | "Full" | "bash";
+
 export interface StepDefinition {
   name: string;
   agent: string;
@@ -13,6 +15,9 @@ export interface StepDefinition {
   gateCommand?: string;
   onFail: string | null;
   maxAttempts: number;
+  stepFile?: string;
+  subagent?: SubagentType;
+  outputBlock?: string;
 }
 
 export interface WorkflowDefinition {

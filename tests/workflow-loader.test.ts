@@ -128,6 +128,131 @@ steps:
     expect(workflow.steps[1]!.gateCommand).toBeUndefined();
   });
 
+  it("parses stepFile field", () => {
+    const yaml = `
+name: custom-steps
+description: Workflow with custom step file
+steps:
+  - name: security-audit
+    agent: auditor
+    stepFile: .dev-vault/workflow-steps/security-audit.md
+  - name: read
+    agent: reader
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.stepFile).toBe(".dev-vault/workflow-steps/security-audit.md");
+    expect(workflow.steps[1]!.stepFile).toBeUndefined();
+  });
+
+  it("parses subagent enum values", () => {
+    const yaml = `
+name: subagent-hints
+description: Workflow with subagent hints
+steps:
+  - name: scan
+    agent: scanner
+    subagent: Explore
+  - name: apply
+    agent: applier
+    subagent: Full
+  - name: smoke
+    agent: smoker
+    subagent: bash
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.subagent).toBe("Explore");
+    expect(workflow.steps[1]!.subagent).toBe("Full");
+    expect(workflow.steps[2]!.subagent).toBe("bash");
+  });
+
+  it("silently skips invalid subagent values", () => {
+    const yaml = `
+name: bad-subagent
+description: Invalid subagent value
+steps:
+  - name: scan
+    agent: scanner
+    subagent: Unknown
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.subagent).toBeUndefined();
+  });
+
+  it("parses outputBlock field", () => {
+    const yaml = `
+name: custom-block
+description: Workflow with custom output block
+steps:
+  - name: audit
+    agent: auditor
+    outputBlock: SECURITY_VERDICT
+  - name: read
+    agent: reader
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.outputBlock).toBe("SECURITY_VERDICT");
+    expect(workflow.steps[1]!.outputBlock).toBeUndefined();
+  });
+
+  it("defaults stepFile, subagent, and outputBlock to undefined when omitted", () => {
+    const yaml = `
+name: minimal
+description: Minimal workflow
+steps:
+  - name: read
+    agent: reader
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.stepFile).toBeUndefined();
+    expect(workflow.steps[0]!.subagent).toBeUndefined();
+    expect(workflow.steps[0]!.outputBlock).toBeUndefined();
+  });
+
+  it("treats empty strings as undefined for stepFile and outputBlock, case-mismatched as invalid subagent", () => {
+    const yaml = `
+name: empties
+description: Empty and invalid values
+steps:
+  - name: first
+    agent: first
+    stepFile:
+    subagent: explore
+    outputBlock:
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.stepFile).toBeUndefined();
+    expect(workflow.steps[0]!.subagent).toBeUndefined();
+    expect(workflow.steps[0]!.outputBlock).toBeUndefined();
+  });
+
+  it("parses stepFile, subagent, and outputBlock together in one step", () => {
+    const yaml = `
+name: combined
+description: All three fields together
+steps:
+  - name: audit
+    agent: auditor
+    stepFile: .dev-vault/workflow-steps/audit.md
+    subagent: Explore
+    outputBlock: AUDIT_REPORT
+    gate: review-pass
+    onFail: code
+`;
+    const workflow = parseWorkflowYaml(yaml);
+
+    expect(workflow.steps[0]!.stepFile).toBe(".dev-vault/workflow-steps/audit.md");
+    expect(workflow.steps[0]!.subagent).toBe("Explore");
+    expect(workflow.steps[0]!.outputBlock).toBe("AUDIT_REPORT");
+    expect(workflow.steps[0]!.gate).toBe("review-pass");
+    expect(workflow.steps[0]!.onFail).toBe("code");
+  });
+
   it("throws for missing name", () => {
     const yaml = `
 description: No name
