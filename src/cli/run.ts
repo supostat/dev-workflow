@@ -10,9 +10,10 @@ import { TaskManager } from "../tasks/manager.js";
 import { WorkflowEngine } from "../workflow/engine.js";
 import type { StepExecutor, GateChecker } from "../workflow/engine.js";
 import { WorkflowState } from "../workflow/state.js";
-import { getBuiltinWorkflow } from "../workflow/builtin.js";
+import { getBuiltinWorkflow, getBuiltinWorkflows } from "../workflow/builtin.js";
 import { loadCustomWorkflows } from "../workflow/loader.js";
 import type { PreparedAgent } from "../agents/types.js";
+import type { WorkflowDefinition } from "../workflow/types.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -66,12 +67,30 @@ function createEngine(vaultPath: string, projectRoot: string) {
   const contextBuilder = new AgentContextBuilder(vaultReader, context);
   const state = new WorkflowState(vaultPath);
   const taskManager = new TaskManager(vaultPath);
-  const resolver = { resolve: getBuiltinWorkflow };
+  const resolver = { resolve: (name: string): WorkflowDefinition => resolveWorkflow(name, vaultPath) };
 
   return new WorkflowEngine(
     registry, contextBuilder, state, taskManager,
     new CliStepExecutor(), new CliGateChecker(), resolver,
   );
+}
+
+export function resolveWorkflow(name: string, vaultPath: string): WorkflowDefinition {
+  const vaultMatch = loadCustomWorkflows(vaultPath).find((w) => w.name === name);
+  if (vaultMatch) return vaultMatch;
+
+  const libraryMatch = loadCustomWorkflows(join(PACKAGE_ROOT, "templates")).find((w) => w.name === name);
+  if (libraryMatch) return libraryMatch;
+
+  return getBuiltinWorkflow(name);
+}
+
+export function listAvailableWorkflows(vaultPath: string): string[] {
+  const names = new Set<string>();
+  for (const workflow of loadCustomWorkflows(vaultPath)) names.add(workflow.name);
+  for (const workflow of loadCustomWorkflows(join(PACKAGE_ROOT, "templates"))) names.add(workflow.name);
+  for (const workflow of getBuiltinWorkflows()) names.add(workflow.name);
+  return [...names].sort();
 }
 
 function parseFlag(args: string[], flag: string): string | undefined {
@@ -99,25 +118,17 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
-  let workflow;
+  let workflow: WorkflowDefinition;
   try {
-    workflow = getBuiltinWorkflow(workflowName);
+    workflow = resolveWorkflow(workflowName, context.vaultPath);
   } catch {
-    const custom = [
-      ...loadCustomWorkflows(context.vaultPath),
-      ...loadCustomWorkflows(join(PACKAGE_ROOT, "templates")),
-    ];
-    workflow = custom.find((w) => w.name === workflowName);
-    if (!workflow) {
-      const customNames = custom.map((w) => w.name);
-      console.error(`Unknown workflow: ${workflowName}`);
-      console.error("Builtin: dev, hotfix, review, test, intake");
-      if (customNames.length > 0) {
-        console.error(`Custom: ${customNames.join(", ")}`);
-      }
-      process.exitCode = 1;
-      return;
+    const available = listAvailableWorkflows(context.vaultPath);
+    console.error(`Unknown workflow: ${workflowName}`);
+    if (available.length > 0) {
+      console.error(`Available: ${available.join(", ")}`);
     }
+    process.exitCode = 1;
+    return;
   }
 
   const taskDescription = args.filter((a) => !a.startsWith("--")).slice(1).join(" ") || workflowName;

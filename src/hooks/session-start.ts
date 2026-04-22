@@ -7,13 +7,14 @@ import { TaskTracker } from "../tasks/tracker.js";
 import { WorkflowState } from "../workflow/state.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { engramSearch, formatEngramResults, isEngramAvailable, engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../lib/engram.js";
 import { formatEngramHealthWarning } from "./engram-health-warning.js";
 import { loadCustomWorkflows } from "../workflow/loader.js";
 import { syncWorkflowShims } from "./workflow-shim-sync.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 
-async function run(): Promise<void> {
+export async function run(): Promise<void> {
   const input = await readStdin();
 
   const context = detectContext(input.cwd);
@@ -158,6 +159,10 @@ function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + "\n\n... (truncated)";
 }
 
-run().catch(() => {
-  process.stdout.write(JSON.stringify({ continue: true }));
-});
+const isMain = process.argv[1] !== undefined
+  && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  run().catch(() => {
+    process.stdout.write(JSON.stringify({ continue: true }));
+  });
+}
