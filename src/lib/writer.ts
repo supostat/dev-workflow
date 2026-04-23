@@ -4,6 +4,18 @@ import type { ProjectContext, BranchContext } from "./types.js";
 import { renderTemplate } from "./templates.js";
 import { writeFileSafe, slugify, todayDate } from "./fs-helpers.js";
 
+export type AppendReason = "file-missing" | "section-missing" | "duplicate";
+
+export interface AppendResult {
+  appended: boolean;
+  reason?: AppendReason;
+}
+
+interface AppendOptions {
+  requireSectionExists?: boolean;
+  checkDuplicate?: boolean;
+}
+
 export class VaultWriter {
   private readonly vaultPath: string;
   private readonly context: ProjectContext;
@@ -93,23 +105,80 @@ export class VaultWriter {
   }
 
   appendKnowledge(section: string, content: string): void {
-    const filepath = join(this.vaultPath, "knowledge.md");
-    if (!existsSync(filepath)) return;
+    this.appendToSection(
+      join(this.vaultPath, "knowledge.md"),
+      section,
+      content,
+    );
+  }
+
+  appendConventions(section: string = "Patterns", content: string): AppendResult {
+    return this.appendToSection(
+      join(this.vaultPath, "conventions.md"),
+      section,
+      content,
+      { requireSectionExists: true, checkDuplicate: true },
+    );
+  }
+
+  private appendToSection(
+    filepath: string,
+    section: string,
+    content: string,
+    options: AppendOptions = {},
+  ): AppendResult {
+    if (!existsSync(filepath)) {
+      return { appended: false, reason: "file-missing" };
+    }
 
     const existing = readFileSync(filepath, "utf-8");
     const sectionHeader = `## ${section}`;
     const sectionIndex = existing.indexOf(sectionHeader);
 
     if (sectionIndex === -1) {
-      writeFileSync(filepath, existing.trimEnd() + `\n\n${sectionHeader}\n\n${content}\n`, "utf-8");
-    } else {
-      const nextSectionMatch = existing.slice(sectionIndex + sectionHeader.length).match(/\n## /);
-      const insertAt = nextSectionMatch
-        ? sectionIndex + sectionHeader.length + (nextSectionMatch.index ?? 0)
-        : existing.length;
-
-      const updated = existing.slice(0, insertAt).trimEnd() + `\n\n${content}\n` + existing.slice(insertAt);
-      writeFileSync(filepath, updated, "utf-8");
+      if (options.requireSectionExists) {
+        return { appended: false, reason: "section-missing" };
+      }
+      writeFileSync(
+        filepath,
+        existing.trimEnd() + `\n\n${sectionHeader}\n\n${content}\n`,
+        "utf-8",
+      );
+      return { appended: true };
     }
+
+    const nextSectionMatch = existing
+      .slice(sectionIndex + sectionHeader.length)
+      .match(/\n## /);
+    const insertAt = nextSectionMatch
+      ? sectionIndex + sectionHeader.length + (nextSectionMatch.index ?? 0)
+      : existing.length;
+
+    if (options.checkDuplicate) {
+      const sectionBody = existing.slice(
+        sectionIndex + sectionHeader.length,
+        insertAt,
+      );
+      if (this.isDuplicateBullet(sectionBody, content)) {
+        return { appended: false, reason: "duplicate" };
+      }
+    }
+
+    const updated =
+      existing.slice(0, insertAt).trimEnd() +
+      `\n\n${content}\n` +
+      existing.slice(insertAt);
+    writeFileSync(filepath, updated, "utf-8");
+    return { appended: true };
+  }
+
+  private isDuplicateBullet(sectionBody: string, newContent: string): boolean {
+    const normalize = (s: string) => s.trim().replace(/\s+/g, " ");
+    const newNormalized = normalize(newContent);
+    if (newNormalized === "") return false;
+    for (const line of sectionBody.split("\n")) {
+      if (normalize(line) === newNormalized) return true;
+    }
+    return false;
   }
 }

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { VaultReader } from "../lib/reader.js";
-import type { VaultWriter } from "../lib/writer.js";
+import type { VaultWriter, AppendReason } from "../lib/writer.js";
 import type { ProjectContext } from "../lib/types.js";
 import { renderTemplate } from "../lib/templates.js";
 import type { AgentRegistry } from "../agents/registry.js";
@@ -124,6 +124,12 @@ export class ToolHandlers {
           requireString(params, "content"),
         );
 
+      case "vault_pattern":
+        return this.vaultPattern(
+          optionalString(params, "section"),
+          requireString(params, "content"),
+        );
+
       case "vault_status":
         return this.vaultStatus();
 
@@ -223,6 +229,36 @@ export class ToolHandlers {
     );
 
     return { success: true };
+  }
+
+  private async vaultPattern(
+    section: string | undefined,
+    content: string,
+  ): Promise<{ success: boolean; appended: boolean; reason?: AppendReason }> {
+    if (content.includes("\n")) {
+      throw new Error("vault_pattern: content must be a single line (no newlines)");
+    }
+    if (section !== undefined && section.includes("\n")) {
+      throw new Error("vault_pattern: section must be a single line (no newlines)");
+    }
+
+    const targetSection = section ?? "Patterns";
+    const result = this.vaultWriter.appendConventions(targetSection, content);
+
+    if (!result.appended) {
+      return { success: true, appended: false, reason: result.reason };
+    }
+
+    await engramStore(
+      `Convention updated: ${targetSection}`,
+      content.slice(0, 300),
+      `Section "${targetSection}" appended in conventions.md of ${this.context.projectName}`,
+      "context",
+      `${this.context.projectName},conventions,${targetSection}`,
+      this.context.projectName,
+    );
+
+    return { success: true, appended: true };
   }
 
   private taskCreate(title: string, description?: string): unknown {

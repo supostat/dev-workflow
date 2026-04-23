@@ -58,6 +58,24 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
+      name: "vault_pattern",
+      description: "Append a pattern bullet to a section in conventions.md (default 'Patterns'). Section must exist; duplicate bullets are silently skipped (no error). Content must be a single line (no newlines). Dedup is case-sensitive and whitespace-insensitive.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          section: {
+            type: "string",
+            description: "Section name in conventions.md (default: 'Patterns')",
+          },
+          content: {
+            type: "string",
+            description: "Pattern bullet to append; typically starts with '- '",
+          },
+        },
+        required: ["content"],
+      },
+    },
+    {
       name: "vault_status",
       description: "Get full vault status: section completeness, tasks summary, active workflow, intelligence stats",
       inputSchema: {

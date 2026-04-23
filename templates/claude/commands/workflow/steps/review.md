@@ -197,7 +197,7 @@ Merge all 3 REVIEW blocks into one verdict:
 **Extract vault-worthy findings:**
 - Gotchas → append to `.dev-vault/knowledge.md` section "Gotchas"
 - Architecture concerns → append to `.dev-vault/knowledge.md` section "Architecture"
-- New conventions → append to `.dev-vault/conventions.md` section "Patterns"
+- New conventions → `mcp__dev-workflow__vault_pattern({ content: "- <finding>" })` (default section "Patterns"; dedup automatic)
 Only findings useful for future sessions. Not bugs (fixed by coder), not style nits.
 
 Display as plain markdown (NOT in a code fence):

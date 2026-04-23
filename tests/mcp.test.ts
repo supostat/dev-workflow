@@ -56,9 +56,14 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 16 tool definitions", () => {
+  it("returns 17 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(16);
+    expect(tools).toHaveLength(17);
+  });
+
+  it("includes vault_pattern", () => {
+    const tools = getToolDefinitions();
+    expect(tools.map((t) => t.name)).toContain("vault_pattern");
   });
 
   it("each tool has name, description, and inputSchema", () => {
@@ -121,6 +126,86 @@ describe("ToolHandlers", () => {
     const reader = new VaultReader(env.context);
     const knowledge = reader.readKnowledge();
     expect(knowledge).toContain("Watch out for ESM imports");
+  });
+
+  it("vault_pattern appends to conventions.md default Patterns section", async () => {
+    const conventionsPath = join(env.context.vaultPath, "conventions.md");
+    writeFileSync(
+      conventionsPath,
+      "# Conventions\n\n## Patterns\n\n- existing\n",
+      "utf-8",
+    );
+
+    const result = await env.handlers.handle("vault_pattern", {
+      content: "- new convention",
+    }) as { success: boolean; appended: boolean };
+
+    expect(result).toEqual({ success: true, appended: true });
+    expect(readFileSync(conventionsPath, "utf-8")).toContain("- new convention");
+  });
+
+  it("vault_pattern accepts explicit section override", async () => {
+    const conventionsPath = join(env.context.vaultPath, "conventions.md");
+    writeFileSync(
+      conventionsPath,
+      "# Conventions\n\n## Patterns\n\n- p\n\n## Testing\n\n- t\n",
+      "utf-8",
+    );
+
+    const result = await env.handlers.handle("vault_pattern", {
+      section: "Testing",
+      content: "- new test rule",
+    }) as { success: boolean; appended: boolean };
+
+    expect(result).toEqual({ success: true, appended: true });
+    expect(readFileSync(conventionsPath, "utf-8")).toContain("- new test rule");
+  });
+
+  it("vault_pattern reports section-missing without throwing", async () => {
+    const conventionsPath = join(env.context.vaultPath, "conventions.md");
+    writeFileSync(conventionsPath, "# Conventions\n\n## Git\n\n- rule\n", "utf-8");
+
+    const result = await env.handlers.handle("vault_pattern", {
+      content: "- nope",
+    }) as { success: boolean; appended: boolean; reason: string };
+
+    expect(result).toEqual({ success: true, appended: false, reason: "section-missing" });
+  });
+
+  it("vault_pattern reports duplicate without throwing", async () => {
+    const conventionsPath = join(env.context.vaultPath, "conventions.md");
+    const initial = "# Conventions\n\n## Patterns\n\n- already-here\n";
+    writeFileSync(conventionsPath, initial, "utf-8");
+
+    const result = await env.handlers.handle("vault_pattern", {
+      content: "- already-here",
+    }) as { success: boolean; appended: boolean; reason: string };
+
+    expect(result).toEqual({ success: true, appended: false, reason: "duplicate" });
+    expect(readFileSync(conventionsPath, "utf-8")).toBe(initial);
+  });
+
+  it("vault_pattern rejects multi-line content", async () => {
+    await expect(env.handlers.handle("vault_pattern", {
+      content: "- line one\n- line two",
+    })).rejects.toThrow(/content must be a single line/);
+  });
+
+  it("vault_pattern rejects multi-line section", async () => {
+    await expect(env.handlers.handle("vault_pattern", {
+      section: "Patterns\n## Injected",
+      content: "- rule",
+    })).rejects.toThrow(/section must be a single line/);
+  });
+
+  it("vault_pattern leaves conventions.md unchanged when appended is false", async () => {
+    const conventionsPath = join(env.context.vaultPath, "conventions.md");
+    const initial = "# Conventions\n\n## Git\n\n- rule\n";
+    writeFileSync(conventionsPath, initial, "utf-8");
+
+    await env.handlers.handle("vault_pattern", { content: "- rejected" });
+
+    expect(readFileSync(conventionsPath, "utf-8")).toBe(initial);
   });
 
   it("task_create creates a new task", async () => {
@@ -450,7 +535,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(16);
+    expect(result.tools).toHaveLength(17);
   });
 
   it("handles tools/call", async () => {

@@ -115,6 +115,110 @@ describe("VaultWriter", () => {
   });
 });
 
+describe("VaultWriter.appendConventions", () => {
+  let context: ProjectContext;
+
+  beforeEach(() => {
+    context = createTempContext();
+  });
+
+  afterEach(() => {
+    rmSync(context.projectRoot, { recursive: true, force: true });
+  });
+
+  function seedConventions(body: string): string {
+    const filepath = join(context.vaultPath, "conventions.md");
+    mkdirSync(context.vaultPath, { recursive: true });
+    writeFileSync(filepath, body, "utf-8");
+    return filepath;
+  }
+
+  it("appends bullet to existing Patterns section", () => {
+    const filepath = seedConventions(
+      "# Conventions\n\n## Patterns\n\n- existing pattern\n\n## Git\n\n- rule\n",
+    );
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "- new pattern");
+
+    expect(result).toEqual({ appended: true });
+    const updated = readFileSync(filepath, "utf-8");
+    expect(updated).toContain("- existing pattern");
+    expect(updated).toContain("- new pattern");
+    expect(updated.indexOf("- new pattern")).toBeLessThan(updated.indexOf("## Git"));
+  });
+
+  it("returns file-missing when conventions.md is absent", () => {
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "- rule");
+
+    expect(result).toEqual({ appended: false, reason: "file-missing" });
+  });
+
+  it("returns section-missing when target section not found", () => {
+    seedConventions("# Conventions\n\n## Git\n\n- rule\n");
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "- rule");
+
+    expect(result).toEqual({ appended: false, reason: "section-missing" });
+  });
+
+  it("returns duplicate when exact bullet already present", () => {
+    seedConventions("# Conventions\n\n## Patterns\n\n- one\n- two\n");
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "- one");
+
+    expect(result).toEqual({ appended: false, reason: "duplicate" });
+  });
+
+  it("dedup is whitespace-insensitive", () => {
+    seedConventions("# Conventions\n\n## Patterns\n\n- my  pattern\n");
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "-   my pattern   ");
+
+    expect(result).toEqual({ appended: false, reason: "duplicate" });
+  });
+
+  it("dedup is case-sensitive", () => {
+    const filepath = seedConventions("# Conventions\n\n## Patterns\n\n- my pattern\n");
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Patterns", "- My pattern");
+
+    expect(result).toEqual({ appended: true });
+    const updated = readFileSync(filepath, "utf-8");
+    expect(updated).toContain("- my pattern");
+    expect(updated).toContain("- My pattern");
+  });
+
+  it("defaults section to 'Patterns' when no section argument passed", () => {
+    const filepath = seedConventions("# Conventions\n\n## Patterns\n\n- existing\n");
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions(undefined as unknown as string, "- default-target");
+
+    expect(result).toEqual({ appended: true });
+    expect(readFileSync(filepath, "utf-8")).toContain("- default-target");
+  });
+
+  it("respects explicit section override", () => {
+    const filepath = seedConventions(
+      "# Conventions\n\n## Patterns\n\n- p\n\n## Testing\n\n- existing test rule\n",
+    );
+
+    const writer = new VaultWriter(context);
+    const result = writer.appendConventions("Testing", "- new test rule");
+
+    expect(result).toEqual({ appended: true });
+    const updated = readFileSync(filepath, "utf-8");
+    const patternsEnd = updated.indexOf("## Testing");
+    expect(updated.indexOf("- new test rule")).toBeGreaterThan(patternsEnd);
+  });
+});
+
 describe("VaultReader", () => {
   let context: ProjectContext;
 
