@@ -21,28 +21,6 @@
           }
         ]
       }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node node_modules/dev-workflow/dist/hooks/pre-compact.js",
-            "timeout": 8000
-          }
-        ]
-      },
-      {
-        "matcher": "manual",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node node_modules/dev-workflow/dist/hooks/pre-compact.js",
-            "timeout": 8000
-          }
-        ]
-      }
     ]
   },
   "statusLine": {

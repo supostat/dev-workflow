@@ -27,7 +27,7 @@ dev-workflow gives it a **strict protocol**: every task goes through a 10-step p
 - **Phase mode** — break large specs into phases, code each subtask separately
 - **Interactive & autonomous** — ask before commit (default) or auto-commit for swarm use
 - **13 MCP tools** — programmatic access to vault, tasks, intelligence (via `.mcp.json`)
-- **5 hooks** — SessionStart, SessionEnd, PostToolUse, TaskCompleted, PreCompact
+- **3 hooks** — SessionStart, SessionEnd, TaskCompleted
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
 - **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore
 - **Plan persistence** — approved plans saved to vault for audit and session resume

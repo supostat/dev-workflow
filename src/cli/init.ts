@@ -94,14 +94,6 @@ function buildSettingsJson(): string {
           timeout: 10000,
         }],
       }],
-      PostToolUse: [{
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [{
-          type: "command",
-          command: `node ${hookBase}/post-edit.js`,
-          timeout: 5000,
-        }],
-      }],
       TaskCompleted: [{
         hooks: [{
           type: "command",
@@ -109,24 +101,6 @@ function buildSettingsJson(): string {
           timeout: 5000,
         }],
       }],
-      PreCompact: [
-        {
-          matcher: "auto",
-          hooks: [{
-            type: "command",
-            command: `node ${hookBase}/pre-compact.js`,
-            timeout: 8000,
-          }],
-        },
-        {
-          matcher: "manual",
-          hooks: [{
-            type: "command",
-            command: `node ${hookBase}/pre-compact.js`,
-            timeout: 8000,
-          }],
-        },
-      ],
     },
     permissions: {
       allow: [
@@ -302,7 +276,6 @@ function ensureGitignoreEntries(projectRoot: string, stack: ReturnType<typeof de
   const devWorkflowEntries = [
     ".dev-vault/daily/",
     ".dev-vault/branches/",
-    ".dev-vault/.edit-log.json",
     ".dev-vault/.intelligence.json",
   ];
 

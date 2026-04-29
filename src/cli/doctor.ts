@@ -148,7 +148,7 @@ export async function doctor(fix: boolean = false): Promise<void> {
         const invalidEvents = Object.keys(hooks).filter((e) => !VALID_HOOK_EVENTS.has(e));
         if (invalidEvents.length > 0) {
           console.log(`  ${icon.error} Hooks           invalid events: ${invalidEvents.join(", ")}`);
-          issues.push(`Invalid hook events: ${invalidEvents.join(", ")} — valid: SessionStart, SessionEnd, PostToolUse, TaskCompleted, PreCompact`);
+          issues.push(`Invalid hook events: ${invalidEvents.join(", ")} — valid: SessionStart, SessionEnd, TaskCompleted`);
         } else {
           console.log(`  ${icon.success} Hooks           ${Object.keys(hooks).length} events configured`);
         }
