@@ -134,6 +134,7 @@ Violation = immediate pipeline abort.
 ```bash
 dev-workflow init [--force] [--detect]   # Initialize vault, hooks, CLAUDE.md, .mcp.json
 dev-workflow update                      # Update commands/agents from package
+dev-workflow templates-root              # Print absolute path to bundled templates/
 dev-workflow status                      # Vault and workflow status
 dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management
