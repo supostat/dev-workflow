@@ -13,6 +13,7 @@ import { search } from "./search.js";
 import { exportVault, importVault } from "./vault-io.js";
 import { config } from "./config.js";
 import { update } from "./update.js";
+import { templatesRoot } from "./templates-root.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -40,6 +41,7 @@ Usage:
   dev-workflow export [file.json]        Export vault to JSON
   dev-workflow import <file.json>        Import vault from JSON
   dev-workflow update                    Update commands/agents from package
+  dev-workflow templates-root            Print absolute path to bundled templates/
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow serve                     Start MCP server
   dev-workflow help                      Show this help
@@ -85,6 +87,9 @@ switch (command) {
     break;
   case "update":
     update();
+    break;
+  case "templates-root":
+    templatesRoot();
     break;
   case "doctor":
     doctor(args.includes("--fix")).catch(handleAsyncError);

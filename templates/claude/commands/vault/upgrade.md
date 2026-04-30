@@ -9,7 +9,7 @@ customizations in `.dev-vault/`.
 
 - Read: yes (templates source + downstream files)
 - Edit/Write: yes — downstream `.claude/` and root config files only. Forbidden in `.dev-vault/`
-- Bash: yes — limited to `npm root`, `mkdir -p`, `cp -P -p`, `date -u`, `cmp -s`, `ls`
+- Bash: yes — limited to `dev-workflow templates-root`, `npx --no-install dev-workflow templates-root`, `pnpm exec dev-workflow templates-root`, `npm root`, `test -d`, `test -f`, `mkdir -p`, `cp -P -p`, `date -u`, `cmp -s`, `ls`
 - MCP vault writes: no — this slash never calls `vault_record` / `vault_knowledge` / `vault_pattern`
 - VIOLATION = ABORT: any write to `.dev-vault/`, to a file outside the approved category list, or before backup confirmation
 
@@ -26,14 +26,30 @@ customizations in `.dev-vault/`.
 
 ### Step 0: Resolve TEMPLATES source
 
-1. Run `npm root` (Bash). Let `ROOT` be its output.
-2. Try in order:
-   1. `$ROOT/@engramm/dev-workflow/templates/`
-   2. `$ROOT/dev-workflow/templates/` (unscoped fallback)
-   3. If `cwd/package.json` has `"name": "@engramm/dev-workflow"` → dogfooding mode, use `./templates/`
-3. If none resolve, abort with: `dev-workflow not installed; run \`npm install @engramm/dev-workflow\` first`.
+The CLI itself is the canonical oracle: `dev-workflow templates-root` prints the absolute path to its own bundled `templates/` dir via `import.meta.url`, independent of how the package is installed (npm link, pnpm link --global, local dependency, dogfooding). Try the CLI by 4 invocation strategies; legacy fallback kicks in only for old CLI builds predating this command.
 
-Save resolved path as `TEMPLATES`. Record the resolved version from `<package>/package.json` for the final summary.
+Each attempt is independent — proceed to next on non-zero exit. Trim whitespace from stdout on success.
+
+1. **Direct CLI** — `dev-workflow templates-root`. Works when bin is on `$PATH` (npm link / pnpm link --global / global install).
+2. **npx local** — `npx --no-install dev-workflow templates-root`. Works for local npm install (resolves `node_modules/.bin/`).
+3. **pnpm exec** — `pnpm exec dev-workflow templates-root`. Works for local pnpm install.
+4. **Legacy fallback** (CLI predates `templates-root` command, e.g. v0.1.7 and earlier):
+   - Run `npm root` (Bash). Let `ROOT` be its output.
+   - Try in order:
+     - `$ROOT/@engramm/dev-workflow/templates/`
+     - `$ROOT/dev-workflow/templates/` (unscoped)
+     - If `cwd/package.json` has `"name": "@engramm/dev-workflow"` → `./templates/` (dogfooding)
+
+If all 4 attempts fail → abort: `dev-workflow templates not resolvable; ensure @engramm/dev-workflow is installed (npm install / pnpm install / npm link / pnpm link --global) and \`dev-workflow\` is on PATH or local node_modules`.
+
+Save the resolved path as `TEMPLATES` and validate (each check on its own line — abort on first failure):
+
+1. `test -d "$TEMPLATES"` (Bash) — must be a directory (rejects file or broken symlink)
+2. `test -d "$TEMPLATES/claude/commands"` (Bash) — structural sanity check
+3. `test -f "$TEMPLATES/../package.json"` (Bash) — sibling `package.json` must exist
+4. Use the **Read tool** (not shell) to read `$TEMPLATES/../package.json`. Parse the JSON in-agent and assert `name === "@engramm/dev-workflow"`. If mismatch or JSON parse fails, abort: `templates source corrupted: package.json invalid or name mismatch at <path>`
+
+Record the `version` field from the parsed `package.json` for the final summary.
 
 ### Step 1: Pre-flight
 
