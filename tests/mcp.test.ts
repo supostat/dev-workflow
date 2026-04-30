@@ -77,13 +77,21 @@ describe("getToolDefinitions", () => {
 
 describe("ToolHandlers", () => {
   let env: ReturnType<typeof createTestEnv>;
+  let originalEngramSocket: string | undefined;
 
   beforeEach(() => {
+    originalEngramSocket = process.env["ENGRAM_SOCKET_PATH"];
+    process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
     env = createTestEnv();
   });
 
   afterEach(() => {
     rmSync(env.projectRoot, { recursive: true, force: true });
+    if (originalEngramSocket === undefined) {
+      delete process.env["ENGRAM_SOCKET_PATH"];
+    } else {
+      process.env["ENGRAM_SOCKET_PATH"] = originalEngramSocket;
+    }
   });
 
   it("vault_read returns stack content", async () => {
@@ -495,14 +503,22 @@ describe("ToolHandlers", () => {
 describe("McpServer.handleLine", () => {
   let env: ReturnType<typeof createTestEnv>;
   let server: McpServer;
+  let originalEngramSocket: string | undefined;
 
   beforeEach(() => {
+    originalEngramSocket = process.env["ENGRAM_SOCKET_PATH"];
+    process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
     env = createTestEnv();
     server = new McpServer(env.handlers);
   });
 
   afterEach(() => {
     rmSync(env.projectRoot, { recursive: true, force: true });
+    if (originalEngramSocket === undefined) {
+      delete process.env["ENGRAM_SOCKET_PATH"];
+    } else {
+      process.env["ENGRAM_SOCKET_PATH"] = originalEngramSocket;
+    }
   });
 
   it("returns parse error for invalid JSON", async () => {

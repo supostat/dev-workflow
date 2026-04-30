@@ -13,6 +13,18 @@ Direct `mcp__engram__memory_*` remains available as **escape hatch** when you ne
 
 Do NOT confuse with `mcp__memory__*` (separate Knowledge Graph MCP for entities/relations — not engram).
 
+### Socket path resolution
+
+Engram now deploys per-project (each project gets its own `engram server` daemon listening on `<project>/.engram/engram.sock`). dev-workflow resolves the socket path with priority:
+
+1. `ENGRAM_SOCKET_PATH` env var (explicit override; trusted local boundary)
+2. `<cwd>/.engram/engram.sock` (per-project, current engram deploy model)
+3. `$HOME/.engram/engram.sock` (legacy / system-wide fallback)
+
+Per-call evaluation — cwd may change between calls, so the resolution is repeated on every engram operation. If the chosen socket disappears between resolution and connect, we safe-fail (return empty/null, no throw).
+
+If you have memories in `~/.engram/engram.db` (legacy global) and want them visible in your per-project daemon, run `engram migrate` from the project root.
+
 ### Judge previous step
 
 After receiving context from a previous pipeline step, call `memory_judge` on memories that informed that step's output. Coder judges Planner's decisions. Reviewer judges Coder's patterns.

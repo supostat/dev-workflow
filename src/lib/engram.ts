@@ -3,14 +3,28 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const DEFAULT_SOCKET_PATH = join(
-  process.env["HOME"] ?? "/tmp",
-  ".engram",
-  "engram.sock",
-);
+/**
+ * Resolve the engram socket path with priority:
+ *   1. ENGRAM_SOCKET_PATH env var (trusted local boundary; no validation)
+ *   2. <cwd>/.engram/engram.sock (per-project, current engram deploy model)
+ *   3. $HOME/.engram/engram.sock (legacy / system-wide fallback)
+ *
+ * Per-call evaluation — cwd may change between calls in test/async paths.
+ * Symlinks are followed (existsSync); user-managed sharing if intentional.
+ * TOCTOU: socketCall re-checks existence at use site → safe-fail on race.
+ *
+ * Exported primarily for testing.
+ */
+export function resolveSocketPath(): string {
+  const envPath = process.env["ENGRAM_SOCKET_PATH"];
+  if (envPath && envPath.length > 0) return envPath;
+  const projectPath = join(process.cwd(), ".engram", "engram.sock");
+  if (existsSync(projectPath)) return projectPath;
+  return join(process.env["HOME"] ?? "/tmp", ".engram", "engram.sock");
+}
 
 export function isEngramAvailable(): boolean {
-  return existsSync(DEFAULT_SOCKET_PATH);
+  return existsSync(resolveSocketPath());
 }
 const CONNECT_TIMEOUT_MS = 500;
 const REQUEST_TIMEOUT_MS = 2000;
@@ -129,7 +143,7 @@ export async function engramSearch(
     const params: Record<string, unknown> = { query, limit };
     if (project) params["project"] = project;
     if (tags?.length) params["tags"] = tags.join(",");
-    const result = await socketCallWithRetry(DEFAULT_SOCKET_PATH, "memory_search", params);
+    const result = await socketCallWithRetry(resolveSocketPath(), "memory_search", params);
     if (!Array.isArray(result)) return [];
     return result as EngramMemory[];
   } catch {
@@ -155,7 +169,7 @@ export async function engramStore(
     };
     if (project) params["project"] = project;
     const response = (await socketCallWithRetry(
-      DEFAULT_SOCKET_PATH,
+      resolveSocketPath(),
       "memory_store",
       params,
     )) as { id?: string } | null;
@@ -171,7 +185,7 @@ export async function engramJudge(
   explanation: string,
 ): Promise<void> {
   try {
-    await socketCall(DEFAULT_SOCKET_PATH, "memory_judge", {
+    await socketCall(resolveSocketPath(), "memory_judge", {
       memory_id: memoryId,
       score,
       explanation,
@@ -189,13 +203,14 @@ export interface EngramHealthStatus {
 }
 
 export async function engramHealth(
-  socketPath: string = DEFAULT_SOCKET_PATH,
+  socketPath?: string,
 ): Promise<EngramHealthStatus | null> {
-  if (!existsSync(socketPath)) {
+  const resolved = socketPath ?? resolveSocketPath();
+  if (!existsSync(resolved)) {
     return null;
   }
   try {
-    const response = await socketCall(socketPath, "memory_health", {});
+    const response = await socketCall(resolved, "memory_health", {});
     if (
       response === null ||
       typeof response !== "object" ||
@@ -300,7 +315,7 @@ export class EngramBridge {
 
     try {
       const response = (await socketCall(
-        DEFAULT_SOCKET_PATH,
+        resolveSocketPath(),
         "memory_store",
         params,
       )) as { id?: string } | null;

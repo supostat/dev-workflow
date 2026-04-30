@@ -19,9 +19,12 @@ describe("session-start hook — shim generation integration", () => {
   let stdoutChunks: string[];
   let originalStdoutWrite: typeof process.stdout.write;
   let originalIsTTY: boolean | undefined;
+  let originalEngramSocket: string | undefined;
 
   beforeEach(() => {
     originalCwd = process.cwd();
+    originalEngramSocket = process.env["ENGRAM_SOCKET_PATH"];
+    process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
     projectRoot = mkdtempSync(join(tmpdir(), "session-start-test-"));
     execSync("git init -q", { cwd: projectRoot });
     mkdirSync(join(projectRoot, ".dev-vault", "workflows"), { recursive: true });
@@ -42,6 +45,11 @@ describe("session-start hook — shim generation integration", () => {
     process.stdout.write = originalStdoutWrite;
     Object.defineProperty(process.stdin, "isTTY", { value: originalIsTTY, configurable: true });
     process.chdir(originalCwd);
+    if (originalEngramSocket === undefined) {
+      delete process.env["ENGRAM_SOCKET_PATH"];
+    } else {
+      process.env["ENGRAM_SOCKET_PATH"] = originalEngramSocket;
+    }
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
