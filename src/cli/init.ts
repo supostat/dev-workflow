@@ -8,6 +8,7 @@ import { detectConventions, renderConventionsMarkdown } from "../lib/conventions
 import { icon, section, keyValue } from "../lib/output.js";
 import { renderTemplate } from "../lib/templates.js";
 import { isEngramAvailable } from "../lib/engram.js";
+import { buildSettingsJson } from "../lib/settings-template.js";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -71,75 +72,6 @@ function mergeSettingsJson(filepath: string, newSettings: Record<string, unknown
 
   mkdirSync(dirname(filepath), { recursive: true });
   writeFileSync(filepath, JSON.stringify(merged, null, 2), "utf-8");
-}
-
-function buildSettingsJson(): string {
-  // Resolve paths from the actual package location (works for npm link, global, and local installs)
-  const distDir = join(PACKAGE_ROOT, "dist");
-  const hookBase = join(distDir, "hooks");
-  const statuslinePath = join(distDir, "lib", "statusline.js");
-  return JSON.stringify({
-    hooks: {
-      SessionStart: [{
-        hooks: [{
-          type: "command",
-          command: `node ${hookBase}/session-start.js`,
-          timeout: 10000,
-        }],
-      }],
-      SessionEnd: [{
-        hooks: [{
-          type: "command",
-          command: `node ${hookBase}/session-end.js`,
-          timeout: 10000,
-        }],
-      }],
-      TaskCompleted: [{
-        hooks: [{
-          type: "command",
-          command: `node ${hookBase}/post-task.js`,
-          timeout: 5000,
-        }],
-      }],
-    },
-    permissions: {
-      allow: [
-        "Read",
-        "Edit",
-        "Write",
-        "Bash(npm test)",
-        "Bash(npm run *)",
-        "Bash(npx *)",
-        "Bash(pnpm test)",
-        "Bash(pnpm run *)",
-        "Bash(node *)",
-        "Bash(git status*)",
-        "Bash(git diff*)",
-        "Bash(git log*)",
-        "Bash(git branch*)",
-        "Bash(git add *)",
-        "Bash(git commit *)",
-        "Bash(git stash *)",
-        "Bash(ls *)",
-        "Bash(cat *)",
-        "Bash(pwd)",
-        "Bash(wc *)",
-        "Agent",
-        "mcp__dev-workflow__*",
-      ],
-      deny: [
-        "Read(./.env)",
-        "Read(./.env.*)",
-        "Bash(git push *)",
-        "Bash(git reset --hard*)",
-        "Bash(rm -rf *)",
-      ],
-    },
-    statusLine: {
-      type: "command",
-      command: `node ${statuslinePath}`,
-    },
-  }, null, 2);
 }
 
 export function init(options: InitOptions): void {

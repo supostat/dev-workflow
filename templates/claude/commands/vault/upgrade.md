@@ -11,7 +11,7 @@ auto-overwrites your customizations in `.dev-vault/`.
 
 - Read: yes (templates source + downstream files)
 - Edit/Write: yes — downstream `.claude/` and root config files only. Forbidden in `.dev-vault/`
-- Bash: yes — limited to `dev-workflow templates-root`, `npx --no-install dev-workflow templates-root`, `pnpm exec dev-workflow templates-root`, `npm root`, `test -d`, `test -f`, `mkdir -p`, `cp -P -p`, `date -u`, `cmp -s`, `ls`
+- Bash: yes — limited to `dev-workflow templates-root`, `npx --no-install dev-workflow templates-root`, `pnpm exec dev-workflow templates-root`, `dev-workflow settings-template`, `npx --no-install dev-workflow settings-template`, `pnpm exec dev-workflow settings-template`, `npm root`, `test -d`, `test -f`, `mkdir -p`, `cp -P -p`, `date -u`, `cmp -s`, `ls`
 - MCP vault writes: no — this slash never calls `vault_record` / `vault_knowledge` / `vault_pattern`
 - VIOLATION = ABORT: any write to `.dev-vault/`, to a file outside the approved category list, or before backup confirmation
 
@@ -110,9 +110,13 @@ Per sub-group: classify → display category summary → numbered approval → b
 
 #### Category D — `.claude/settings.json` (MERGE, never overwrite)
 
-1. Parse both JSON files. Abort category D only if downstream is invalid JSON: report `invalid JSON in settings.json; skipping category D, fix manually`. Continue to other categories.
-2. **Reserved key guard.** Reject merge if either side contains top-level keys `__proto__`, `constructor`, or `prototype` (prototype-pollution vectors). Abort category D only: `settings.json contains reserved key <key>; skipping merge — manual review required`.
-3. Compute key-by-key delta:
+The reference template comes from `dev-workflow settings-template` (CLI oracle), NOT a static template file — paths are computed at runtime from `PACKAGE_ROOT` (via `import.meta.url` + `realpathSync`), so they work correctly in any install mode (npm link, pnpm link --global, local dependency, dogfooding). This avoids propagating broken `node_modules/...` paths from a static template.
+
+1. Run `dev-workflow settings-template` (Bash). Capture stdout. If exit non-zero, fall through `npx --no-install dev-workflow settings-template`, then `pnpm exec dev-workflow settings-template` (same 3-attempt CLI chain as Step 0). If all three fail, **abort Category D only** (continue with other categories): `cannot resolve dev-workflow CLI for settings-template; skipping merge`.
+2. Parse the captured stdout as `templateSettings` JSON. If parse fails: `templateSettings invalid JSON; skipping merge`. Validate that `templateSettings.hooks` and `templateSettings.statusLine` keys are present; otherwise abort Category D: `settings template incomplete (missing <key>); reinstall the package`.
+3. Parse downstream `.claude/settings.json` as `userSettings`. Abort Category D only if invalid JSON: `invalid JSON in downstream settings.json; skipping category D, fix manually`. Continue with other categories.
+4. **Reserved key guard.** Reject merge if either side contains top-level keys `__proto__`, `constructor`, or `prototype` (prototype-pollution vectors). Abort Category D only: `settings.json contains reserved key <key>; skipping merge — manual review required`.
+5. Compute key-by-key delta:
    - **New top-level keys** in template → propose addition
    - **Hooks array changes** — dedup by stringified command. New template hooks proposed; user-only hooks preserved
    - **Permissions array changes** — preserve user-added entries; surface template additions as proposals
@@ -126,10 +130,10 @@ Per sub-group: classify → display category summary → numbered approval → b
      2. Permission "bash:rm" — only in your version
         → 2a. preserve  2b. remove
      ```
-4. **Never silent-merge.** If a key changes meaning ambiguously, surface as conflict.
-5. Backup `settings.json` whole-file before write. Apply delta as a single Write of the merged result.
+6. **Never silent-merge.** If a key changes meaning ambiguously, surface as conflict.
+7. Backup `settings.json` whole-file before write. Apply delta as a single Write of the merged result.
 
-Replicate semantics from `src/cli/init.ts:30-74` (`mergeSettingsJson`).
+Slash implements the merge logic itself (interactive, numbered conflicts) — `src/cli/init.ts:mergeSettingsJson` is the non-interactive precedent (silent dedup) used during `dev-workflow init`. Two implementations serve different UX modes.
 
 #### Category E — `CLAUDE.md` + `.gitignore` (append-only)
 
