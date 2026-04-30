@@ -38,3 +38,4 @@ out/
 # dev-workflow (stack-detected)
 .turbo/
 .next/
+.engram/
