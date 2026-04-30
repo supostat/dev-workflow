@@ -148,7 +148,7 @@ dev-workflow serve                       # Start MCP server
 
 ## MCP Tools
 
-14 tools available via MCP server:
+20 tools available via MCP server:
 
 | Tool | Description |
 |------|------------|
@@ -157,6 +157,7 @@ dev-workflow serve                       # Start MCP server
 | `vault_search` | Search vault files |
 | `vault_record` | Create ADR/bug/debt record |
 | `vault_knowledge` | Append to knowledge.md |
+| `vault_pattern` | Append a pattern bullet to conventions.md |
 | `intelligence_query` | Query pattern graph with scoring |
 | `task_create` | Create task |
 | `task_list` | List tasks |
@@ -164,8 +165,13 @@ dev-workflow serve                       # Start MCP server
 | `task_start` | Start task (link to branch) |
 | `task_create_from_phase` | Parse phase file and create missing tasks |
 | `workflow_status` | Current workflow status |
+| `workflow_create` | Save a custom workflow YAML |
 | `agent_list` | List agents with permissions |
 | `agent_run` | Generate agent prompt with vault context |
+| `parse_engram_feedback` | Parse `## Engram Feedback` block from agent output |
+| `memory_search` | Search Engram memories with auto-decoration (step/branch/run/task tags) |
+| `memory_store` | Store Engram memory with auto-decoration |
+| `memory_judge` | Rate Engram memory's usefulness (0.0–1.0) |
 
 ## Documentation
 

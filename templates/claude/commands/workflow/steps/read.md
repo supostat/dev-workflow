@@ -4,11 +4,11 @@
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__engram__memory_search({ query: "read " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+1. Call `mcp__dev-workflow__memory_search({ query: "read " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
 2. Save the returned array of memory objects. Extract `engramMemoryIds = results.map(m => m.id)`.
 3. Build a human-readable `engramContextBlock`: for each memory, a bullet `- [<type>] <context> — <action>`. If no results, set `engramContextBlock = "(none)"`.
 4. Note any `antipattern` records — they MUST be addressed explicitly by the subagent.
-5. **Fail-safe:** if `mcp__engram__memory_search` unavailable (engram daemon down, dev-workflow MCP not connected), log `[engram] search skipped for Step 1` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+5. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable (engram daemon down, dev-workflow MCP not connected), log `[engram] search skipped for Step 1` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
 
 ## Step 1.1: Launch subagent
 
@@ -75,9 +75,9 @@ After subagent returns `output`:
 
 1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
 2. For each `{id, score, explanation}` in `result.judgments`:
-   `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
+   `mcp__dev-workflow__memory_judge({ memory_id: id, score, explanation })`.
 3. For each `id` in `result.fallbackIds`:
-   `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+   `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
 4. **Fail-safe:** if any tool unavailable, log `[engram] feedback skipped for Step 1` to stderr. Continue — do not abort pipeline.
 
 Save CONTEXT block (without the `## Engram Feedback` section) for the next step. Display as plain markdown (NOT in a code fence):

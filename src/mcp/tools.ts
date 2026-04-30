@@ -241,5 +241,57 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["name", "description", "steps"],
       },
     },
+    {
+      name: "memory_search",
+      description: "Search Engram memories with auto-decoration (step/branch/run/task tags from active pipeline). Direct mcp__engram__memory_search remains available as escape hatch for explicit project/tag control.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 5)" },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Extra tags merged (deduped) with auto-tags",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "memory_store",
+      description: "Store an Engram memory with auto-decoration. Engram splits content into context/action/result fields.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          context: { type: "string", description: "Situation / what was being done" },
+          action: { type: "string", description: "Approach / decision taken" },
+          result: { type: "string", description: "Outcome / why it matters for future" },
+          type: {
+            type: "string",
+            enum: ["pattern", "antipattern", "decision", "bugfix", "context"],
+          },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Extra tags merged (deduped) with auto-tags",
+          },
+        },
+        required: ["context", "action", "result", "type"],
+      },
+    },
+    {
+      name: "memory_judge",
+      description: "Rate an Engram memory's usefulness (0.0-1.0). Feeds Q-learning router.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          memory_id: { type: "string" },
+          score: { type: "number", minimum: 0, maximum: 1 },
+          explanation: { type: "string", description: "Brief judgment rationale" },
+        },
+        required: ["memory_id", "score"],
+      },
+    },
   ];
 }

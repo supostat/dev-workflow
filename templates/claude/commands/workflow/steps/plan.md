@@ -4,10 +4,10 @@
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__engram__memory_search({ query: "plan " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+1. Call `mcp__dev-workflow__memory_search({ query: "plan " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
 2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock` (bullet list `- [<type>] <context> — <action>`, or `"(none)"`).
 3. Note any `antipattern` records — the planner MUST address them explicitly.
-4. **Fail-safe:** if `mcp__engram__memory_search` unavailable, log `[engram] search skipped for Step 2` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+4. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable, log `[engram] search skipped for Step 2` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
 
 ## Step 2.1: Launch subagent
 
@@ -115,8 +115,8 @@ Judgments:
 After subagent returns `output`:
 
 1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. For each `{id, score, explanation}` in `result.judgments`: `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
-3. For each `id` in `result.fallbackIds`: `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+2. For each `{id, score, explanation}` in `result.judgments`: `mcp__dev-workflow__memory_judge({ memory_id: id, score, explanation })`.
+3. For each `id` in `result.fallbackIds`: `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
 4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 2` to stderr. Continue.
 
 **Phase mode addition:** if task is a phase file, add to prompt:

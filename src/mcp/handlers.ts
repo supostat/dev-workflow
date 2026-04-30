@@ -10,7 +10,8 @@ import type { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
-import { engramSearch, engramStore } from "../lib/engram.js";
+import { engramSearch, engramStore, engramJudge } from "../lib/engram.js";
+import { loadPipelineContext, buildAutoTags, mergeTags } from "./engram-proxy.js";
 import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 import { createWorkflow, type WorkflowCreateInput } from "./workflow-create.js";
@@ -183,6 +184,31 @@ export class ToolHandlers {
       case "workflow_create":
         return this.workflowCreate(params as unknown as WorkflowCreateInput);
 
+      case "memory_search":
+        return this.memorySearch(
+          requireString(params, "query"),
+          {
+            limit: typeof params["limit"] === "number" ? params["limit"] : undefined,
+            tags: Array.isArray(params["tags"]) ? params["tags"] as string[] : undefined,
+          },
+        );
+
+      case "memory_store":
+        return this.memoryStore(
+          requireString(params, "context"),
+          requireString(params, "action"),
+          requireString(params, "result"),
+          requireString(params, "type"),
+          { tags: Array.isArray(params["tags"]) ? params["tags"] as string[] : undefined },
+        );
+
+      case "memory_judge":
+        return this.memoryJudge(
+          requireString(params, "memory_id"),
+          typeof params["score"] === "number" ? params["score"] : Number(params["score"]),
+          optionalString(params, "explanation"),
+        );
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -259,6 +285,52 @@ export class ToolHandlers {
     );
 
     return { success: true, appended: true };
+  }
+
+  private async memorySearch(
+    query: string,
+    opts: { limit?: number; tags?: string[] },
+  ): Promise<unknown> {
+    const pipelineCtx = loadPipelineContext(this.context);
+    const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
+    return await engramSearch(
+      query,
+      this.context.projectName,
+      opts.limit ?? 5,
+      tags,
+    );
+  }
+
+  private async memoryStore(
+    context: string,
+    action: string,
+    result: string,
+    type: string,
+    opts: { tags?: string[] },
+  ): Promise<{ id: string | null }> {
+    const pipelineCtx = loadPipelineContext(this.context);
+    const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
+    const id = await engramStore(
+      context,
+      action,
+      result,
+      type,
+      tags.join(","),
+      this.context.projectName,
+    );
+    return { id };
+  }
+
+  private async memoryJudge(
+    memoryId: string,
+    score: number,
+    explanation?: string,
+  ): Promise<{ ok: true }> {
+    if (!Number.isFinite(score) || score < 0 || score > 1) {
+      throw new Error(`memory_judge: score must be a finite number in [0, 1], got ${score}`);
+    }
+    await engramJudge(memoryId, score, explanation ?? "");
+    return { ok: true };
   }
 
   private taskCreate(title: string, description?: string): unknown {

@@ -4,7 +4,7 @@
 
 Before launching reviewers, orchestrator MUST:
 
-1. Call `mcp__engram__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+1. Call `mcp__dev-workflow__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
 2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock`.
 3. The SAME memory set is shared across all 3 reviewers — each reviewer provides their own judgments in their own output.
 4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemoryIds = []`, continue.
@@ -176,8 +176,8 @@ Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 After all 3 reviewers return their outputs (security, quality, coverage):
 
 1. For EACH reviewer output, call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. Three reviewers × same memory set = 3 judgments per memory. Apply each: `mcp__engram__memory_judge({ memory_id, score, explanation })`. Engram daemon will aggregate.
-3. For IDs in `fallbackIds` of ALL 3 reviewers (i.e., no reviewer judged): `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback from any reviewer" })`.
+2. Three reviewers × same memory set = 3 judgments per memory. Apply each: `mcp__dev-workflow__memory_judge({ memory_id, score, explanation })`. Engram daemon will aggregate.
+3. For IDs in `fallbackIds` of ALL 3 reviewers (i.e., no reviewer judged): `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback from any reviewer" })`.
 4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 5`. Continue.
 
 ## Step 5.3: Extract gate body (orchestrator, BEFORE gate check)

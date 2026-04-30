@@ -123,10 +123,12 @@ export async function engramSearch(
   query: string,
   project?: string,
   limit = 5,
+  tags?: string[],
 ): Promise<EngramMemory[]> {
   try {
     const params: Record<string, unknown> = { query, limit };
     if (project) params["project"] = project;
+    if (tags?.length) params["tags"] = tags.join(",");
     const result = await socketCallWithRetry(DEFAULT_SOCKET_PATH, "memory_search", params);
     if (!Array.isArray(result)) return [];
     return result as EngramMemory[];

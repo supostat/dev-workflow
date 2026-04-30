@@ -5,6 +5,14 @@ These rules apply to **mid-work agent behavior** — when Claude makes decisions
 
 API reference: `~/.engram/AGENT.md`
 
+### Tool surface — proxy vs direct
+
+Use `mcp__dev-workflow__memory_search` / `memory_store` / `memory_judge` (proxy) by default. The proxy decorates calls with pipeline-context auto-tags (`step:<name>`, `branch:<current>`, `task:<id>`, `run:<id>`) and routes to engram with the right project name.
+
+Direct `mcp__engram__memory_*` remains available as **escape hatch** when you need explicit project/tag control without auto-decoration.
+
+Do NOT confuse with `mcp__memory__*` (separate Knowledge Graph MCP for entities/relations — not engram).
+
 ### Judge previous step
 
 After receiving context from a previous pipeline step, call `memory_judge` on memories that informed that step's output. Coder judges Planner's decisions. Reviewer judges Coder's patterns.

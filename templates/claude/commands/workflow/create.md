@@ -9,7 +9,7 @@
 ### Step 0: Engram search (memory lookup)
 
 Вызови:
-`mcp__engram__memory_search({ query: "workflow pattern steps agents " + $ARGUMENTS, project: "<projectName>", limit: 5 })`
+`mcp__dev-workflow__memory_search({ query: "workflow pattern steps agents " + $ARGUMENTS, limit: 5 })`
 
 Отметь антипаттерны из выдачи. При недоступности engram — продолжай без него (fail-safe).
 
@@ -87,13 +87,12 @@
 
 Вызови:
 
-`mcp__engram__memory_store({
-  memory_type: "pattern",
+`mcp__dev-workflow__memory_store({
+  type: "pattern",
   context: "Custom workflow created: <name> — <description>. Steps: <summary>. Used for: <intent>",
   action: "workflow_create",
   result: "Saved to <filepath>",
-  tags: ["workflow", "custom", "<name>"],
-  project: "<projectName>"
+  tags: ["workflow", "custom", "<name>"]
 })`
 
 При недоступности engram — продолжай без него (fail-safe).

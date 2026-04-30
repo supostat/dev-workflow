@@ -4,7 +4,7 @@
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__engram__memory_search({ query: "code " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+1. Call `mcp__dev-workflow__memory_search({ query: "code " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
 2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock` (bullet list or `"(none)"`).
 3. Address any `antipattern` records — the coder MUST note why the approach differs or change approach.
 4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 4` to stderr, set `engramMemoryIds = []`, `engramContextBlock = "(engram unavailable)"`. Continue.
@@ -101,8 +101,8 @@ Judgments:
 After subagent returns `output`:
 
 1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. For each judgment: `mcp__engram__memory_judge({ memory_id: id, score, explanation })`.
-3. For each fallback id: `mcp__engram__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
+2. For each judgment: `mcp__dev-workflow__memory_judge({ memory_id: id, score, explanation })`.
+3. For each fallback id: `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
 4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 4` to stderr. Continue.
 
 **Fix mode** (when called from REVIEW loop):
