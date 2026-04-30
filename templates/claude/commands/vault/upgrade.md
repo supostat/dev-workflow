@@ -1,9 +1,11 @@
 # /vault:upgrade — Safely upgrade dev-workflow against the installed package
 
-Compare your project's installed dev-workflow files against the version shipped
-in `node_modules/@engramm/dev-workflow/templates/`. Per-category two-phase
-plan/apply with mandatory timestamped backup. Never auto-overwrites your
-customizations in `.dev-vault/`.
+Compare your project's installed dev-workflow files against the templates
+bundled with the resolved `@engramm/dev-workflow` install (resolution oracle:
+`dev-workflow templates-root`, see Step 0). Works across all install modes —
+local dependency, `npm link` global, `pnpm link --global`, or dogfooding.
+Per-category two-phase plan/apply with mandatory timestamped backup. Never
+auto-overwrites your customizations in `.dev-vault/`.
 
 ## Permissions
 
