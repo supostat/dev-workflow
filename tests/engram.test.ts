@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:net";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
+  EngramBridge,
   engramHealth,
   engramSearch,
   engramStore,
@@ -171,7 +172,7 @@ describe("engramStore wire format", () => {
     delete process.env["ENGRAM_SOCKET_PATH"];
   });
 
-  it("sends tags as JSON-encoded array on the wire", async () => {
+  it("sends tags as native array on the wire", async () => {
     server = await createMockEngramServer(socketPath, (request) => {
       capturedParams = request.params as Record<string, unknown>;
       return { ok: true, data: { id: "test-id" } };
@@ -188,10 +189,10 @@ describe("engramStore wire format", () => {
     );
 
     expect(id).toBe("test-id");
-    expect(capturedParams!["tags"]).toBe('["alpha","beta:1"]');
+    expect(capturedParams!["tags"]).toEqual(["alpha", "beta:1"]);
   });
 
-  it("sends empty tags as JSON-encoded empty array", async () => {
+  it("sends empty tags as native empty array", async () => {
     server = await createMockEngramServer(socketPath, (request) => {
       capturedParams = request.params as Record<string, unknown>;
       return { ok: true, data: { id: "test-id" } };
@@ -200,23 +201,20 @@ describe("engramStore wire format", () => {
 
     await engramStore("ctx", "act", "res", "context", [], "proj");
 
-    expect(capturedParams!["tags"]).toBe("[]");
+    expect(capturedParams!["tags"]).toEqual([]);
   });
 
-  it("escapes JSON-special characters in individual tags", async () => {
+  it("preserves JSON-special characters in individual tags as native array elements", async () => {
     server = await createMockEngramServer(socketPath, (request) => {
       capturedParams = request.params as Record<string, unknown>;
       return { ok: true, data: { id: "test-id" } };
     });
     process.env["ENGRAM_SOCKET_PATH"] = socketPath;
     // Per-tag validation only rejects `,` and `\n`; quotes and backslashes
-    // are allowed. JSON.stringify must escape them correctly so the daemon
-    // can parse without ambiguity.
+    // are allowed. With native-array wire, JSON-RPC serialization handles the
+    // escaping transparently — the daemon receives the original strings.
     await engramStore("ctx", "act", "res", "context", ['quote"in:tag', 'back\\slash'], "proj");
-    // Verify exact wire output — the JSON encoding escapes quotes/backslashes.
-    expect(capturedParams!["tags"]).toBe('["quote\\"in:tag","back\\\\slash"]');
-    // And it round-trips: a daemon doing JSON.parse on this gets the original strings.
-    expect(JSON.parse(capturedParams!["tags"] as string)).toEqual(['quote"in:tag', 'back\\slash']);
+    expect(capturedParams!["tags"]).toEqual(['quote"in:tag', 'back\\slash']);
   });
 });
 
@@ -239,7 +237,7 @@ describe("engramSearch wire format", () => {
     delete process.env["ENGRAM_SOCKET_PATH"];
   });
 
-  it("sends tag filter as JSON-encoded array", async () => {
+  it("sends tag filter as native array", async () => {
     server = await createMockEngramServer(socketPath, (request) => {
       capturedParams = request.params as Record<string, unknown>;
       return { ok: true, data: [] };
@@ -248,7 +246,7 @@ describe("engramSearch wire format", () => {
 
     await engramSearch("query", "proj", 5, ["branch:main"]);
 
-    expect(capturedParams!["tags"]).toBe('["branch:main"]');
+    expect(capturedParams!["tags"]).toEqual(["branch:main"]);
   });
 
   it("omits tags param when filter is empty", async () => {
@@ -261,5 +259,39 @@ describe("engramSearch wire format", () => {
     await engramSearch("query", "proj", 5, []);
 
     expect(capturedParams!["tags"]).toBeUndefined();
+  });
+});
+
+describe("EngramBridge.afterStep wire format", () => {
+  let socketPath: string;
+  let server: Server | null = null;
+  let capturedParams: Record<string, unknown> | undefined;
+
+  beforeEach(() => {
+    capturedParams = undefined;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    socketPath = join(SHORT_TEMP_ROOT, `dv-bridge-${process.pid}-${id}.sock`);
+  });
+
+  afterEach(async () => {
+    if (server) {
+      await closeServer(server);
+      server = null;
+    }
+    delete process.env["ENGRAM_SOCKET_PATH"];
+  });
+
+  it("sends tags as native array on memory_store wire", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: { id: "stored-id" } };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+
+    const bridge = new EngramBridge("proj", "branch");
+    const id = await bridge.afterStep("plan", "output", "completed", null);
+
+    expect(id).toBe("stored-id");
+    expect(capturedParams!["tags"]).toEqual(["proj", "branch", "plan", "completed"]);
   });
 });

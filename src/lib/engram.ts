@@ -142,7 +142,7 @@ export async function engramSearch(
   try {
     const params: Record<string, unknown> = { query, limit };
     if (project) params["project"] = project;
-    if (tags?.length) params["tags"] = JSON.stringify(tags);
+    if (tags?.length) params["tags"] = tags;
     const result = await socketCallWithRetry(resolveSocketPath(), "memory_search", params);
     if (!Array.isArray(result)) return [];
     return result as EngramMemory[];
@@ -154,11 +154,16 @@ export async function engramSearch(
 /**
  * Store a memory in the engram daemon.
  *
- * Wire format note: tags are sent as `JSON.stringify(tags)` — including the
- * empty case (`tags: []` → wire `"[]"`). This is intentional asymmetry with
- * `engramSearch`, which omits the `tags` param entirely when the filter is
- * empty (skip the filter). Storage always emits a tags-key for consistent
- * payload shape on the daemon side.
+ * Wire format: tags are sent as a native JSON array (e.g. `["a","b"]`), not as
+ * a JSON-encoded string. The daemon (variant B onwards) requires a JSON
+ * sequence on `memory_search` — a string yields `[6007] dispatch error:
+ * invalid type: string, expected a sequence`. `memory_store` is tolerant and
+ * normalizes both formats to a JSON-array string in the storage column, but we
+ * send arrays uniformly for consistency.
+ *
+ * Asymmetry vs `engramSearch`: store always emits the `tags` key (even when
+ * empty) for consistent payload shape; search omits the key entirely when the
+ * filter is empty.
  */
 export async function engramStore(
   context: string,
@@ -174,7 +179,7 @@ export async function engramStore(
       action,
       result,
       memory_type: memoryType,
-      tags: JSON.stringify(tags),
+      tags,
     };
     if (project) params["project"] = project;
     const response = (await socketCallWithRetry(
@@ -317,7 +322,7 @@ export class EngramBridge {
       action: truncatedOutput,
       result: `Step ${stepName} ${status} on ${this.branch}`,
       memory_type: memoryType,
-      tags: JSON.stringify(tags),
+      tags,
     };
     if (this.project) params["project"] = this.project;
     if (parentId) params["parent_id"] = parentId;
