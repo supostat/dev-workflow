@@ -47,11 +47,14 @@ describe("mirrorVaultRecord", () => {
     expect(vi.mocked(engramStore)).toHaveBeenCalledOnce();
     const callArgs = vi.mocked(engramStore).mock.calls[0]!;
     expect(callArgs[3]).toBe("decision");
-    const tagsString = callArgs[4]!;
-    expect(tagsString).toContain(`vault-type:adr`);
-    expect(tagsString).toContain(`vault-source:.dev-vault/architecture/2026-05-01-sample-decision.md`);
-    expect(tagsString).toMatch(/vault-content-hash:[a-f0-9]{12}/);
-    expect(tagsString).toContain(PROJECT_NAME);
+    const tags = callArgs[4]!;
+    expect(Array.isArray(tags)).toBe(true);
+    expect(tags).toContain(`vault-type:adr`);
+    expect(tags).toContain(`vault-source:.dev-vault/architecture/2026-05-01-sample-decision.md`);
+    expect(tags.find((t) => t.startsWith("vault-content-hash:"))).toMatch(
+      /^vault-content-hash:[a-f0-9]{12}$/,
+    );
+    expect(tags).toContain(PROJECT_NAME);
   });
 
   it("stores bug as memory_type=antipattern", async () => {
@@ -92,7 +95,7 @@ describe("mirrorVaultRecord", () => {
         action: "body",
         result: "stored",
         score: 0.5,
-        tags: `${sourceTag},vault-content-hash:${"a".repeat(12)}`,
+        tags: JSON.stringify([sourceTag, `vault-content-hash:${"a".repeat(12)}`]),
         project: PROJECT_NAME,
       },
     ]);
@@ -115,7 +118,7 @@ describe("mirrorVaultRecord", () => {
         action: "old body",
         result: "stored",
         score: 0.5,
-        tags: `${sourceTag},vault-content-hash:abc123abc123`,
+        tags: JSON.stringify([sourceTag, "vault-content-hash:abc123abc123"]),
         project: PROJECT_NAME,
       },
     ]);
@@ -142,9 +145,9 @@ describe("mirrorVaultRecord", () => {
     }));
 
     const callArgs = vi.mocked(engramStore).mock.calls[0]!;
-    const tagsString = callArgs[4]!;
+    const tags = callArgs[4]!;
     // relative() produces "../some/other/place/..." for paths outside projectRoot
-    expect(tagsString).toContain("vault-source:../../some/other/place/2026-05-01-sample-decision.md");
+    expect(tags).toContain("vault-source:../../some/other/place/2026-05-01-sample-decision.md");
   });
 
   it("inherits proxy auto-tags (step/branch/task/run) from caller", async () => {
@@ -152,14 +155,15 @@ describe("mirrorVaultRecord", () => {
       autoTags: ["step:code", "branch:main", "task:task-042", "run:run-test-id"],
     }));
 
-    const tagsString = vi.mocked(engramStore).mock.calls[0]![4]!;
-    expect(tagsString).toContain("step:code");
-    expect(tagsString).toContain("branch:main");
-    expect(tagsString).toContain("task:task-042");
-    expect(tagsString).toContain("run:run-test-id");
-    expect(tagsString).toContain("vault-type:adr");
-    expect(tagsString).toMatch(/vault-source:.+\.md/);
-    expect(tagsString).toMatch(/vault-content-hash:[a-f0-9]{12}/);
+    const tags = vi.mocked(engramStore).mock.calls[0]![4]!;
+    expect(Array.isArray(tags)).toBe(true);
+    expect(tags).toContain("step:code");
+    expect(tags).toContain("branch:main");
+    expect(tags).toContain("task:task-042");
+    expect(tags).toContain("run:run-test-id");
+    expect(tags).toContain("vault-type:adr");
+    expect(tags.find((t) => /^vault-source:.+\.md$/.test(t))).toBeDefined();
+    expect(tags.find((t) => /^vault-content-hash:[a-f0-9]{12}$/.test(t))).toBeDefined();
   });
 
   it("idempotency check uses client-side AND filter regardless of engramSearch results", async () => {
@@ -168,9 +172,9 @@ describe("mirrorVaultRecord", () => {
     // Run once to capture the actual hash from the store call
     await mirrorVaultRecord(args);
     const realTags = vi.mocked(engramStore).mock.calls[0]![4]!;
-    const hashMatch = realTags.match(/vault-content-hash:([a-f0-9]{12})/);
-    expect(hashMatch).not.toBeNull();
-    const realHash = hashMatch![1]!;
+    const hashTag = realTags.find((t) => t.startsWith("vault-content-hash:"));
+    expect(hashTag).toBeDefined();
+    const realHash = hashTag!.slice("vault-content-hash:".length);
 
     // Reset mocks, this time engramSearch returns a memory with EXACT matching tags
     vi.mocked(engramStore).mockClear();
@@ -183,7 +187,7 @@ describe("mirrorVaultRecord", () => {
         action: "deterministic body for hash test",
         result: "stored",
         score: 0.5,
-        tags: `${PROJECT_NAME},vault-type:adr,${sourceTag},vault-content-hash:${realHash}`,
+        tags: JSON.stringify([PROJECT_NAME, "vault-type:adr", sourceTag, `vault-content-hash:${realHash}`]),
         project: PROJECT_NAME,
       },
     ]);

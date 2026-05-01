@@ -35,7 +35,7 @@ async function run(): Promise<void> {
     `Branch: ${context.branch}`,
     `Completed at ${time}`,
     "context",
-    `${context.projectName},${context.branch},task`,
+    [context.projectName, context.branch, "task"],
     context.projectName,
   );
 

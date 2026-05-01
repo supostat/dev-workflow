@@ -242,7 +242,7 @@ describe("memory_store MCP handler", () => {
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it("joins merged tags into comma-separated string for engramStore", async () => {
+  it("forwards merged tags as string array to engramStore", async () => {
     const env = createTestContext();
     projectRoot = env.projectRoot;
     writeActiveRun(env.context.vaultPath, {
@@ -262,9 +262,11 @@ describe("memory_store MCP handler", () => {
     expect(callArgs[1]).toBe("Refactored to use proxy");
     expect(callArgs[2]).toBe("Cleaner abstraction");
     expect(callArgs[3]).toBe("pattern");
-    expect(callArgs[4]).toContain("step:review");
-    expect(callArgs[4]).toContain("branch:feature-x");
-    expect(callArgs[4]).toContain("arch");
+    const tagsArg = callArgs[4];
+    expect(Array.isArray(tagsArg)).toBe(true);
+    expect(tagsArg).toContain("step:review");
+    expect(tagsArg).toContain("branch:feature-x");
+    expect(tagsArg).toContain("arch");
     expect(callArgs[5]).toBe("test-project");
     expect(result).toEqual({ id: "mem-test-id" });
   });

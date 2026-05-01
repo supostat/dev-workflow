@@ -75,7 +75,7 @@ export async function run(): Promise<void> {
       `Changed: ${changedFiles.slice(0, 10).join(", ")}`,
       statusShort ? `Status: ${statusShort.split("\n").length} uncommitted` : "Clean",
       "context",
-      `${context.projectName},${context.branch},session`,
+      [context.projectName, context.branch, "session"],
       context.projectName,
     );
   }

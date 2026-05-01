@@ -271,7 +271,7 @@ export class ToolHandlers {
       content.slice(0, 300),
       `Section "${section}" appended in ${this.context.projectName}`,
       "context",
-      `${this.context.projectName},knowledge,${section}`,
+      [this.context.projectName, "knowledge", section],
       this.context.projectName,
     );
     this.bumpTelemetry("store");
@@ -302,7 +302,7 @@ export class ToolHandlers {
       content.slice(0, 300),
       `Section "${targetSection}" appended in conventions.md of ${this.context.projectName}`,
       "context",
-      `${this.context.projectName},conventions,${targetSection}`,
+      [this.context.projectName, "conventions", targetSection],
       this.context.projectName,
     );
     this.bumpTelemetry("store");
@@ -354,7 +354,7 @@ export class ToolHandlers {
       action,
       result,
       type,
-      tags.join(","),
+      tags,
       this.context.projectName,
     );
     this.bumpTelemetry("store");

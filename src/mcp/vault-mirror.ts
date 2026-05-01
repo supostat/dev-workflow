@@ -41,6 +41,13 @@ export async function mirrorVaultRecord(args: VaultMirrorArgs): Promise<VaultMir
   const hashTag = `vault-content-hash:${contentHash}`;
 
   const existing = await engramSearch(relativePath, args.projectName, 5, [sourceTag]);
+  // Dedup: substring-match on memory.tags string. Works for both CSV
+  // (legacy daemon records) and JSON-stringified arrays (post-fix). Per-tag
+  // validation rejects `,` and `\n` in individual tag values, so the
+  // sourceTag string appears literally inside both representations and
+  // matches via substring search. After engram-team's auto-migration on
+  // daemon startup, all records will be JSON; the substring match remains
+  // correct.
   const matches = existing.filter(
     (memory) => memory.tags.includes(sourceTag) && memory.tags.includes(hashTag),
   );
@@ -54,7 +61,7 @@ export async function mirrorVaultRecord(args: VaultMirrorArgs): Promise<VaultMir
     sourceTag,
     hashTag,
     ...args.autoTags,
-  ].join(",");
+  ];
 
   const memoryId = await engramStore(
     `${args.type.toUpperCase()} recorded: ${args.title}`,

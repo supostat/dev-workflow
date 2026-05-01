@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createServer, type Server } from "node:net";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../src/lib/engram.js";
+import {
+  engramHealth,
+  engramSearch,
+  engramStore,
+  PENDING_JUDGMENTS_THRESHOLD,
+} from "../src/lib/engram.js";
 
 // Unix domain socket paths have a ~104 byte limit on macOS, so tests use a
 // short /tmp prefix instead of os.tmpdir() (which resolves to a long path).
@@ -144,5 +149,117 @@ describe("PENDING_JUDGMENTS_THRESHOLD", () => {
   it("is exported as a positive number", () => {
     expect(typeof PENDING_JUDGMENTS_THRESHOLD).toBe("number");
     expect(PENDING_JUDGMENTS_THRESHOLD).toBeGreaterThan(0);
+  });
+});
+
+describe("engramStore wire format", () => {
+  let socketPath: string;
+  let server: Server | null = null;
+  let capturedParams: Record<string, unknown> | undefined;
+
+  beforeEach(() => {
+    capturedParams = undefined;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    socketPath = join(SHORT_TEMP_ROOT, `dv-store-${process.pid}-${id}.sock`);
+  });
+
+  afterEach(async () => {
+    if (server) {
+      await closeServer(server);
+      server = null;
+    }
+    delete process.env["ENGRAM_SOCKET_PATH"];
+  });
+
+  it("sends tags as JSON-encoded array on the wire", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: { id: "test-id" } };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+
+    const id = await engramStore(
+      "ctx",
+      "act",
+      "res",
+      "context",
+      ["alpha", "beta:1"],
+      "proj",
+    );
+
+    expect(id).toBe("test-id");
+    expect(capturedParams!["tags"]).toBe('["alpha","beta:1"]');
+  });
+
+  it("sends empty tags as JSON-encoded empty array", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: { id: "test-id" } };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+
+    await engramStore("ctx", "act", "res", "context", [], "proj");
+
+    expect(capturedParams!["tags"]).toBe("[]");
+  });
+
+  it("escapes JSON-special characters in individual tags", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: { id: "test-id" } };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+    // Per-tag validation only rejects `,` and `\n`; quotes and backslashes
+    // are allowed. JSON.stringify must escape them correctly so the daemon
+    // can parse without ambiguity.
+    await engramStore("ctx", "act", "res", "context", ['quote"in:tag', 'back\\slash'], "proj");
+    // Verify exact wire output — the JSON encoding escapes quotes/backslashes.
+    expect(capturedParams!["tags"]).toBe('["quote\\"in:tag","back\\\\slash"]');
+    // And it round-trips: a daemon doing JSON.parse on this gets the original strings.
+    expect(JSON.parse(capturedParams!["tags"] as string)).toEqual(['quote"in:tag', 'back\\slash']);
+  });
+});
+
+describe("engramSearch wire format", () => {
+  let socketPath: string;
+  let server: Server | null = null;
+  let capturedParams: Record<string, unknown> | undefined;
+
+  beforeEach(() => {
+    capturedParams = undefined;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    socketPath = join(SHORT_TEMP_ROOT, `dv-search-${process.pid}-${id}.sock`);
+  });
+
+  afterEach(async () => {
+    if (server) {
+      await closeServer(server);
+      server = null;
+    }
+    delete process.env["ENGRAM_SOCKET_PATH"];
+  });
+
+  it("sends tag filter as JSON-encoded array", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: [] };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+
+    await engramSearch("query", "proj", 5, ["branch:main"]);
+
+    expect(capturedParams!["tags"]).toBe('["branch:main"]');
+  });
+
+  it("omits tags param when filter is empty", async () => {
+    server = await createMockEngramServer(socketPath, (request) => {
+      capturedParams = request.params as Record<string, unknown>;
+      return { ok: true, data: [] };
+    });
+    process.env["ENGRAM_SOCKET_PATH"] = socketPath;
+
+    await engramSearch("query", "proj", 5, []);
+
+    expect(capturedParams!["tags"]).toBeUndefined();
   });
 });

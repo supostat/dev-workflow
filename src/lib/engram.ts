@@ -142,7 +142,7 @@ export async function engramSearch(
   try {
     const params: Record<string, unknown> = { query, limit };
     if (project) params["project"] = project;
-    if (tags?.length) params["tags"] = tags.join(",");
+    if (tags?.length) params["tags"] = JSON.stringify(tags);
     const result = await socketCallWithRetry(resolveSocketPath(), "memory_search", params);
     if (!Array.isArray(result)) return [];
     return result as EngramMemory[];
@@ -151,12 +151,21 @@ export async function engramSearch(
   }
 }
 
+/**
+ * Store a memory in the engram daemon.
+ *
+ * Wire format note: tags are sent as `JSON.stringify(tags)` — including the
+ * empty case (`tags: []` → wire `"[]"`). This is intentional asymmetry with
+ * `engramSearch`, which omits the `tags` param entirely when the filter is
+ * empty (skip the filter). Storage always emits a tags-key for consistent
+ * payload shape on the daemon side.
+ */
 export async function engramStore(
   context: string,
   action: string,
   result: string,
   memoryType: string,
-  tags: string,
+  tags: string[],
   project?: string,
 ): Promise<string | null> {
   try {
@@ -165,7 +174,7 @@ export async function engramStore(
       action,
       result,
       memory_type: memoryType,
-      tags,
+      tags: JSON.stringify(tags),
     };
     if (project) params["project"] = project;
     const response = (await socketCallWithRetry(
@@ -302,13 +311,13 @@ export class EngramBridge {
       ? output.slice(0, 500) + "..."
       : output;
 
-    const tags = [this.project, this.branch, stepName, status].join(",");
+    const tags = [this.project, this.branch, stepName, status];
     const params: Record<string, unknown> = {
       context: `Workflow step [${stepName}]: ${status}`,
       action: truncatedOutput,
       result: `Step ${stepName} ${status} on ${this.branch}`,
       memory_type: memoryType,
-      tags,
+      tags: JSON.stringify(tags),
     };
     if (this.project) params["project"] = this.project;
     if (parentId) params["parent_id"] = parentId;
