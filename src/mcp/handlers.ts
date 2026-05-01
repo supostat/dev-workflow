@@ -10,11 +10,15 @@ import type { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
+import type { TelemetryCounters } from "../workflow/types.js";
 import { engramSearch, engramStore, engramJudge } from "../lib/engram.js";
 import { loadPipelineContext, buildAutoTags, mergeTags } from "./engram-proxy.js";
 import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 import { createWorkflow, type WorkflowCreateInput } from "./workflow-create.js";
+import { mirrorVaultRecord } from "./vault-mirror.js";
+
+const VAULT_RECORD_TYPES = new Set(["adr", "bug", "debt"]);
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -231,7 +235,10 @@ export class ToolHandlers {
     return searchVaultFiles(this.context.vaultPath, query);
   }
 
-  private vaultRecord(type: string, title: string, content: string): { filepath: string } {
+  private async vaultRecord(type: string, title: string, content: string): Promise<{ filepath: string }> {
+    if (!VAULT_RECORD_TYPES.has(type)) {
+      throw new Error(`vault_record: invalid type "${type}", expected adr|bug|debt`);
+    }
     const slug = slugifyTitle(title);
     const rendered = renderTemplate(`records/${type}`, {
       title,
@@ -239,6 +246,20 @@ export class ToolHandlers {
     });
     const finalContent = rendered + "\n" + content;
     const filepath = this.vaultWriter.writeRecord(type, slug, finalContent);
+
+    const mirror = await mirrorVaultRecord({
+      type,
+      title,
+      content,
+      filepath,
+      projectRoot: this.context.projectRoot,
+      projectName: this.context.projectName,
+      autoTags: buildAutoTags(loadPipelineContext(this.context)),
+    });
+    this.bumpTelemetry("vaultRecord");
+    if (mirror.stored) this.bumpTelemetry("store");
+    if (mirror.skipped) this.bumpTelemetry("skipped");
+
     return { filepath };
   }
 
@@ -253,6 +274,7 @@ export class ToolHandlers {
       `${this.context.projectName},knowledge,${section}`,
       this.context.projectName,
     );
+    this.bumpTelemetry("store");
 
     return { success: true };
   }
@@ -283,6 +305,7 @@ export class ToolHandlers {
       `${this.context.projectName},conventions,${targetSection}`,
       this.context.projectName,
     );
+    this.bumpTelemetry("store");
 
     return { success: true, appended: true };
   }
@@ -291,14 +314,23 @@ export class ToolHandlers {
     query: string,
     opts: { limit?: number; tags?: string[] },
   ): Promise<unknown> {
+    if (opts.tags) {
+      for (const tag of opts.tags) {
+        if (tag.includes(",") || tag.includes("\n")) {
+          throw new Error(`memory_search: tag must not contain commas or newlines, got "${tag}"`);
+        }
+      }
+    }
     const pipelineCtx = loadPipelineContext(this.context);
     const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
-    return await engramSearch(
+    const result = await engramSearch(
       query,
       this.context.projectName,
       opts.limit ?? 5,
       tags,
     );
+    this.bumpTelemetry("search");
+    return result;
   }
 
   private async memoryStore(
@@ -308,6 +340,13 @@ export class ToolHandlers {
     type: string,
     opts: { tags?: string[] },
   ): Promise<{ id: string | null }> {
+    if (opts.tags) {
+      for (const tag of opts.tags) {
+        if (tag.includes(",") || tag.includes("\n")) {
+          throw new Error(`memory_store: tag must not contain commas or newlines, got "${tag}"`);
+        }
+      }
+    }
     const pipelineCtx = loadPipelineContext(this.context);
     const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
     const id = await engramStore(
@@ -318,6 +357,7 @@ export class ToolHandlers {
       tags.join(","),
       this.context.projectName,
     );
+    this.bumpTelemetry("store");
     return { id };
   }
 
@@ -330,7 +370,14 @@ export class ToolHandlers {
       throw new Error(`memory_judge: score must be a finite number in [0, 1], got ${score}`);
     }
     await engramJudge(memoryId, score, explanation ?? "");
+    this.bumpTelemetry("judge");
     return { ok: true };
+  }
+
+  private bumpTelemetry(kind: keyof TelemetryCounters): void {
+    const state = new WorkflowState(this.context.vaultPath);
+    const run = state.loadCurrent();
+    if (run) state.bumpTelemetry(run.id, kind);
   }
 
   private taskCreate(title: string, description?: string): unknown {

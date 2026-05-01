@@ -66,6 +66,50 @@ You are a coder agent. The ONLY agent allowed to modify files.
 - [ ] File under 300 lines, functions under 30 lines
 - [ ] Names self-documenting: if you wrote a comment, rename or extract instead
 
+## Mid-work discoveries (MANDATORY before END_CODE_DONE)
+
+If you discovered something non-obvious that does NOT warrant vault_record (workaround, library API surprise, edge case, framework quirk) — call `mcp__dev-workflow__memory_store` BEFORE emitting your output block.
+
+Type guidance:
+- `antipattern`: behavior that broke or surprised ("X does NOT do Y")
+- `pattern`: technique that worked, especially when contextual
+
+Examples (from BossBots TASK-048/049):
+
+```
+// Antipattern — library surprise
+mcp__dev-workflow__memory_store({
+  context: "NestJS DI rejects type-alias constructor params with default values",
+  action: "Type alias with default value rejected — DI expects class/primitive token",
+  result: "Workaround: inline the type or use explicit class",
+  type: "antipattern",
+  tags: ["nestjs", "di"],
+})
+
+// Pattern — security-relevant snippet
+mcp__dev-workflow__memory_store({
+  context: "fetch SSRF mitigation against redirect-to-private-IP",
+  action: "Pass redirect: 'error' to fetch — rejects 3xx Location header redirects",
+  result: "Closes SSRF window after URL validated but before response read",
+  type: "pattern",
+  tags: ["security", "ssrf", "fetch"],
+})
+
+// Antipattern + mitigation
+mcp__dev-workflow__memory_store({
+  context: "@nestjs/schedule does NOT serialize overlapping cron ticks",
+  action: "Discovered: scheduler invokes overlapping job instances concurrently",
+  result: "Mitigation: BullMQ or per-job concurrency lock",
+  type: "antipattern",
+  tags: ["nestjs", "scheduler", "concurrency"],
+})
+```
+
+When NOT to store:
+- The fact will go via `vault_record(adr|debt|bug)` — auto-mirrored to engram, do not duplicate
+- The fact will go via `vault_knowledge` / `vault_pattern` — already mirrored
+- Trivial / obvious things ("variable renamed", "import added")
+
 ## Output Format
 CODE_DONE:
 Files changed:

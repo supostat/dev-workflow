@@ -125,6 +125,64 @@ describe("ToolHandlers", () => {
     expect(result.filepath).toContain("use-typescript");
   });
 
+  it("vault_record rejects invalid type", async () => {
+    await expect(env.handlers.handle("vault_record", {
+      type: "invalid",
+      title: "x",
+      content: "y",
+    })).rejects.toThrow(/invalid type "invalid"/);
+  });
+
+  it("vault_record bumps telemetry counters on the active workflow run", async () => {
+    const workflowsDir = join(env.context.vaultPath, "workflows");
+    mkdirSync(workflowsDir, { recursive: true });
+    const run = {
+      id: "run-mirror-test",
+      workflowName: "dev",
+      taskId: null,
+      taskDescription: "test",
+      currentStep: "code",
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      status: "running",
+      steps: {},
+    };
+    writeFileSync(join(workflowsDir, `${run.id}.json`), JSON.stringify(run, null, 2), "utf-8");
+
+    await env.handlers.handle("vault_record", {
+      type: "adr",
+      title: "Telemetry test record",
+      content: "some content",
+    });
+
+    const reloaded = JSON.parse(readFileSync(join(workflowsDir, `${run.id}.json`), "utf-8")) as {
+      telemetry?: { vaultRecord: number; store: number; skipped: number };
+    };
+    expect(reloaded.telemetry).toBeDefined();
+    expect(reloaded.telemetry!.vaultRecord).toBe(1);
+    // Engram is stubbed to /tmp/no-such-socket → store fails → mirror returns stored=false → store counter stays 0
+    expect(reloaded.telemetry!.store).toBe(0);
+    expect(reloaded.telemetry!.skipped).toBe(0);
+  });
+
+  it("memory_store rejects tags containing commas or newlines", async () => {
+    await expect(env.handlers.handle("memory_store", {
+      context: "ctx", action: "act", result: "res", type: "pattern",
+      tags: ["valid", "bad,tag"],
+    })).rejects.toThrow(/must not contain commas or newlines/);
+
+    await expect(env.handlers.handle("memory_store", {
+      context: "ctx", action: "act", result: "res", type: "pattern",
+      tags: ["bad\nnewline"],
+    })).rejects.toThrow(/must not contain commas or newlines/);
+  });
+
+  it("memory_search rejects tags containing commas or newlines", async () => {
+    await expect(env.handlers.handle("memory_search", {
+      query: "x", tags: ["a,b"],
+    })).rejects.toThrow(/must not contain commas or newlines/);
+  });
+
   it("vault_knowledge appends to knowledge.md", async () => {
     await env.handlers.handle("vault_knowledge", {
       section: "Gotchas",

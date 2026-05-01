@@ -40,6 +40,14 @@ export interface StepState {
   engramMemoryId: string | null;
 }
 
+export interface TelemetryCounters {
+  search: number;
+  store: number;
+  judge: number;
+  vaultRecord: number;
+  skipped: number;
+}
+
 export interface WorkflowRun {
   id: string;
   workflowName: string;
@@ -50,4 +58,5 @@ export interface WorkflowRun {
   completedAt: string | null;
   status: WorkflowStatus;
   steps: Record<string, StepState>;
+  telemetry?: TelemetryCounters;
 }

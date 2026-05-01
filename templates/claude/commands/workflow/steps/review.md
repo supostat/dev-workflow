@@ -51,6 +51,10 @@ Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_SECURITY
 
+## Mid-work discoveries (MANDATORY before END_REVIEW_SECURITY)
+
+If you noticed something non-obvious about the codebase or a library while reviewing (workaround, library API surprise, edge case, framework quirk) that does NOT warrant a vault_record — call `mcp__dev-workflow__memory_store` BEFORE emitting the output block. Type `antipattern` for surprising/broken behaviour, `pattern` for techniques that worked. See `coder.md` "Mid-work discoveries" for examples. Skip if the finding is already covered by `vault_record` (auto-mirrored), `vault_knowledge`, `vault_pattern`, or is trivial.
+
 ## Engram Memory
 [engramContextBlock]
 
@@ -113,6 +117,10 @@ Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_QUALITY
 
+## Mid-work discoveries (MANDATORY before END_REVIEW_QUALITY)
+
+If you noticed something non-obvious about the codebase or a library while reviewing (workaround, library API surprise, edge case, framework quirk) that does NOT warrant a vault_record — call `mcp__dev-workflow__memory_store` BEFORE emitting the output block. Type `antipattern` for surprising/broken behaviour, `pattern` for techniques that worked. See `coder.md` "Mid-work discoveries" for examples. Skip if the finding is already covered by `vault_record` (auto-mirrored), `vault_knowledge`, `vault_pattern`, or is trivial.
+
 ## Engram Memory
 [engramContextBlock]
 
@@ -159,6 +167,10 @@ Verdict: [PASS / FAIL]
 Issues:
 - [SEVERITY]: [file]:[line] — [issue + fix]
 END_REVIEW_COVERAGE
+
+## Mid-work discoveries (MANDATORY before END_REVIEW_COVERAGE)
+
+If you noticed something non-obvious about the codebase or a library while reviewing (workaround, library API surprise, edge case, framework quirk) that does NOT warrant a vault_record — call `mcp__dev-workflow__memory_store` BEFORE emitting the output block. Type `antipattern` for surprising/broken behaviour, `pattern` for techniques that worked. See `coder.md` "Mid-work discoveries" for examples. Skip if the finding is already covered by `vault_record` (auto-mirrored), `vault_knowledge`, `vault_pattern`, or is trivial.
 
 ## Engram Memory
 [engramContextBlock]
