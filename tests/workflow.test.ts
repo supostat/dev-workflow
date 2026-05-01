@@ -759,3 +759,64 @@ describe("WorkflowEngine with Engram", () => {
     expect(run.steps["code"]!.status).toBe("completed");
   });
 });
+
+describe("WorkflowEngine — ENGRAM_TRACE_FILE", () => {
+  let env: ReturnType<typeof createTestEnv>;
+  let originalTraceEnv: string | undefined;
+
+  beforeEach(() => {
+    env = createTestEnv();
+    originalTraceEnv = process.env["ENGRAM_TRACE_FILE"];
+  });
+
+  afterEach(() => {
+    if (originalTraceEnv === undefined) {
+      delete process.env["ENGRAM_TRACE_FILE"];
+    } else {
+      process.env["ENGRAM_TRACE_FILE"] = originalTraceEnv;
+    }
+    rmSync(env.projectRoot, { recursive: true, force: true });
+  });
+
+  function createEngine(): WorkflowEngine {
+    return new WorkflowEngine(
+      env.registry,
+      env.contextBuilder,
+      env.state,
+      env.taskManager,
+      createMockExecutor(),
+      createMockGateChecker(),
+    );
+  }
+
+  it("sets ENGRAM_TRACE_FILE under workflow-state/runs when env is unset", async () => {
+    delete process.env["ENGRAM_TRACE_FILE"];
+    const workflow: WorkflowDefinition = {
+      name: "trace-default",
+      description: "Default trace path",
+      steps: [
+        { name: "read", agent: "reader", input: [], gate: "none", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const run = await createEngine().start(workflow, "Trace task");
+
+    const expected = join(env.vaultPath, "workflow-state", "runs", `${run.id}.engram-trace.jsonl`);
+    expect(process.env["ENGRAM_TRACE_FILE"]).toBe(expected);
+  });
+
+  it("does not overwrite ENGRAM_TRACE_FILE when manually set", async () => {
+    process.env["ENGRAM_TRACE_FILE"] = "/custom/trace/path.jsonl";
+    const workflow: WorkflowDefinition = {
+      name: "trace-keep",
+      description: "Preserve manual trace path",
+      steps: [
+        { name: "read", agent: "reader", input: [], gate: "none", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    await createEngine().start(workflow, "Trace task");
+
+    expect(process.env["ENGRAM_TRACE_FILE"]).toBe("/custom/trace/path.jsonl");
+  });
+});

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentContextBuilder } from "../agents/context-builder.js";
 import type { PreparedAgent } from "../agents/types.js";
@@ -99,6 +100,15 @@ export class WorkflowEngine {
     };
 
     this.state.save(run);
+
+    if (!process.env["ENGRAM_TRACE_FILE"]) {
+      process.env["ENGRAM_TRACE_FILE"] = join(
+        this.state.vaultPath,
+        "workflow-state",
+        "runs",
+        `${runId}.engram-trace.jsonl`,
+      );
+    }
 
     if (taskId && this.taskManager) {
       this.taskManager.update(taskId, { workflowRun: runId, status: "in-progress" });

@@ -132,6 +132,11 @@ export async function run(): Promise<void> {
     sections.push(healthWarning);
   }
 
+  // Fire-and-forget warmup: prime the daemon vector index so the first user-driven
+  // memory_search doesn't pay cold-start lazy-init (~2s) and silently degrade to []
+  // via REQUEST_TIMEOUT_MS. Cold-start [] artifact observed in resume session 2026-05-01.
+  engramSearch("warmup", undefined, 1).catch(() => {});
+
   if (isEngramAvailable()) {
     const claudeMdPath = join(context.projectRoot, "CLAUDE.md");
     const hasProtocol = existsSync(claudeMdPath)

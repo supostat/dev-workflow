@@ -13,8 +13,10 @@ const EMPTY_TELEMETRY: TelemetryCounters = {
 
 export class WorkflowState {
   private readonly workflowsDir: string;
+  public readonly vaultPath: string;
 
   constructor(vaultPath: string) {
+    this.vaultPath = vaultPath;
     this.workflowsDir = join(vaultPath, "workflows");
   }
 

@@ -2,6 +2,7 @@ import { createConnection } from "node:net";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { appendEngramTrace } from "./engram-trace.js";
 
 /**
  * Resolve the engram socket path with priority:
@@ -68,8 +69,32 @@ function socketCall(
   method: string,
   params: Record<string, unknown>,
 ): Promise<unknown> {
+  const start = Date.now();
+  const traceOk = (data: unknown): void => {
+    appendEngramTrace({
+      ts: new Date().toISOString(),
+      method,
+      params,
+      ok: true,
+      response_summary: JSON.stringify(data ?? null).slice(0, 500),
+      duration_ms: Date.now() - start,
+    });
+  };
+  const traceErr = (message: string): void => {
+    appendEngramTrace({
+      ts: new Date().toISOString(),
+      method,
+      params,
+      ok: false,
+      response_summary: "",
+      duration_ms: Date.now() - start,
+      error: message,
+    });
+  };
+
   return new Promise((resolve, reject) => {
     if (!existsSync(socketPath)) {
+      traceErr("socket not found");
       reject(new Error("socket not found"));
       return;
     }
@@ -82,6 +107,7 @@ function socketCall(
 
     const connectTimer = setTimeout(() => {
       socket.destroy();
+      traceErr("connect timeout");
       reject(new Error("connect timeout"));
     }, CONNECT_TIMEOUT_MS);
 
@@ -89,6 +115,7 @@ function socketCall(
       clearTimeout(connectTimer);
       requestTimer = setTimeout(() => {
         socket.destroy();
+        traceErr("request timeout");
         reject(new Error("request timeout"));
       }, REQUEST_TIMEOUT_MS);
       const request = { id: randomUUID(), method, params };
@@ -99,6 +126,7 @@ function socketCall(
       buffer += chunk.toString("utf8");
       if (buffer.length > MAX_BUFFER_BYTES) {
         socket.destroy();
+        traceErr("response too large");
         reject(new Error("response too large"));
         return;
       }
@@ -116,11 +144,15 @@ function socketCall(
           error?: { message: string };
         };
         if (response.ok) {
+          traceOk(response.data);
           resolve(response.data);
         } else {
-          reject(new Error(response.error?.message ?? "engram error"));
+          const message = response.error?.message ?? "engram error";
+          traceErr(message);
+          reject(new Error(message));
         }
       } catch {
+        traceErr("invalid response");
         reject(new Error("invalid response"));
       }
     });
@@ -128,6 +160,7 @@ function socketCall(
     socket.on("error", (error) => {
       clearTimeout(connectTimer);
       if (requestTimer) clearTimeout(requestTimer);
+      traceErr(error instanceof Error ? error.message : String(error));
       reject(error);
     });
   });
