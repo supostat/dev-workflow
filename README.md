@@ -138,6 +138,7 @@ dev-workflow init [--force] [--detect]   # Initialize vault, hooks, CLAUDE.md, .
 dev-workflow update                      # Update commands/agents from package
 dev-workflow templates-root              # Print absolute path to bundled templates/
 dev-workflow settings-template           # Print bundled .claude/settings.json (absolute paths)
+dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)
 dev-workflow status                      # Vault and workflow status
 dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management

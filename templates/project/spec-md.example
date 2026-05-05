@@ -1,0 +1,110 @@
+<!--
+  SPEC.md — Project specification template for dev-workflow ingest.
+
+  This skeleton mirrors the 4-phase output of `/vault:from-spec` exactly.
+  Fill each subsection with project facts. Leave subsections empty (or
+  delete them) if they don't apply — `from-spec` skips empty sections.
+
+  The bootstrap block below tells Claude Code (and humans) how to wire
+  the project to dev-workflow. Keep it on top — it is read before any
+  ingest happens.
+-->
+
+> **Bootstrap order (run once, in this order):**
+> 1. `git init && dev-workflow init` — installs CLAUDE.md, `.claude/`, `.mcp.json`, copies commands and agents.
+> 2. `/vault:from-spec docs/SPEC.md` — populates `.dev-vault/{stack,conventions,knowledge,gameplan}.md` from this file.
+> 3. `dev-workflow task list` then `/workflow:dev "<phase 1 task>"` — start the first implementation cycle.
+>
+> Keep this SPEC.md project-pure: no slash commands, vault rules, or engram protocol here. Those live in CLAUDE.md (delivered by `dev-workflow init`) under `/vault:upgrade` control.
+
+# Stack
+
+## Languages
+- <language> — <version, purpose>
+
+## Frameworks
+- <framework> — <version, purpose>
+
+## Database
+- <database> — <version, purpose>
+
+## Testing
+- <tool> — <version, purpose>
+
+## Infrastructure
+- <tool> — <purpose>
+
+## Dev Tools
+- <tool> — <purpose>
+
+# Conventions
+
+## File Structure
+- <directory> — <purpose>
+
+## Naming
+- Functions: <convention>
+- Types/Classes: <convention>
+- Files: <convention>
+- Database: <convention if applicable>
+
+## Code Style
+- <rule>
+
+## Patterns
+- <pattern>: <where/when used>
+
+## Git
+- Branches: <convention>
+- Commits: <convention>
+
+## Testing
+- <approach>
+
+# Knowledge
+
+## Architecture
+- <component> -> <component>: <relationship>
+- Deployment: <model>
+
+## Data Model
+- <entity>: <key fields, relationships, constraints>
+
+## API
+- <method> <path> — <purpose> [auth: <type>]
+
+## Security
+- Auth: <mechanism>
+- Data: <protection approach>
+- Validation: <approach>
+- Secrets: <storage / rotation>
+
+## Gotchas
+- <non-obvious constraint or decision from spec>
+
+# Gameplan
+
+## Current Phase
+Phase 1: <phase name>
+
+## Phases
+
+### Phase 1: <name> — <goal>
+- [ ] <task>
+- [ ] <task>
+**Done when:** <completion criteria>
+
+### Phase 2: <name> — <goal>
+- [ ] <task>
+- [ ] <task>
+**Done when:** <completion criteria>
+
+### Phase N: Hardening
+- [ ] Test coverage
+- [ ] Security audit
+- [ ] Performance
+- [ ] Documentation
+**Done when:** <completion criteria>
+
+## Backlog
+- <deferred items from spec>

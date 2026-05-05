@@ -15,6 +15,7 @@ import { config } from "./config.js";
 import { update } from "./update.js";
 import { templatesRoot } from "./templates-root.js";
 import { settingsTemplate } from "./settings-template.js";
+import { specTemplate } from "./spec-template.js";
 import { engramTrace } from "./engram-trace.js";
 
 const args = process.argv.slice(2);
@@ -45,6 +46,7 @@ Usage:
   dev-workflow update                    Update commands/agents from package
   dev-workflow templates-root            Print absolute path to bundled templates/
   dev-workflow settings-template         Print bundled .claude/settings.json (absolute paths)
+  dev-workflow spec-template             Print bundled SPEC.md template (Mirror Skeleton)
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow engram-trace <runId>      Show engram socket trace summary [--raw]
   dev-workflow serve                     Start MCP server
@@ -97,6 +99,9 @@ switch (command) {
     break;
   case "settings-template":
     settingsTemplate();
+    break;
+  case "spec-template":
+    specTemplate();
     break;
   case "doctor":
     doctor(args.includes("--fix")).catch(handleAsyncError);
