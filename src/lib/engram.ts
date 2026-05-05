@@ -28,7 +28,7 @@ export function isEngramAvailable(): boolean {
   return existsSync(resolveSocketPath());
 }
 const CONNECT_TIMEOUT_MS = 500;
-const REQUEST_TIMEOUT_MS = 2000;
+const REQUEST_TIMEOUT_MS = 5000;
 const RETRY_BACKOFF_MS = 300;
 
 function isRetryableError(error: unknown): boolean {
@@ -257,20 +257,24 @@ export async function engramHealth(
     return null;
   }
   try {
-    const response = await socketCall(resolved, "memory_health", {});
+    const response = await socketCall(resolved, "memory_status", {});
     if (
       response === null ||
       typeof response !== "object" ||
       !("pending_judgments" in response) ||
-      !("models_stale" in response)
+      !("hints" in response)
     ) {
       return null;
     }
     const record = response as Record<string, unknown>;
     const pendingRaw = Number(record["pending_judgments"]);
+    const hints = Array.isArray(record["hints"]) ? record["hints"] : [];
+    const modelsStale = hints.some(
+      (hint) => typeof hint === "string" && hint.toLowerCase().includes("models may be outdated"),
+    );
     return {
       pendingJudgments: Number.isFinite(pendingRaw) ? pendingRaw : 0,
-      modelsStale: Boolean(record["models_stale"]),
+      modelsStale,
     };
   } catch {
     return null;

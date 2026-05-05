@@ -73,10 +73,16 @@ describe("engramHealth()", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("returns health when daemon responds with valid data", async () => {
+  it("returns health with modelsStale=true when hints include outdated-models warning", async () => {
     server = await createMockEngramServer(socketPath, () => ({
       ok: true,
-      data: { pending_judgments: 75, models_stale: true },
+      data: {
+        pending_judgments: 75,
+        hints: [
+          "Models may be outdated. Re-run: engram train",
+          "75 memories pending judgment. Use memory_judge to improve search quality",
+        ],
+      },
     }));
 
     const health = await engramHealth(socketPath);
@@ -84,15 +90,29 @@ describe("engramHealth()", () => {
     expect(health).toEqual({ pendingJudgments: 75, modelsStale: true });
   });
 
-  it("returns clean state when daemon reports zero pending and fresh models", async () => {
+  it("returns clean state when daemon reports zero pending and no hints", async () => {
     server = await createMockEngramServer(socketPath, () => ({
       ok: true,
-      data: { pending_judgments: 0, models_stale: false },
+      data: { pending_judgments: 0, hints: [] },
     }));
 
     const health = await engramHealth(socketPath);
 
     expect(health).toEqual({ pendingJudgments: 0, modelsStale: false });
+  });
+
+  it("ignores hints unrelated to model staleness when computing modelsStale", async () => {
+    server = await createMockEngramServer(socketPath, () => ({
+      ok: true,
+      data: {
+        pending_judgments: 12,
+        hints: ["12 memories pending judgment. Use memory_judge to improve search quality"],
+      },
+    }));
+
+    const health = await engramHealth(socketPath);
+
+    expect(health).toEqual({ pendingJudgments: 12, modelsStale: false });
   });
 
   it("returns null when socket file does not exist", async () => {
@@ -104,7 +124,7 @@ describe("engramHealth()", () => {
   it("returns null when daemon returns error response", async () => {
     server = await createMockEngramServer(socketPath, () => ({
       ok: false,
-      error: { message: "memory_health not implemented" },
+      error: { message: "memory_status failed" },
     }));
 
     const health = await engramHealth(socketPath);
@@ -137,7 +157,7 @@ describe("engramHealth()", () => {
   it("coerces non-numeric pending_judgments to zero", async () => {
     server = await createMockEngramServer(socketPath, () => ({
       ok: true,
-      data: { pending_judgments: "not a number", models_stale: false },
+      data: { pending_judgments: "not a number", hints: [] },
     }));
 
     const health = await engramHealth(socketPath);
