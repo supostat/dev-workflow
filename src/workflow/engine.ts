@@ -9,9 +9,11 @@ import type { EngramBridge, EngramBeforeStepResult } from "../lib/engram.js";
 import {
   extractEngramFeedbackSection,
   parseEngramFeedback,
+  applyEngramJudgments,
 } from "../lib/engram-feedback.js";
 import type { EngramFeedbackResult } from "../lib/engram-feedback.js";
 import { todayDate } from "../lib/fs-helpers.js";
+import { extractVerdict, extractNextTarget, isAllowedNextTarget } from "./output-parser.js";
 
 export interface WorkflowResolver {
   resolve(name: string): WorkflowDefinition;
@@ -251,11 +253,31 @@ export class WorkflowEngine {
           run.completedAt = nowISO();
         } else if (stepDef.onFail) {
           stepState.output = output;
-          run.currentStep = stepDef.onFail;
-          const failTarget = run.steps[stepDef.onFail];
-          if (failTarget) {
-            failTarget.status = "pending";
+          const requestedNext = extractNextTarget(output);
+          let target: string;
+          if (requestedNext && isAllowedNextTarget(requestedNext, workflow)) {
+            target = requestedNext;
+          } else {
+            if (requestedNext && requestedNext !== stepDef.onFail) {
+              process.stderr.write(
+                `[engine] step "${stepDef.name}" emitted Next: "${requestedNext}" but target is not whitelisted (must be coder agent + name ending in -fix); falling back to onFail target "${stepDef.onFail}"\n`,
+              );
+            }
+            target = stepDef.onFail;
           }
+          if (!run.steps[target]) {
+            stepState.status = "failed";
+            run.status = "failed";
+            run.completedAt = nowISO();
+            process.stderr.write(
+              `[engine] onFail target "${target}" referenced by step "${stepDef.name}" is an unknown step in workflow "${workflow.name}"; aborting run\n`,
+            );
+            this.state.save(run);
+            return run;
+          }
+          run.currentStep = target;
+          const failTarget = run.steps[target]!;
+          failTarget.status = "pending";
         } else {
           stepState.status = "failed";
           run.status = "failed";
@@ -282,31 +304,14 @@ export class WorkflowEngine {
     status: "completed" | "failed",
   ): Promise<void> {
     if (!this.engramBridge) return;
-    if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length === 0) {
-      return;
-    }
-
-    const fallbackExplanation = status === "completed"
-      ? `Memories retrieved before step [${stepName}] which completed successfully (no agent feedback)`
-      : `Memories retrieved before step [${stepName}] which failed gate check (no agent feedback)`;
-
-    const JUDGE_CAP = 20;
-    let budget = JUDGE_CAP;
-
-    for (const [id, judgment] of feedbackResult.judgments.entries()) {
-      if (budget-- <= 0) break;
-      await this.engramBridge.judge(id, judgment.score, judgment.explanation);
-    }
-    for (const id of feedbackResult.fallbackIds) {
-      if (budget-- <= 0) break;
-      await this.engramBridge.judge(id, fallbackScore, fallbackExplanation);
-    }
-
-    if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length > 0) {
-      process.stderr.write(
-        `[engram] feedback section missing for step [${stepName}], applied blanket ${fallbackScore} to ${feedbackResult.fallbackIds.length} memories\n`,
-      );
-    }
+    const bridge = this.engramBridge;
+    await applyEngramJudgments(
+      (id, score, explanation) => bridge.judge(id, score, explanation),
+      feedbackResult,
+      fallbackScore,
+      stepName,
+      status,
+    );
   }
 
   private collectInputs(
@@ -339,6 +344,9 @@ export class WorkflowEngine {
         return "passed";
 
       case "user-approve": {
+        if (extractVerdict(output) === "NEEDS_REVISION") {
+          return "failed";
+        }
         const approved = await this.gateChecker.requestUserApproval(
           stepDef.name,
           output,

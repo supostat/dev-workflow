@@ -12,6 +12,7 @@ import type { StepExecutor, GateChecker } from "../workflow/engine.js";
 import { WorkflowState } from "../workflow/state.js";
 import { getBuiltinWorkflow, getBuiltinWorkflows } from "../workflow/builtin.js";
 import { loadCustomWorkflows, parseWorkflowYaml } from "../workflow/loader.js";
+import { validateOnFailRouting } from "../workflow/validate.js";
 import type { PreparedAgent } from "../agents/types.js";
 import type { WorkflowDefinition } from "../workflow/types.js";
 
@@ -262,6 +263,8 @@ export function validate(args: string[]): void {
       }
     }
   }
+
+  warnings.push(...validateOnFailRouting(workflow));
 
   if (warnings.length > 0) {
     console.log("");

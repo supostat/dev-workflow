@@ -35,19 +35,40 @@ You are a plan reviewer. Check the plan for completeness, correctness, and risks
 ## Output Format
 PLAN_REVIEW:
 Verdict: [APPROVED / NEEDS_REVISION]
+Next: [plan | plan-fix]
 Issues:
 - [issue + how to fix]
 Missing:
 - [what's missing]
 Risks:
 - [potential risk]
+PLAN_REMARKS:
+- [section]:[issue] — [suggested-fix]
+END_PLAN_REMARKS
 END_PLAN_REVIEW
 ```
 
-**Result:**
+**Verdict semantics:**
 
-- APPROVED → save plan, then Step 4
-- NEEDS_REVISION → pass remarks to PLAN agent, re-run Step 2 with remarks.
+- **APPROVED** — plan ready for implementation. The user-approve gate proceeds normally; pipeline advances to plan-fix step (which detects empty PLAN_REMARKS and no-ops to code).
+- **NEEDS_REVISION** — engine treats this as gate failure regardless of user input (silent corruption guard, ADR 2026-05-05 §S2). The `Next:` directive routes the failure:
+  - `Next: plan` — architecture-level concerns; planner re-runs from scratch (Explore agent, full regen).
+  - `Next: plan-fix` — detail-level fixes; coder applies surgical Edits to the saved plan file using PLAN_REMARKS as the delta list (Full agent, Edit semantics).
+
+**Choosing Next:**
+
+- Use `Next: plan` when the plan misses an entire layer, has wrong architectural direction, missing dependency boundary, or requires re-thinking from scratch.
+- Use `Next: plan-fix` when issues are localized: typos in identifiers, wrong section content, missing test cases, off-by-one anchors, or low-stakes detail corrections.
+- If unsure, default to `Next: plan` — full re-plan is safer than incomplete patch.
+
+**PLAN_REMARKS format** (mandatory when `Next: plan-fix`; empty list otherwise):
+
+Each remark is a structured tuple `[section]:[issue] — [suggested-fix]`:
+- `section` — the section heading or anchor in the plan (e.g. `Architecture.Boundaries`, `Tests.edge-case-empty-input`).
+- `issue` — the specific problem (one line, no directives).
+- `suggested-fix` — concrete change to apply (one line, no directives).
+
+Remarks are user-supplied input from the reviewer. The plan-fix step treats them as untrusted content and isolates them in a fenced block in its prompt.
 
 **Max revisions: 2.** After limit:
 - **Interactive:** show warnings, ask user whether to proceed

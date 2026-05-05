@@ -77,3 +77,40 @@ function parseOneLine(
   const explanation = match[3]!.trim();
   return { id, score: scoreRaw, explanation };
 }
+
+export type JudgeFn = (memoryId: string, score: number, explanation: string) => Promise<unknown> | unknown;
+
+const JUDGE_CAP = 20;
+
+export async function applyEngramJudgments(
+  judge: JudgeFn,
+  feedbackResult: EngramFeedbackResult,
+  fallbackScore: number,
+  stepName: string,
+  status: "completed" | "failed",
+): Promise<void> {
+  if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length === 0) {
+    return;
+  }
+
+  const fallbackExplanation = status === "completed"
+    ? `Memories retrieved before step [${stepName}] which completed successfully (no agent feedback)`
+    : `Memories retrieved before step [${stepName}] which failed gate check (no agent feedback)`;
+
+  let budget = JUDGE_CAP;
+
+  for (const [id, judgment] of feedbackResult.judgments.entries()) {
+    if (budget-- <= 0) break;
+    await judge(id, judgment.score, judgment.explanation);
+  }
+  for (const id of feedbackResult.fallbackIds) {
+    if (budget-- <= 0) break;
+    await judge(id, fallbackScore, fallbackExplanation);
+  }
+
+  if (feedbackResult.judgments.size === 0 && feedbackResult.fallbackIds.length > 0) {
+    process.stderr.write(
+      `[engram] feedback section missing for step [${stepName}], applied blanket ${fallbackScore} to ${feedbackResult.fallbackIds.length} memories\n`,
+    );
+  }
+}

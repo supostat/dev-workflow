@@ -75,8 +75,8 @@ markdown (the prompt that tells the orchestrator how to run this step):
    |------------|-----------|-------|
    | reader | steps/read.md | Context gathering |
    | planner | steps/plan.md | Architecture + pseudo-code |
-   | plan-reviewer | steps/plan-review.md | 9-criteria plan review |
-   | coder | steps/coder.md | Implementation |
+   | plan-reviewer | steps/plan-review.md | 9-criteria plan review + emits `Verdict:` and `Next:` directives |
+   | coder | steps/coder.md, steps/plan-fix.md | Implementation (also serves plan-fix step in PLAN_FIX mode) |
    | reviewer | steps/review.md | 3 parallel reviewers |
    | tester | steps/test.md | Build + test gate |
    | verifier | steps/verify.md | Task compliance check |
@@ -143,7 +143,11 @@ For each step:
 Apply `step.gate` from YAML after the subagent completes:
 
 - `none` — auto-advance to the next step
-- `user-approve` — show the subagent output, ask the user yes/no
+- `user-approve` — show the subagent output, ask the user yes/no.
+  **Verdict-aware override (ADR 2026-05-05):** if the output contains a
+  line `Verdict: NEEDS_REVISION` (exact match, line-anchored), engine treats
+  this as gate failure regardless of user input. Prevents silent corruption
+  where reviewer flags plan but user accidentally clicks Yes.
 - `tests-pass` — orchestrator runs the project's build+test commands; gate
   passes iff both exit 0
 - `review-pass` — scan the output for `CRITICAL` or `HIGH` severity markers;
@@ -158,7 +162,21 @@ Apply `step.gate` from YAML after the subagent completes:
 - On gate failure, apply `step.onFail`:
   - `null` (default) — abort pipeline
   - `"<step-name>"` — redirect to that step for a retry
-- `step.maxAttempts` (default 3) caps retries. After limit:
+- **Runtime `Next:` directive override (ADR 2026-05-05):** if the failed
+  step's output contains `Next: <step-name>` (kebab-case, line-anchored)
+  AND the target is **whitelisted** (agent === "coder" AND name ends with
+  `-fix`), engine routes to that target instead of the static onFail. If
+  Next points to a non-whitelisted step (e.g., `commit`, `test`), engine
+  logs to stderr and falls back to the static onFail target. This enables
+  conditional routing: architecture changes → planner re-entry; detail
+  fixes → fix-class step like `plan-fix`.
+- If the resolved target step does not exist in `workflow.steps`, engine
+  gracefully fails the run (status=failed, stderr log, state saved). No
+  uncaught exceptions.
+- `step.maxAttempts` (default 3) caps retries per step. The attempt counter
+  on a re-entered step is **NOT reset** — total budget across the cycle is
+  global (defends against infinite re-entry loops in cyclic onFail edges).
+- After limit:
   - **Interactive mode** — ask the user whether to proceed, retry, or abort
   - **Autonomous mode** (`--auto-commit`) — abort without commit
 

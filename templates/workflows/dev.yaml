@@ -14,6 +14,10 @@ steps:
     input: [read.output, plan.output]
     gate: user-approve
     onFail: plan
+  - name: plan-fix
+    agent: coder
+    input: [plan.output, plan-review.output]
+    maxAttempts: 2
   - name: code
     agent: coder
     input: [read.output, plan.output]

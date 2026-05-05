@@ -196,4 +196,72 @@ describe("validate CLI command", () => {
     expect(out).toContain(`outputBlock "bad_case"`);
     expect(out).toContain(`onFail references unknown step "nonexistent"`);
   });
+
+  it("warns when onFail routes Full agent (coder) to Explore agent (reader)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: full-to-explore\ndescription: test\nsteps:\n  - name: read\n    agent: reader\n  - name: code\n    agent: coder\n    onFail: read\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain(`onFail target "read" routes Full agent`);
+    expect(joinedLog()).toContain(`Explore agent`);
+  });
+
+  it("does not warn when onFail routes Explore agent (reviewer) to Full agent (coder)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: explore-to-full\ndescription: test\nsteps:\n  - name: code\n    agent: coder\n  - name: review\n    agent: reviewer\n    onFail: code\n`);
+    validate([filepath]);
+    expect(joinedLog()).not.toContain("Full agent");
+    expect(joinedLog()).not.toContain("Explore agent");
+  });
+
+  it("does not warn for plan-review onFail to plan-fix (Explore to Full, documented pattern)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: planflow\ndescription: test\nsteps:\n  - name: plan\n    agent: planner\n  - name: plan-review\n    agent: plan-reviewer\n    onFail: plan-fix\n  - name: plan-fix\n    agent: coder\n`);
+    validate([filepath]);
+    expect(joinedLog()).not.toContain("routes Full");
+  });
+
+  it("warns when onFail forms a cycle (A -> B -> A)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: cycle\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n    onFail: b\n  - name: b\n    agent: planner\n    onFail: a\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain(`onFail forms a cycle`);
+  });
+
+  it("warns when onFail self-loops (A -> A)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: selfloop\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n    onFail: a\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain(`onFail forms a cycle`);
+  });
+
+  it("does not warn on linear onFail chains without cycles", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: linear\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n  - name: b\n    agent: planner\n    onFail: a\n  - name: c\n    agent: reviewer\n    onFail: b\n`);
+    validate([filepath]);
+    expect(joinedLog()).not.toContain("cycle");
+  });
+
+  it("does not warn on cycle when target is unknown step (existing onFail-references-unknown warning takes precedence)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: unknown-target\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n    onFail: nowhere\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain(`onFail references unknown step "nowhere"`);
+    expect(joinedLog()).not.toContain("cycle");
+  });
+
+  it("detects long onFail cycles (A -> B -> C -> D -> A)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: longcycle\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n    onFail: b\n  - name: b\n    agent: planner\n    onFail: c\n  - name: c\n    agent: reviewer\n    onFail: d\n  - name: d\n    agent: verifier\n    onFail: a\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain(`onFail forms a cycle`);
+  });
+
+  it("warns once per source for branch pattern (two steps with same onFail target into a cycle)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: branch\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n    onFail: c\n  - name: b\n    agent: planner\n    onFail: c\n  - name: c\n    agent: reviewer\n    onFail: a\n`);
+    validate([filepath]);
+    const out = joinedLog();
+    const matches = out.match(/onFail forms a cycle/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+  });
 });

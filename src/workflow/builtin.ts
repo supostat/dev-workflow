@@ -32,6 +32,10 @@ const DEV: WorkflowDefinition = {
       gate: "user-approve",
       onFail: "plan",
     }),
+    step("plan-fix", "coder", {
+      input: ["plan.output", "plan-review.output"],
+      maxAttempts: 2,
+    }),
     step("code", "coder", {
       input: ["read.output", "plan.output"],
     }),

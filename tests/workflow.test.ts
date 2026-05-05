@@ -35,7 +35,7 @@ function createTestEnv() {
 
   const agentsDir = join(projectRoot, "test-agents");
   mkdirSync(agentsDir, { recursive: true });
-  for (const name of ["reader", "planner", "coder", "reviewer", "tester", "committer"]) {
+  for (const name of ["reader", "planner", "plan-reviewer", "coder", "reviewer", "tester", "committer"]) {
     writeFileSync(join(agentsDir, `${name}.md`), `---
 name: ${name}
 description: Test ${name}
@@ -357,6 +357,327 @@ describe("WorkflowEngine", () => {
     expect(reviewCallCount).toBe(2);
   });
 
+  it("user-approve gate fails when output verdict is NEEDS_REVISION", async () => {
+    const executor: StepExecutor = {
+      async execute(_agent: PreparedAgent): Promise<string> {
+        return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION\nIssues:\n- something\nEND_PLAN_REVIEW";
+      },
+    };
+
+    let approvalCallCount = 0;
+    const gateChecker = createMockGateChecker({
+      requestUserApproval: async () => {
+        approvalCallCount++;
+        return true;
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "verdict-gate",
+      description: "Verdict-aware gate",
+      steps: [
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("failed");
+    expect(approvalCallCount).toBe(0);
+  });
+
+  it("user-approve gate proceeds normally when verdict is APPROVED", async () => {
+    const executor: StepExecutor = {
+      async execute(_agent: PreparedAgent): Promise<string> {
+        return "PLAN_REVIEW:\nVerdict: APPROVED\nIssues:\nEND_PLAN_REVIEW";
+      },
+    };
+
+    let approvalCallCount = 0;
+    const gateChecker = createMockGateChecker({
+      requestUserApproval: async () => {
+        approvalCallCount++;
+        return true;
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "verdict-approved",
+      description: "Verdict APPROVED gate",
+      steps: [
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(approvalCallCount).toBe(1);
+  });
+
+  it("user-approve gate proceeds normally when no Verdict field present", async () => {
+    const executor: StepExecutor = {
+      async execute(_agent: PreparedAgent): Promise<string> {
+        return "Some output without verdict";
+      },
+    };
+
+    let approvalCallCount = 0;
+    const gateChecker = createMockGateChecker({
+      requestUserApproval: async () => {
+        approvalCallCount++;
+        return true;
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "no-verdict",
+      description: "No verdict field",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "user-approve", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(approvalCallCount).toBe(1);
+  });
+
+  it("Next directive overrides static onFail target", async () => {
+    const callOrder: string[] = [];
+    const executor: StepExecutor = {
+      async execute(agent: PreparedAgent): Promise<string> {
+        callOrder.push(agent.definition.name);
+        if (agent.definition.name === "plan-reviewer") {
+          return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION\nNext: plan-fix\nEND_PLAN_REVIEW";
+        }
+        return "ok";
+      },
+    };
+
+    const workflow: WorkflowDefinition = {
+      name: "next-override",
+      description: "Next directive overrides onFail",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: "plan", maxAttempts: 3 },
+        { name: "plan-fix", agent: "coder", input: [], gate: "none", onFail: null, maxAttempts: 2 },
+      ],
+    };
+
+    const engine = createEngine(executor, createMockGateChecker());
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(callOrder).toEqual(["planner", "plan-reviewer", "coder"]);
+    expect(run.steps["plan-fix"]!.status).toBe("completed");
+  });
+
+  it("Next directive falls back to static onFail target when Next is missing", async () => {
+    const callOrder: string[] = [];
+    let planReviewCallCount = 0;
+    const executor: StepExecutor = {
+      async execute(agent: PreparedAgent): Promise<string> {
+        callOrder.push(agent.definition.name);
+        if (agent.definition.name === "plan-reviewer") {
+          planReviewCallCount++;
+          if (planReviewCallCount === 1) {
+            return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION\nEND_PLAN_REVIEW";
+          }
+          return "PLAN_REVIEW:\nVerdict: APPROVED\nEND_PLAN_REVIEW";
+        }
+        return "ok";
+      },
+    };
+
+    const workflow: WorkflowDefinition = {
+      name: "next-fallback",
+      description: "Next missing falls back to onFail target",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: "plan", maxAttempts: 3 },
+        { name: "plan-fix", agent: "coder", input: [], gate: "none", onFail: null, maxAttempts: 2 },
+      ],
+    };
+
+    const engine = createEngine(executor, createMockGateChecker());
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(callOrder.filter((n) => n === "planner").length).toBe(2);
+    expect(callOrder.filter((n) => n === "plan-reviewer").length).toBe(2);
+  });
+
+  it("Next directive falls back to onFail when target is not in whitelist (security: gate bypass guard)", async () => {
+    const callOrder: string[] = [];
+    const executor: StepExecutor = {
+      async execute(agent: PreparedAgent): Promise<string> {
+        callOrder.push(agent.definition.name);
+        if (agent.definition.name === "plan-reviewer") {
+          return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION\nNext: commit\nEND_PLAN_REVIEW";
+        }
+        return "ok";
+      },
+    };
+
+    let planRecallCount = 0;
+    const workflow: WorkflowDefinition = {
+      name: "next-not-whitelisted",
+      description: "Next target not whitelisted",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: "plan", maxAttempts: 3 },
+        { name: "commit", agent: "committer", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+      ],
+    };
+
+    const stderrChunks: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array): boolean => {
+      stderrChunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const engine = createEngine(executor, createMockGateChecker());
+      const run = await engine.start(workflow, "Test");
+      planRecallCount = callOrder.filter((n) => n === "planner").length;
+      expect(planRecallCount).toBeGreaterThanOrEqual(2);
+      expect(run.steps["commit"]!.status).toBe("pending");
+      expect(stderrChunks.join("")).toContain('Next: "commit"');
+      expect(stderrChunks.join("")).toContain("not whitelisted");
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it("Next directive pointing to unknown step gracefully fails workflow (no uncaught throw)", async () => {
+    const executor: StepExecutor = {
+      async execute(agent: PreparedAgent): Promise<string> {
+        if (agent.definition.name === "plan-reviewer") {
+          return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION\nNext: nowhere-fix\nEND_PLAN_REVIEW";
+        }
+        return "ok";
+      },
+    };
+
+    const workflow: WorkflowDefinition = {
+      name: "next-unknown",
+      description: "Next points to unknown step that is allowed-class but not present",
+      steps: [
+        { name: "plan", agent: "planner", input: [], gate: "none", onFail: null, maxAttempts: 3 },
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: "nowhere-fix", maxAttempts: 3 },
+      ],
+    };
+
+    const stderrChunks: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array): boolean => {
+      stderrChunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const engine = createEngine(executor, createMockGateChecker());
+      const run = await engine.start(workflow, "Test");
+      expect(run.status).toBe("failed");
+      expect(run.completedAt).not.toBeNull();
+      expect(stderrChunks.join("")).toContain('"nowhere-fix"');
+      expect(stderrChunks.join("")).toContain("unknown step");
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  });
+
+  it("Next directive verdict regex rejects malformed verdicts (NEEDS_REVISION_X)", async () => {
+    const executor: StepExecutor = {
+      async execute(_agent: PreparedAgent): Promise<string> {
+        return "PLAN_REVIEW:\nVerdict: NEEDS_REVISION_EXTRA\nEND_PLAN_REVIEW";
+      },
+    };
+
+    let approvalCallCount = 0;
+    const gateChecker = createMockGateChecker({
+      requestUserApproval: async () => {
+        approvalCallCount++;
+        return true;
+      },
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "verdict-malformed",
+      description: "Malformed verdict suffix",
+      steps: [
+        { name: "plan-review", agent: "plan-reviewer", input: [], gate: "user-approve", onFail: null, maxAttempts: 1 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("completed");
+    expect(approvalCallCount).toBe(1);
+  });
+
+  it("self-loop onFail does not infinite-loop due to global attempt cap (D3a)", async () => {
+    let executorCalls = 0;
+    const executor: StepExecutor = {
+      async execute(_agent: PreparedAgent): Promise<string> {
+        executorCalls++;
+        if (executorCalls > 100) {
+          throw new Error("infinite loop detected — test guard");
+        }
+        return "fail";
+      },
+    };
+
+    const gateChecker = createMockGateChecker({
+      checkTestsPass: async () => false,
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "self-loop",
+      description: "Step onFails to itself",
+      steps: [
+        { name: "tester", agent: "tester", input: [], gate: "tests-pass", onFail: "tester", maxAttempts: 3 },
+      ],
+    };
+
+    const engine = createEngine(executor, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("failed");
+    expect(executorCalls).toBeLessThanOrEqual(3);
+    expect(run.steps["tester"]!.attempt).toBe(3);
+  });
+
+  it("onFail attempt counter accumulates globally across re-entry cycle (D3a)", async () => {
+    const gateChecker = createMockGateChecker({
+      checkTestsPass: async () => false,
+    });
+
+    const workflow: WorkflowDefinition = {
+      name: "global-cap",
+      description: "Global attempt cap across re-entry",
+      steps: [
+        { name: "a", agent: "tester", input: [], gate: "tests-pass", onFail: "b", maxAttempts: 2 },
+        { name: "b", agent: "tester", input: [], gate: "tests-pass", onFail: "a", maxAttempts: 2 },
+      ],
+    };
+
+    const engine = createEngine(undefined, gateChecker);
+    const run = await engine.start(workflow, "Test");
+
+    expect(run.status).toBe("failed");
+    const totalAttempts = (run.steps["a"]!.attempt ?? 0) + (run.steps["b"]!.attempt ?? 0);
+    expect(totalAttempts).toBeGreaterThanOrEqual(2);
+    expect(totalAttempts).toBeLessThanOrEqual(4);
+  });
+
   it("maxAttempts limits retries", async () => {
     const gateChecker = createMockGateChecker({
       checkTestsPass: async () => false,
@@ -515,7 +836,7 @@ describe("Builtin workflows", () => {
   it("gets workflow by name", () => {
     const dev = getBuiltinWorkflow("dev");
     expect(dev.name).toBe("dev");
-    expect(dev.steps.length).toBe(10);
+    expect(dev.steps.length).toBe(11);
   });
 
   it("throws for unknown workflow", () => {
@@ -530,6 +851,7 @@ describe("Builtin workflows", () => {
       "read",
       "plan",
       "plan-review",
+      "plan-fix",
       "code",
       "review",
       "test",
@@ -537,6 +859,16 @@ describe("Builtin workflows", () => {
       "commit",
       "vault-updates",
     ]);
+  });
+
+  it("dev plan-fix step routes through coder agent (Full subagent)", () => {
+    const dev = getBuiltinWorkflow("dev");
+    const planFix = dev.steps.find((s) => s.name === "plan-fix");
+    expect(planFix?.agent).toBe("coder");
+    expect(planFix?.input).toEqual(["plan.output", "plan-review.output"]);
+    expect(planFix?.maxAttempts).toBe(2);
+    expect(planFix?.gate).toBe("none");
+    expect(planFix?.onFail).toBeNull();
   });
 
   it("hotfix workflow skips plan and review", () => {

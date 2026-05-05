@@ -4,22 +4,22 @@
 [![CI](https://github.com/supostat/dev-workflow/actions/workflows/website.yml/badge.svg)](https://github.com/supostat/dev-workflow/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Multi-agent development pipeline for Claude Code.** 10 steps from task to commit, with quality gates, isolated agent permissions, and persistent project vault.
+**Multi-agent development pipeline for Claude Code.** 11 steps from task to commit, with quality gates, isolated agent permissions, and persistent project vault.
 
 ```
-PREFLIGHT → READ → PLAN → PLAN_REVIEW → CODER → REVIEW×3 → TEST → VERIFY → COMMIT
-   bash     Explore Explore  Explore      Full    Explore×3   bash  Explore   Full
+PREFLIGHT → READ → PLAN → PLAN_REVIEW → PLAN_FIX → CODER → REVIEW×3 → TEST → VERIFY → COMMIT
+   bash     Explore Explore  Explore      Full       Full    Explore×3   bash  Explore   Full
 ```
 
 ## Why
 
 Claude Code is powerful, but without structure it improvises. It skips reviews, forgets tests, loses context between sessions, and drifts from the original task.
 
-dev-workflow gives it a **strict protocol**: every task goes through a 10-step pipeline with quality gates. Each agent is isolated by permissions. Context persists across sessions.
+dev-workflow gives it a **strict protocol**: every task goes through an 11-step pipeline with quality gates. Each agent is isolated by permissions. Context persists across sessions.
 
 ## Features
 
-- **10-step quality pipeline** — preflight, plan with pseudo-code, plan review (9 criteria), test-first coding, 3 parallel reviewers, mandatory test gate, task verification, commit
+- **11-step quality pipeline** — preflight, plan with pseudo-code, plan review (9 criteria), surgical plan-fix on detail-level revisions, test-first coding, 3 parallel reviewers, mandatory test gate, task verification, commit
 - **Agent isolation** — reader can't write, coder can't commit, reviewer can't modify code
 - **3 specialized reviewers** — security, quality, and coverage run in parallel on real `git diff`
 - **Vault** — persistent project knowledge: stack, conventions, architecture, gameplan
@@ -62,13 +62,14 @@ Then in Claude Code (VS Code or CLI):
 | 0. PREFLIGHT | bash | Baseline: git status, build, tests |
 | 1. READ | Explore | Gather context from codebase |
 | 2. PLAN | Explore | Architecture analysis + pseudo-code |
-| 3. PLAN_REVIEW | Explore | 9 criteria: completeness, architecture, production readiness |
-| 4. CODER | Full | Test-first implementation |
-| 5. REVIEW | Explore ×3 | Security + Quality + Coverage (parallel, real git diff) |
-| 6. FIX LOOP | Full + Explore | Coder fixes, reviewer re-checks (max 3 iterations) |
-| 7. TEST | bash | Build + lint + tests (compared against baseline) |
-| 8. VERIFY | Explore | Does the code match the original task? |
-| 9. COMMIT | Full | Stage + commit (interactive or autonomous) |
+| 3. PLAN_REVIEW | Explore | 9 criteria + verdict-aware gate (NEEDS_REVISION short-circuits user-approve) |
+| 4. PLAN_FIX | Full | Apply surgical Edits to saved plan when reviewer emits `Next: plan-fix` (no-op pass-through if approved) |
+| 5. CODER | Full | Test-first implementation |
+| 6. REVIEW | Explore ×3 | Security + Quality + Coverage (parallel, real git diff) |
+| 7. FIX LOOP | Full + Explore | Coder fixes, reviewer re-checks (max 3 iterations) |
+| 8. TEST | bash | Build + lint + tests (compared against baseline) |
+| 9. VERIFY | Explore | Does the code match the original task? |
+| 10. COMMIT | Full | Stage + commit (interactive or autonomous) |
 
 ## Permission Matrix
 
@@ -78,6 +79,7 @@ Agent          Read   Write   Bash           Subagent
 READ           yes    no      no             Explore
 PLAN           yes    no      no             Explore
 PLAN_REVIEW    yes    no      no             Explore
+PLAN_FIX       yes    yes     no             Full (coder)
 CODER          yes    yes     build/test     Full
 REVIEW ×3      yes    no      no             Explore
 TEST           no     no      build/test     bash
