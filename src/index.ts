@@ -21,7 +21,7 @@ export { parseWorkflowYaml, loadCustomWorkflows } from "./workflow/loader.js";
 export { McpServer } from "./mcp/server.js";
 export { ToolHandlers } from "./mcp/handlers.js";
 export { getToolDefinitions } from "./mcp/tools.js";
-export { engramSearch, engramStore, engramJudge, engramHealth, formatEngramResults, EngramBridge, isEngramAvailable } from "./lib/engram.js";
+export { engramSearch, engramStore, engramStoreStrict, engramJudge, engramHealth, formatEngramResults, EngramBridge, isEngramAvailable } from "./lib/engram.js";
 export type { EngramBeforeStepResult, EngramHealthStatus } from "./lib/engram.js";
 export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-feedback.js";
 export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";

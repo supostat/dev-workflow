@@ -226,6 +226,54 @@ export async function engramStore(
   }
 }
 
+/**
+ * Store a memory in the engram daemon (strict variant).
+ *
+ * Differs from engramStore: throws on daemon errors instead of silently returning null.
+ * Use ONLY for user-invoked MCP paths. Auto-mirror callers (vault_record,
+ * vaultKnowledge, vaultPattern, EngramBridge) MUST keep using engramStore for
+ * the silent fail-safe invariant (ADR 2026-05-01).
+ *
+ * Error wrapping: original socket/daemon error message preserved inside a
+ * prefixed message ("engram memory_store: <original>") so MCP server.ts:107-113
+ * surfaces it via isError: true response with both the layer context and the
+ * root cause for agent diagnosis.
+ *
+ * Wire format identical to engramStore (native JSON array for tags).
+ */
+export async function engramStoreStrict(
+  context: string,
+  action: string,
+  result: string,
+  memoryType: string,
+  tags: string[],
+  project?: string,
+): Promise<string> {
+  const params: Record<string, unknown> = {
+    context,
+    action,
+    result,
+    memory_type: memoryType,
+    tags,
+  };
+  if (project) params["project"] = project;
+  let response: { id?: string } | null;
+  try {
+    response = (await socketCallWithRetry(
+      resolveSocketPath(),
+      "memory_store",
+      params,
+    )) as { id?: string } | null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`engram memory_store: ${message}`);
+  }
+  if (!response?.id) {
+    throw new Error("engram memory_store: response missing id");
+  }
+  return response.id;
+}
+
 export async function engramJudge(
   memoryId: string,
   score: number,

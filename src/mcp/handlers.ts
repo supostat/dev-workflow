@@ -11,7 +11,7 @@ import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
 import { WorkflowState } from "../workflow/state.js";
 import type { TelemetryCounters } from "../workflow/types.js";
-import { engramSearch, engramStore, engramJudge } from "../lib/engram.js";
+import { engramSearch, engramStore, engramStoreStrict, engramJudge } from "../lib/engram.js";
 import { loadPipelineContext, buildAutoTags, mergeTags } from "./engram-proxy.js";
 import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
@@ -339,7 +339,7 @@ export class ToolHandlers {
     result: string,
     type: string,
     opts: { tags?: string[] },
-  ): Promise<{ id: string | null }> {
+  ): Promise<{ id: string }> {
     if (opts.tags) {
       for (const tag of opts.tags) {
         if (tag.includes(",") || tag.includes("\n")) {
@@ -349,7 +349,7 @@ export class ToolHandlers {
     }
     const pipelineCtx = loadPipelineContext(this.context);
     const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
-    const id = await engramStore(
+    const id = await engramStoreStrict(
       context,
       action,
       result,

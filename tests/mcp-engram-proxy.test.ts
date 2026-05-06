@@ -17,11 +17,12 @@ vi.mock("../src/lib/engram.js", async () => {
     ...actual,
     engramSearch: vi.fn(async () => []),
     engramStore: vi.fn(async () => "mem-test-id"),
+    engramStoreStrict: vi.fn(async () => "mem-strict-id"),
     engramJudge: vi.fn(async () => undefined),
   };
 });
 
-import { engramSearch, engramStore, engramJudge } from "../src/lib/engram.js";
+import { engramSearch, engramStore, engramStoreStrict, engramJudge } from "../src/lib/engram.js";
 import { ToolHandlers } from "../src/mcp/handlers.js";
 import { VaultReader } from "../src/lib/reader.js";
 import { VaultWriter } from "../src/lib/writer.js";
@@ -235,14 +236,14 @@ describe("memory_store MCP handler", () => {
   let projectRoot: string;
 
   beforeEach(() => {
-    vi.mocked(engramStore).mockClear();
+    vi.mocked(engramStoreStrict).mockClear();
   });
 
   afterEach(() => {
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it("forwards merged tags as string array to engramStore", async () => {
+  it("forwards merged tags as string array to engramStoreStrict", async () => {
     const env = createTestContext();
     projectRoot = env.projectRoot;
     writeActiveRun(env.context.vaultPath, {
@@ -256,8 +257,8 @@ describe("memory_store MCP handler", () => {
       type: "pattern",
       tags: ["arch"],
     });
-    expect(engramStore).toHaveBeenCalledTimes(1);
-    const callArgs = vi.mocked(engramStore).mock.calls[0]!;
+    expect(engramStoreStrict).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(engramStoreStrict).mock.calls[0]!;
     expect(callArgs[0]).toBe("Found pattern");
     expect(callArgs[1]).toBe("Refactored to use proxy");
     expect(callArgs[2]).toBe("Cleaner abstraction");
@@ -268,7 +269,92 @@ describe("memory_store MCP handler", () => {
     expect(tagsArg).toContain("branch:feature-x");
     expect(tagsArg).toContain("arch");
     expect(callArgs[5]).toBe("test-project");
-    expect(result).toEqual({ id: "mem-test-id" });
+    expect(result).toEqual({ id: "mem-strict-id" });
+  });
+});
+
+describe("memory_store handler — strict error surfacing (ADR 2026-05-06)", () => {
+  let projectRoot: string;
+
+  beforeEach(() => {
+    vi.mocked(engramStoreStrict).mockClear();
+  });
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it("returns id on successful engramStoreStrict", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    vi.mocked(engramStoreStrict).mockResolvedValueOnce("mem-success-1");
+
+    const result = await handlers.handle("memory_store", {
+      context: "test",
+      action: "test",
+      result: "test",
+      type: "context",
+    }) as { id: string };
+
+    expect(result.id).toBe("mem-success-1");
+  });
+
+  it("propagates daemon error message via thrown Error", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    vi.mocked(engramStoreStrict).mockRejectedValueOnce(
+      new Error("engram memory_store: embedding api unavailable: 403 Forbidden"),
+    );
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "test",
+        action: "test",
+        result: "test",
+        type: "context",
+      }),
+    ).rejects.toThrow(/embedding api unavailable.*403/);
+  });
+
+  it("throws when daemon returns response without id (empty-id contract violation)", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    vi.mocked(engramStoreStrict).mockRejectedValueOnce(
+      new Error("engram memory_store: response missing id"),
+    );
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "test",
+        action: "test",
+        result: "test",
+        type: "context",
+      }),
+    ).rejects.toThrow(/response missing id/);
+  });
+
+  it("does not call engramStoreStrict when tag-validation fails", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "test",
+        action: "test",
+        result: "test",
+        type: "context",
+        tags: ["bad,tag"],
+      }),
+    ).rejects.toThrow(/must not contain commas/);
+
+    expect(vi.mocked(engramStoreStrict)).not.toHaveBeenCalled();
   });
 });
 
