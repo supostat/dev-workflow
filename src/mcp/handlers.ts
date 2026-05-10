@@ -17,6 +17,9 @@ import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feed
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 import { createWorkflow, type WorkflowCreateInput } from "./workflow-create.js";
 import { mirrorVaultRecord } from "./vault-mirror.js";
+import { loadCommunicationConfig } from "../lib/communication.js";
+import { getActiveProfile, setActiveProfile, clearActiveProfile } from "../lib/communication-state.js";
+import type { CommunicationProfile } from "../lib/types.js";
 
 const VAULT_RECORD_TYPES = new Set(["adr", "bug", "debt"]);
 
@@ -213,6 +216,15 @@ export class ToolHandlers {
           optionalString(params, "explanation"),
         );
 
+      case "profile_get":
+        return this.profileGet();
+
+      case "profile_set":
+        return this.profileSet(requireString(params, "name"));
+
+      case "profile_clear":
+        return this.profileClear();
+
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -394,6 +406,46 @@ export class ToolHandlers {
     if (status) patch["status"] = status;
     if (description) patch["description"] = description;
     return this.taskManager.update(id, patch as { status?: TaskStatus; description?: string });
+  }
+
+  private profileGet(): unknown {
+    const config = loadCommunicationConfig(this.context.vaultPath);
+    if (config === null) {
+      return { configured: false, active: null, default: null, available: [], config: null };
+    }
+    const stateActive = getActiveProfile(this.context.vaultPath);
+    const effective = stateActive ?? config.active_profile;
+    const profile: CommunicationProfile | null = config.profiles[effective] ?? null;
+    return {
+      configured: true,
+      active: stateActive,
+      default: config.active_profile,
+      effective,
+      available: Object.keys(config.profiles).sort(),
+      config: profile,
+    };
+  }
+
+  private profileSet(name: string): unknown {
+    const config = loadCommunicationConfig(this.context.vaultPath);
+    if (config === null) {
+      throw new Error(`profile_set: communication.yaml not found in ${this.context.vaultPath}`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(config.profiles, name)) {
+      const available = Object.keys(config.profiles).sort().join(", ");
+      throw new Error(`profile_set: unknown profile '${name}' — available: ${available}`);
+    }
+    setActiveProfile(this.context.vaultPath, name);
+    return {
+      ok: true,
+      active: name,
+      config: config.profiles[name],
+    };
+  }
+
+  private profileClear(): unknown {
+    clearActiveProfile(this.context.vaultPath);
+    return { ok: true };
   }
 
   private vaultStatus(): unknown {

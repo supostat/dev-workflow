@@ -293,5 +293,32 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["memory_id", "score"],
       },
     },
+    {
+      name: "profile_get",
+      description: "Read communication profile state: active (from .profile-state), default (from communication.yaml), available list, and effective profile config",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "profile_set",
+      description: "Activate a communication profile by name. Validates name exists in communication.yaml; persists in gitignored .dev-vault/.profile-state",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Profile name (must exist in communication.yaml profiles map)" },
+        },
+        required: ["name"],
+      },
+    },
+    {
+      name: "profile_clear",
+      description: "Reset active profile state by deleting .dev-vault/.profile-state. After clear, getActive falls back to communication.yaml's active_profile field. No-op if state file already missing",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
   ];
 }

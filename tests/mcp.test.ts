@@ -56,9 +56,16 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 20 tool definitions", () => {
+  it("returns 23 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(20);
+    expect(tools).toHaveLength(23);
+  });
+
+  it("includes profile_get / profile_set / profile_clear", () => {
+    const names = getToolDefinitions().map((t) => t.name);
+    expect(names).toContain("profile_get");
+    expect(names).toContain("profile_set");
+    expect(names).toContain("profile_clear");
   });
 
   it("includes vault_pattern", () => {
@@ -556,6 +563,114 @@ describe("ToolHandlers", () => {
     await expect(env.handlers.handle("nonexistent", {}))
       .rejects.toThrow("Unknown tool: nonexistent");
   });
+
+  describe("profile_get / profile_set / profile_clear", () => {
+    function writeMinimalConfig(): void {
+      const yaml = [
+        "active_profile: senior_fast",
+        "",
+        "profiles:",
+        "  onboarding:",
+        "    language: ru",
+        "    tone: friendly",
+        "  senior_fast:",
+        "    language: ru",
+        "    tone: terse",
+        "    output: code_first",
+        "",
+      ].join("\n");
+      writeFileSync(join(env.context.vaultPath, "communication.yaml"), yaml, "utf-8");
+    }
+
+    it("profile_get returns configured: false when communication.yaml missing", async () => {
+      const result = await env.handlers.handle("profile_get", {}) as {
+        configured: boolean; active: unknown; available: unknown[];
+      };
+      expect(result.configured).toBe(false);
+      expect(result.active).toBeNull();
+      expect(result.available).toEqual([]);
+    });
+
+    it("profile_get returns full snapshot when configured (no state file)", async () => {
+      writeMinimalConfig();
+      const result = await env.handlers.handle("profile_get", {}) as {
+        configured: boolean;
+        active: string | null;
+        default: string;
+        effective: string;
+        available: string[];
+        config: { language: string; tone: string };
+      };
+      expect(result.configured).toBe(true);
+      expect(result.active).toBeNull();
+      expect(result.default).toBe("senior_fast");
+      expect(result.effective).toBe("senior_fast");
+      expect(result.available).toEqual(["onboarding", "senior_fast"]);
+      expect(result.config.tone).toBe("terse");
+    });
+
+    it("profile_set persists name and profile_get reflects it", async () => {
+      writeMinimalConfig();
+      const setResult = await env.handlers.handle("profile_set", { name: "onboarding" }) as {
+        ok: boolean; active: string;
+      };
+      expect(setResult.ok).toBe(true);
+      expect(setResult.active).toBe("onboarding");
+
+      const getResult = await env.handlers.handle("profile_get", {}) as {
+        active: string; effective: string; config: { tone: string };
+      };
+      expect(getResult.active).toBe("onboarding");
+      expect(getResult.effective).toBe("onboarding");
+      expect(getResult.config.tone).toBe("friendly");
+    });
+
+    it("profile_set throws on unknown name (with available list in error)", async () => {
+      writeMinimalConfig();
+      await expect(env.handlers.handle("profile_set", { name: "nonexistent" }))
+        .rejects.toThrow(/unknown profile 'nonexistent'.*available: onboarding, senior_fast/);
+    });
+
+    it("profile_set throws when communication.yaml missing", async () => {
+      await expect(env.handlers.handle("profile_set", { name: "onboarding" }))
+        .rejects.toThrow(/communication\.yaml not found/);
+    });
+
+    it("profile_set throws on missing name parameter", async () => {
+      writeMinimalConfig();
+      await expect(env.handlers.handle("profile_set", {}))
+        .rejects.toThrow(/Missing required parameter: name/);
+    });
+
+    it("profile_clear removes state file (subsequent profile_get returns default)", async () => {
+      writeMinimalConfig();
+      await env.handlers.handle("profile_set", { name: "onboarding" });
+
+      const clearResult = await env.handlers.handle("profile_clear", {}) as { ok: boolean };
+      expect(clearResult.ok).toBe(true);
+
+      const getResult = await env.handlers.handle("profile_get", {}) as {
+        active: string | null; effective: string;
+      };
+      expect(getResult.active).toBeNull();
+      expect(getResult.effective).toBe("senior_fast");
+    });
+
+    it("profile_clear is no-op when state file missing (no throw)", async () => {
+      writeMinimalConfig();
+      const result = await env.handlers.handle("profile_clear", {}) as { ok: boolean };
+      expect(result.ok).toBe(true);
+    });
+
+    it("profile_set rejects __proto__ (defense-in-depth via communication.yaml schema)", async () => {
+      writeMinimalConfig();
+      // setActiveProfile regex is /^[\w][\w_-]*$/ which DOES match __proto__,
+      // but profile_set's hasOwnProperty check rejects it because __proto__
+      // is not in the (Object.create(null)-based) profiles map.
+      await expect(env.handlers.handle("profile_set", { name: "__proto__" }))
+        .rejects.toThrow(/unknown profile '__proto__'/);
+    });
+  });
 });
 
 describe("McpServer.handleLine", () => {
@@ -609,7 +724,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(20);
+    expect(result.tools).toHaveLength(23);
   });
 
   it("handles tools/call", async () => {
