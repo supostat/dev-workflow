@@ -17,6 +17,7 @@ import { templatesRoot } from "./templates-root.js";
 import { settingsTemplate } from "./settings-template.js";
 import { specTemplate } from "./spec-template.js";
 import { engramTrace } from "./engram-trace.js";
+import { runWorkflowCommand } from "./workflow.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -49,6 +50,7 @@ Usage:
   dev-workflow spec-template             Print bundled SPEC.md template (Mirror Skeleton)
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow engram-trace <runId>      Show engram socket trace summary [--raw]
+  dev-workflow workflow show|graph|effective <name>   Inspect workflow structure
   dev-workflow serve                     Start MCP server
   dev-workflow help                      Show this help
 
@@ -108,6 +110,9 @@ switch (command) {
     break;
   case "engram-trace":
     engramTrace(args.slice(1));
+    break;
+  case "workflow":
+    runWorkflowCommand(args.slice(1));
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);

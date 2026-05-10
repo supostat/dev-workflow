@@ -118,3 +118,16 @@ Planner обязан включить в план:
 2. Запускает — проверяет что тесты ПАДАЮТ
 3. Пишет реализацию
 4. Запускает — проверяет что тесты ПРОХОДЯТ
+
+## /workflow:graph
+
+Рендерит workflow в Mermaid DAG прямо в чате. Удобно для визуальной проверки pipeline до запуска.
+
+```
+/workflow:graph dev
+```
+
+Альтернативы для CLI:
+- ASCII (терминал): `dev-workflow workflow graph dev --ascii`
+- Полные тела step-файлов: `dev-workflow workflow show dev --bodies`
+- Разрешённый pipeline (после custom-first routing): `dev-workflow workflow effective dev`

@@ -115,6 +115,7 @@ Violation = immediate pipeline abort.
 | `/workflow:dev "task"` | Full 11-step pipeline |
 | `/workflow:dev path/phase.md` | Phase mode (subtask loop) |
 | `/workflow:dev "task" --auto-commit` | Autonomous mode for swarm |
+| `/workflow:graph "name"` | Render workflow as Mermaid DAG (chat-friendly) |
 
 ### Session
 
@@ -142,6 +143,9 @@ dev-workflow templates-root              # Print absolute path to bundled templa
 dev-workflow settings-template           # Print bundled .claude/settings.json (absolute paths)
 dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)
 dev-workflow engram-trace <runId>        # Show engram socket trace summary [--raw]
+dev-workflow workflow show <name> [--bodies]   # Inspect workflow structure
+dev-workflow workflow graph <name> [--ascii]   # Render DAG (Mermaid default)
+dev-workflow workflow effective <name>          # Show resolved step-files + subagents
 dev-workflow status                      # Vault and workflow status
 dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management
