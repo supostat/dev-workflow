@@ -26,6 +26,7 @@ export type { EngramBeforeStepResult, EngramHealthStatus } from "./lib/engram.js
 export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-feedback.js";
 export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";
 export { loadCommunicationConfig } from "./lib/communication.js";
+export { getActiveProfile, setActiveProfile, clearActiveProfile } from "./lib/communication-state.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext, CommunicationProfile, CommunicationConfig, ToneType, VerbosityType, ExpertiseType, LanguageType, OutputType } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
