@@ -25,8 +25,9 @@ export { engramSearch, engramStore, engramStoreStrict, engramJudge, engramHealth
 export type { EngramBeforeStepResult, EngramHealthStatus } from "./lib/engram.js";
 export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-feedback.js";
 export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";
+export { loadCommunicationConfig } from "./lib/communication.js";
 
-export type { ProjectContext, VaultData, DailyLog, BranchContext } from "./lib/types.js";
+export type { ProjectContext, VaultData, DailyLog, BranchContext, CommunicationProfile, CommunicationConfig, ToneType, VerbosityType, ExpertiseType, LanguageType, OutputType } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";
 export type { AgentDefinition, PreparedAgent, AgentPermissions, VaultSection, GitOperation } from "./agents/types.js";
 export type { Task, TaskStatus, TaskPriority, TaskFilter } from "./tasks/types.js";
