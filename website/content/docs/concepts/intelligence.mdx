@@ -44,3 +44,40 @@ intelligence_query(branch?, task?, limit?) → ScoredNode[]
 ## Хранилище
 
 Граф хранится в `.dev-vault/.intelligence.json` — не коммитится (в .gitignore).
+
+## Engram — долгосрочная память
+
+Параллельно с графом паттернов, Engram хранит структурированную долгосрочную память:
+
+- Контекст + действие + результат (вместо свободного текста)
+- Семантический поиск через embeddings от Voyage AI (`api.voyageai.com`, model `voyage-code-3`)
+- Auto-decoration: теги шага, ветки, run id, task id помечают каждое воспоминание автоматически (только через `mcp__dev-workflow__memory_*` proxy)
+- Q-learning: скоры полезности (`memory_judge`, 0.0–1.0) влияют на отбор контекста в будущих сессиях
+
+### Sock resolution и per-project deploy
+
+Engram теперь deploys per-project. dev-workflow ищет сокет в порядке:
+
+1. `ENGRAM_SOCKET_PATH` env var (явный override)
+2. `<project>/.engram/engram.sock` (per-project, current model)
+3. `$HOME/.engram/engram.sock` (legacy, system-wide fallback)
+
+Для миграции memories из legacy global store (`~/.engram/engram.db`) в per-project запустите `engram migrate` из корня проекта.
+
+Если сокет недоступен на любом этапе resolve, dev-workflow деградирует: `memory_search` возвращает `[]`, `vault_record` mirror silently no-op'ит. Workflow продолжается без падения.
+
+### Voyage AI зависимость
+
+Embedding generation требует Voyage AI cloud (`api.voyageai.com`). Implications:
+
+- **Не offline-capable** — без интернета `memory_search` падает с `[2001] embedding api unavailable`
+- **Стоимость** — ~$0.0001 на `memory_search` (Voyage charges per token)
+- **Privacy** — каждый query уходит в Voyage cloud
+- **API key** — в `~/.engram/engram.toml` `[embedding].api_key`; ротация через Voyage dashboard + restart daemon
+- **Fallback** — `[embedding].provider = "deterministic"` (hash-based, instant, без semantic quality, для testing/offline)
+
+Cold-start latency: 1.6–2.8 s steady, до 4.7 s on first call. dev-workflow `REQUEST_TIMEOUT_MS = 5000` покрывает cold case (ADR 2026-05-05).
+
+### Diagnostic trace
+
+Engram I/O можно записать в JSONL для отладки: установите `ENGRAM_TRACE_FILE=<path>` перед запуском, или дайте `WorkflowEngine.start()` авто-установить путь `<vault>/workflow-state/runs/<runId>.engram-trace.jsonl`. Subagent processes наследуют ENV → автоматически тратят в тот же файл. Просмотр: `dev-workflow engram-trace <runId>` (summary) или `--raw` (JSONL verbatim). Каждая строка содержит `{ts, method, params, ok, response_summary, duration_ms, error?}`.

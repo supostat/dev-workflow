@@ -26,12 +26,13 @@ dev-workflow gives it a **strict protocol**: every task goes through an 11-step 
 - **Intelligence** — pattern graph with scoring (recency, frequency, context match)
 - **Phase mode** — break large specs into phases, code each subtask separately
 - **Interactive & autonomous** — ask before commit (default) or auto-commit for swarm use
-- **13 MCP tools** — programmatic access to vault, tasks, intelligence (via `.mcp.json`)
+- **20 MCP tools** — programmatic access to vault, tasks, intelligence, memory, workflows, agents (via `.mcp.json`)
+- **Engram memory** — persistent long-term store with semantic search via Voyage AI embeddings; auto-decorated with pipeline tags (step/branch/run/task)
 - **3 hooks** — SessionStart, SessionEnd, TaskCompleted
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
 - **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore
 - **Plan persistence** — approved plans saved to vault for audit and session resume
-- **Modular prompts** — orchestrator (153 lines) + 11 step files read on demand
+- **Modular prompts** — thin shim orchestrator (~14 lines) + 11 step files read on demand
 
 ## Quick Start
 
@@ -99,6 +100,7 @@ Violation = immediate pipeline abort.
 | `/vault:analyze` | Deep codebase analysis, fill conventions + knowledge |
 | `/vault:bug` | Record a resolved bug |
 | `/vault:adr` | Record an architecture decision |
+| `/vault:pattern` | Append a pattern bullet to conventions.md |
 | `/vault:debt` | Record tech debt |
 | `/vault:arch` | Architecture analysis: 2-3 options with trade-offs |
 | `/vault:project-review` | Full project audit: 7 perspectives, A-F scoring |
@@ -110,7 +112,7 @@ Violation = immediate pipeline abort.
 
 | Command | Description |
 |---------|------------|
-| `/workflow:dev "task"` | Full 10-step pipeline |
+| `/workflow:dev "task"` | Full 11-step pipeline |
 | `/workflow:dev path/phase.md` | Phase mode (subtask loop) |
 | `/workflow:dev "task" --auto-commit` | Autonomous mode for swarm |
 
@@ -139,6 +141,7 @@ dev-workflow update                      # Update commands/agents from package
 dev-workflow templates-root              # Print absolute path to bundled templates/
 dev-workflow settings-template           # Print bundled .claude/settings.json (absolute paths)
 dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)
+dev-workflow engram-trace <runId>        # Show engram socket trace summary [--raw]
 dev-workflow status                      # Vault and workflow status
 dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management
@@ -159,7 +162,7 @@ dev-workflow serve                       # Start MCP server
 | `vault_status` | Full vault state in one call |
 | `vault_read` | Read vault section |
 | `vault_search` | Search vault files |
-| `vault_record` | Create ADR/bug/debt record |
+| `vault_record` | Create ADR / bug / debt record (auto-mirrored to engram) |
 | `vault_knowledge` | Append to knowledge.md |
 | `vault_pattern` | Append a pattern bullet to conventions.md |
 | `intelligence_query` | Query pattern graph with scoring |
@@ -174,7 +177,7 @@ dev-workflow serve                       # Start MCP server
 | `agent_run` | Generate agent prompt with vault context |
 | `parse_engram_feedback` | Parse `## Engram Feedback` block from agent output |
 | `memory_search` | Search Engram memories with auto-decoration (step/branch/run/task tags) |
-| `memory_store` | Store Engram memory with auto-decoration |
+| `memory_store` | Store Engram memory with auto-decoration; throws daemon errors to caller |
 | `memory_judge` | Rate Engram memory's usefulness (0.0–1.0) |
 
 ## Documentation
