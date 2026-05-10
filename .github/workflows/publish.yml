@@ -21,6 +21,9 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Pin npm 11.5.1 for trusted publisher OIDC token exchange
+        run: npm install -g npm@11.5.1
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -30,5 +33,11 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Print toolchain versions
+        run: |
+          echo "node: $(node --version)"
+          echo "npm:  $(npm --version)"
+          echo "pnpm: $(pnpm --version)"
+
       - name: Publish
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --loglevel=verbose
