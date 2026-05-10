@@ -42,3 +42,4 @@
 .pipeline-step:nth-child(8) { animation-delay: 2100ms; }
 .pipeline-step:nth-child(9) { animation-delay: 2400ms; }
 .pipeline-step:nth-child(10) { animation-delay: 2700ms; }
+.pipeline-step:nth-child(11) { animation-delay: 3000ms; }

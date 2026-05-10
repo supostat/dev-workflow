@@ -5,6 +5,7 @@ const PIPELINE_STEPS = [
   { name: "READ", type: "Explore", detail: "read-only" },
   { name: "PLAN", type: "Explore", detail: "pseudo-code" },
   { name: "PLAN_REVIEW", type: "Explore", detail: "9 criteria" },
+  { name: "PLAN_FIX", type: "Full", detail: "edit deltas" },
   { name: "CODER", type: "Full", detail: "test-first" },
   { name: "REVIEW\u00d73", type: "Explore\u00d73", detail: "parallel" },
   { name: "FIX", type: "Full", detail: "max 3" },
@@ -35,11 +36,11 @@ const REVIEWERS = [
 ] as const;
 
 const STATS = [
-  { value: "10", label: "шагов pipeline" },
+  { value: "11", label: "шагов pipeline" },
   { value: "3", label: "reviewer-а параллельно" },
   { value: "9", label: "критериев плана" },
-  { value: "13", label: "MCP tools" },
-  { value: "5", label: "хуков автоматики" },
+  { value: "20", label: "MCP tools" },
+  { value: "3", label: "хука автоматики" },
 ] as const;
 
 export default function HomePage() {
@@ -51,7 +52,7 @@ export default function HomePage() {
           workflow engine for Claude Code
         </p>
         <h1 className="mb-6 text-5xl md:text-7xl font-bold tracking-tight animate-fade-in-up animate-delay-100">
-          10 агентов.
+          11 агентов.
           <br />
           <span className="text-fd-muted-foreground">0 импровизаций.</span>
         </h1>
@@ -128,7 +129,7 @@ export default function HomePage() {
             </h2>
             <ul className="space-y-4 text-fd-muted-foreground">
               {[
-                "Жёсткий протокол из 10 шагов с quality gates",
+                "Жёсткий протокол из 11 шагов с quality gates",
                 "TEST и REVIEW — обязательные gates перед коммитом",
                 "3 специализированных reviewer-а параллельно",
                 "Vault сохраняет контекст между сессиями",
