@@ -71,7 +71,7 @@ export function loadCommunicationConfig(vaultPath: string): CommunicationConfig 
   const filePath = join(vaultPath, FILE_NAME);
   const content = readFileOrNull(filePath);
   if (content === null) return null;
-  return parseAndValidateCommunicationYaml(content, FILE_NAME);
+  return parseAndValidateCommunicationYaml(content, filePath);
 }
 
 function parseAndValidateCommunicationYaml(
