@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engramSearch, formatEngramResults, isEngramAvailable, engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../lib/engram.js";
 import { formatEngramHealthWarning } from "./engram-health-warning.js";
+import { formatActiveProfileBlock } from "./active-profile-block.js";
 import { loadCustomWorkflows } from "../workflow/loader.js";
 import { syncWorkflowShims } from "./workflow-shim-sync.js";
 import { readStdin, hookSuccess } from "./stdin.js";
@@ -141,6 +142,11 @@ export async function run(): Promise<void> {
     if (!hasProtocol) {
       sections.push("\n> **Engram detected but Protocol not in CLAUDE.md.** Run `dev-workflow init` to add it.");
     }
+  }
+
+  const profileBlock = formatActiveProfileBlock(context.vaultPath);
+  if (profileBlock) {
+    sections.push(profileBlock);
   }
 
   const specPath = join(context.projectRoot, "SPEC.md");
