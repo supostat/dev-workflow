@@ -180,6 +180,24 @@ dev-workflow serve                       # Start MCP server
 | `memory_store` | Store Engram memory with auto-decoration; throws daemon errors to caller |
 | `memory_judge` | Rate Engram memory's usefulness (0.0–1.0) |
 
+## Migration: 0.1.x → 0.2.0
+
+`mcp__dev-workflow__memory_store` now **throws** daemon errors (Voyage 403,
+offline, etc.) via JSON-RPC `isError: true` — previously returned silent
+`{id: null}`. Wrap calls in `try/catch` if you depend on silent behavior, or
+call `mcp__engram__memory_store` directly (no auto-decoration). Auto-mirror
+via `vault_record` / `vault_knowledge` / `vault_pattern` is unchanged
+(silent fail-safe; vault file is source of truth).
+
+Engram socket resolution moved to per-project: `ENGRAM_SOCKET_PATH` →
+`<project>/.engram/engram.sock` → `$HOME/.engram/engram.sock` (legacy).
+Run `engram migrate` from the project root to copy legacy memories.
+
+Pipeline gained 11th step `PLAN_FIX`. `dev-workflow validate` warns about
+stale references in custom workflows.
+
+Full notes: [CHANGELOG.md](CHANGELOG.md).
+
 ## Documentation
 
 Full documentation: [supostat.github.io/dev-workflow](https://supostat.github.io/dev-workflow/)
