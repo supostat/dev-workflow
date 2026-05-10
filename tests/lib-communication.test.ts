@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadCommunicationConfig } from "../src/lib/communication.js";
@@ -821,6 +821,48 @@ describe("loadCommunicationConfig", () => {
 
       expect(() => loadCommunicationConfig(vaultPath)).toThrow(/unknown field/);
       expect(() => loadCommunicationConfig(vaultPath)).toThrow(/constructor/);
+    });
+  });
+
+  describe("bundled template templates/project/communication-yaml.example", () => {
+    // Integration: parses through loadCommunicationConfig — guards drift between
+    // the bundled example and the parser/schema. Any field rename, allowed-value
+    // change, or yaml format shift breaks this test before downstream consumers.
+
+    it("parses cleanly and exposes 4 ADR profiles with senior_fast active", () => {
+      copyFileSync(
+        join(process.cwd(), "templates/project/communication-yaml.example"),
+        join(vaultPath, "communication.yaml"),
+      );
+
+      const config = loadCommunicationConfig(vaultPath);
+
+      expect(config).not.toBeNull();
+      expect(config!.active_profile).toBe("senior_fast");
+      expect(Object.keys(config!.profiles).sort()).toEqual([
+        "bilingual",
+        "code_review",
+        "onboarding",
+        "senior_fast",
+      ]);
+
+      // Spot-check key fields per profile to lock the example against silent drift.
+      expect(config!.profiles.onboarding!.tone).toBe("friendly");
+      expect(config!.profiles.onboarding!.expertise).toBe("junior");
+
+      expect(config!.profiles.senior_fast!.output).toBe("code_first");
+      expect(config!.profiles.senior_fast!.ask_before_acting).toBe(false);
+
+      expect(config!.profiles.code_review!.emojis).toBe(false);
+      expect(config!.profiles.code_review!.severity_levels).toEqual([
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+      ]);
+
+      expect(config!.profiles.bilingual!.language).toBe("auto");
+      expect(config!.profiles.bilingual!.commit_messages).toBe("en");
     });
   });
 });

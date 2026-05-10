@@ -1,0 +1,81 @@
+# Communication profiles for dev-workflow agents.
+#
+# This file controls how Claude communicates with you across sessions:
+# language, tone, verbosity, expertise level, output format, etc.
+#
+# Allowed values per field:
+#   language          : ru | en | auto
+#   tone              : friendly | terse | formal
+#   verbosity         : brief | detailed | structured
+#   expertise         : junior | senior
+#   output            : code_first | with_alternatives | review_template
+#   explanations      : code_first | with_alternatives | review_template
+#   ask_before_acting : true | false
+#   emojis            : true | false
+#   output_format     : free-form string (e.g. "review_template")
+#   severity_levels   : inline array, e.g. [CRITICAL, HIGH, MEDIUM, LOW]
+#   fallback_language : ru | en | auto
+#   code_comments     : ru | en | auto
+#   commit_messages   : ru | en | auto
+#   docs_language     : ru | en | auto
+#   session_logs      : ru | en | auto
+#
+# Only `language` is required per profile. All other fields are optional.
+#
+# Bootstrap (run once):
+#   1. Copy this file to .dev-vault/communication.yaml
+#   2. Edit profiles + active_profile to taste
+#   3. Switch active profile mid-session via `/profile <name>` (writes .dev-vault/.profile-state)
+#   4. Reset to default via `/profile clear` (deletes .profile-state, falls back to active_profile below)
+#
+# The `active_profile` field below is the DEFAULT used when .profile-state is
+# missing. Once you switch via /profile, the runtime override lives in
+# .dev-vault/.profile-state (gitignored). The yaml field stays static — config
+# (what profiles exist) is separate from runtime state (which one is active).
+
+active_profile: senior_fast
+
+profiles:
+
+  # ─────────── ONBOARDING ───────────
+  # Junior on a new stack — needs explanations, alternatives, learning resources.
+  # Use when getting up to speed on unfamiliar code or domain.
+  onboarding:
+    language: ru
+    tone: friendly
+    verbosity: detailed
+    expertise: junior
+    explanations: with_alternatives
+
+  # ─────────── SENIOR_FAST ───────────
+  # Daily debugging / production incident — terse, code-first, no preamble.
+  # Use when you know the domain and want minimal friction per turn.
+  senior_fast:
+    language: ru
+    tone: terse
+    verbosity: brief
+    expertise: senior
+    output: code_first
+    ask_before_acting: false
+
+  # ─────────── CODE_REVIEW ───────────
+  # PR review / hand-off / audit — formal, structured findings template.
+  # Use when generating output meant for sharing (Jira ticket, Slack, GitHub PR).
+  code_review:
+    language: ru
+    tone: formal
+    verbosity: structured
+    output_format: review_template
+    emojis: false
+    severity_levels: [CRITICAL, HIGH, MEDIUM, LOW]
+
+  # ─────────── BILINGUAL ───────────
+  # Mixed RU/EN team — switch language by user prompt; code/commits always EN.
+  # Use for international PRs, OSS contributions, doc generation for foreign teams.
+  bilingual:
+    language: auto
+    fallback_language: en
+    code_comments: en
+    commit_messages: en
+    docs_language: en
+    session_logs: ru
