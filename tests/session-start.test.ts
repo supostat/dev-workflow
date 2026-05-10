@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { run } from "../src/hooks/session-start.js";
+import { hashString, formatHash } from "../src/lib/spec-hash.js";
 
 interface SessionStartOutput {
   continue: boolean;
@@ -150,5 +151,125 @@ describe("session-start hook — shim generation integration", () => {
     expect(output.continue).toBe(true);
     const additionalContext = output.hookSpecificOutput?.additionalContext ?? "";
     expect(additionalContext).not.toContain("Custom workflows:");
+  });
+});
+
+describe("session-start hook — SPEC drift warning", () => {
+  let projectRoot: string;
+  let originalCwd: string;
+  let stdoutChunks: string[];
+  let originalStdoutWrite: typeof process.stdout.write;
+  let originalIsTTY: boolean | undefined;
+  let originalEngramSocket: string | undefined;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    originalEngramSocket = process.env["ENGRAM_SOCKET_PATH"];
+    process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
+    projectRoot = mkdtempSync(join(tmpdir(), "session-start-spec-drift-"));
+    execSync("git init -q", { cwd: projectRoot });
+    mkdirSync(join(projectRoot, ".dev-vault"), { recursive: true });
+    process.chdir(projectRoot);
+
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+
+    stdoutChunks = [];
+    originalStdoutWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string) => {
+      stdoutChunks.push(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+  });
+
+  afterEach(() => {
+    process.stdout.write = originalStdoutWrite;
+    Object.defineProperty(process.stdin, "isTTY", { value: originalIsTTY, configurable: true });
+    process.chdir(originalCwd);
+    if (originalEngramSocket === undefined) {
+      delete process.env["ENGRAM_SOCKET_PATH"];
+    } else {
+      process.env["ENGRAM_SOCKET_PATH"] = originalEngramSocket;
+    }
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  function additionalContext(): string {
+    const joined = stdoutChunks.join("");
+    const parsed = JSON.parse(joined) as {
+      continue: boolean;
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    return parsed.hookSpecificOutput?.additionalContext ?? "";
+  }
+
+  it("no SPEC.md — no drift warning", async () => {
+    writeFileSync(
+      join(projectRoot, ".dev-vault", "gameplan.md"),
+      "---\nspec-hash: sha256:0000000000000000000000000000000000000000000000000000000000000000\n---\n# Gameplan\n",
+      "utf-8",
+    );
+
+    await run();
+
+    const ctx = additionalContext();
+    expect(ctx).not.toContain("SPEC.md changed");
+    expect(ctx).not.toContain("malformed");
+  });
+
+  it("no gameplan.md — no drift warning", async () => {
+    writeFileSync(join(projectRoot, "SPEC.md"), "# Stack\n- TypeScript\n", "utf-8");
+
+    await run();
+
+    const ctx = additionalContext();
+    expect(ctx).not.toContain("SPEC.md changed");
+    expect(ctx).not.toContain("malformed");
+  });
+
+  it("matching hash — no drift warning", async () => {
+    const specContent = "# Stack\n- TypeScript 5.4\n";
+    writeFileSync(join(projectRoot, "SPEC.md"), specContent, "utf-8");
+    const expectedHash = formatHash(hashString(specContent));
+    writeFileSync(
+      join(projectRoot, ".dev-vault", "gameplan.md"),
+      `---\nspec-hash: ${expectedHash}\n---\n# Gameplan\n`,
+      "utf-8",
+    );
+
+    await run();
+
+    const ctx = additionalContext();
+    expect(ctx).not.toContain("SPEC.md changed");
+    expect(ctx).not.toContain("malformed");
+  });
+
+  it("hash mismatch — emits 'SPEC.md changed since last' warning", async () => {
+    writeFileSync(join(projectRoot, "SPEC.md"), "# Stack\n- TypeScript 5.4\n", "utf-8");
+    writeFileSync(
+      join(projectRoot, ".dev-vault", "gameplan.md"),
+      "---\nspec-hash: sha256:1111111111111111111111111111111111111111111111111111111111111111\n---\n# Gameplan\n",
+      "utf-8",
+    );
+
+    await run();
+
+    const ctx = additionalContext();
+    expect(ctx).toContain("SPEC.md changed since last");
+  });
+
+  it("malformed stored hash — emits 'malformed' warning", async () => {
+    writeFileSync(join(projectRoot, "SPEC.md"), "# Stack\n- TS\n", "utf-8");
+    writeFileSync(
+      join(projectRoot, ".dev-vault", "gameplan.md"),
+      "---\nspec-hash: not-a-hash\n---\n# Gameplan\n",
+      "utf-8",
+    );
+
+    await run();
+
+    const ctx = additionalContext();
+    expect(ctx).toContain("malformed");
+    expect(ctx).not.toContain("SPEC.md changed since last");
   });
 });

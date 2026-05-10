@@ -146,6 +146,7 @@ dev-workflow engram-trace <runId>        # Show engram socket trace summary [--r
 dev-workflow workflow show <name> [--bodies]   # Inspect workflow structure
 dev-workflow workflow graph <name> [--ascii]   # Render DAG (Mermaid default)
 dev-workflow workflow effective <name>          # Show resolved step-files + subagents
+dev-workflow vault diff [SPEC.md]        # Compare SPEC against vault (exit 0=match, 1=drift)
 dev-workflow status                      # Vault and workflow status
 dev-workflow doctor [--fix]              # Health check (vault, hooks, .mcp.json, permissions)
 dev-workflow task create|list|start|done # Task management

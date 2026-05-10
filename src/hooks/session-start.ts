@@ -13,6 +13,8 @@ import { formatEngramHealthWarning } from "./engram-health-warning.js";
 import { loadCustomWorkflows } from "../workflow/loader.js";
 import { syncWorkflowShims } from "./workflow-shim-sync.js";
 import { readStdin, hookSuccess } from "./stdin.js";
+import { hashString, formatHash } from "../lib/spec-hash.js";
+import { parseFrontmatter } from "../lib/frontmatter.js";
 
 export async function run(): Promise<void> {
   const input = await readStdin();
@@ -138,6 +140,40 @@ export async function run(): Promise<void> {
       && readFileSync(claudeMdPath, "utf-8").includes("Engram Memory Protocol");
     if (!hasProtocol) {
       sections.push("\n> **Engram detected but Protocol not in CLAUDE.md.** Run `dev-workflow init` to add it.");
+    }
+  }
+
+  const specPath = join(context.projectRoot, "SPEC.md");
+  const gameplanPath = join(context.vaultPath, "gameplan.md");
+  const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
+  if (existsSync(specPath) && existsSync(gameplanPath)) {
+    try {
+      const specContent = readFileSync(specPath, "utf-8");
+      const currentHash = formatHash(hashString(specContent));
+      const gameplanContent = readFileSync(gameplanPath, "utf-8");
+      const { fields } = parseFrontmatter(gameplanContent);
+      const storedHash = fields["spec-hash"];
+      if (typeof storedHash === "string") {
+        if (!HASH_PATTERN.test(storedHash)) {
+          // Malformed hash (user manually edited gameplan.md frontmatter wrong).
+          sections.push(
+            "\n⚠️  spec-hash in gameplan.md frontmatter is malformed; run /vault:from-spec to refresh.",
+          );
+        } else if (storedHash !== currentHash) {
+          sections.push(
+            "\n⚠️  SPEC.md changed since last `/vault:from-spec` ingest.\n" +
+              "   Run `dev-workflow vault diff SPEC.md` to see changes.\n" +
+              "   Run `/vault:from-spec` to re-ingest (interactive merge).",
+          );
+        }
+      }
+      // No spec-hash stored = first session OR pre-feature project; no warning.
+    } catch {
+      // Silent fail OK because drift detection is secondary; user can run
+      // `dev-workflow vault diff` for detailed errors.
+      // Errors swallowed here: file I/O (readFileSync ENOENT/EACCES race after
+      // existsSync), YAML parse failures inside parseFrontmatter, hash compute
+      // exceptions on unreadable buffers. Session-start hook must not block.
     }
   }
 

@@ -282,6 +282,38 @@ After creation:
 💡 Run: /workflow:dev .dev-vault/phases/phase-1-<slug>.md
 ```
 
+### Step 4b: Record SPEC hash for drift detection
+
+After Phase 4 completes successfully, update `.dev-vault/gameplan.md` frontmatter to record the SPEC source and hash. This enables `session-start` warnings + `dev-workflow vault diff` for future drift detection.
+
+1. Compute SPEC hash. The path is passed as a positional argument (`process.argv[1]`), NOT inlined into the `-e` source — this prevents shell-quoting or substitution issues for paths with spaces or special characters:
+   ```bash
+   node -e "const c=require('crypto'),f=require('fs'),p=process.argv[1];console.log('sha256:'+c.createHash('sha256').update(f.readFileSync(p)).digest('hex'))" SPEC.md
+   ```
+
+   If your spec is at a non-default path (e.g. `docs/SPEC.md`), pass it as the trailing argument:
+   ```bash
+   node -e "const c=require('crypto'),f=require('fs'),p=process.argv[1];console.log('sha256:'+c.createHash('sha256').update(f.readFileSync(p)).digest('hex'))" docs/SPEC.md
+   ```
+   Do NOT inline the path into the `-e` source string.
+
+   Alternative: run `dev-workflow vault diff <path>` once after Step 4b to verify the recorded hash matches — the CLI safely handles arbitrary paths (with path-traversal protection).
+
+2. Use Edit to update gameplan.md frontmatter (preserve existing `updated`, `tags` fields):
+
+   ```yaml
+   ---
+   updated: <today YYYY-MM-DD>
+   tags: [gameplan, dev-workflow]
+   spec-source: SPEC.md
+   spec-hash: sha256:<hex from step 1>
+   ---
+   ```
+
+3. If `spec-source` references a non-default path (e.g. `docs/SPEC.md`), use that path for hash computation AND store the path in `spec-source`.
+
+This step is idempotent: re-running `/vault:from-spec` overwrites both fields with current values.
+
 ### Step 4: Summary
 
 ✅ **vault:from-spec complete**
