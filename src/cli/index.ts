@@ -16,6 +16,7 @@ import { update } from "./update.js";
 import { templatesRoot } from "./templates-root.js";
 import { settingsTemplate } from "./settings-template.js";
 import { specTemplate } from "./spec-template.js";
+import { communicationTemplate } from "./communication-template.js";
 import { engramTrace } from "./engram-trace.js";
 import { runWorkflowCommand } from "./workflow.js";
 import { runVaultCommand } from "./vault.js";
@@ -49,6 +50,7 @@ Usage:
   dev-workflow templates-root            Print absolute path to bundled templates/
   dev-workflow settings-template         Print bundled .claude/settings.json (absolute paths)
   dev-workflow spec-template             Print bundled SPEC.md template (Mirror Skeleton)
+  dev-workflow communication-template    Print bundled communication.yaml template (4 profiles)
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow engram-trace <runId>      Show engram socket trace summary [--raw]
   dev-workflow workflow show|graph|effective <name>   Inspect workflow structure
@@ -106,6 +108,9 @@ switch (command) {
     break;
   case "spec-template":
     specTemplate();
+    break;
+  case "communication-template":
+    communicationTemplate();
     break;
   case "doctor":
     doctor(args.includes("--fix")).catch(handleAsyncError);
