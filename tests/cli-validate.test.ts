@@ -124,6 +124,31 @@ describe("validate CLI command", () => {
     expect(joinedLog()).not.toContain("onFail references unknown step");
   });
 
+  it("warns when step.agent is not in bundled or custom agent registry", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: read\n    agent: nonexistent_agent_xyz\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain('agent "nonexistent_agent_xyz" not found');
+  });
+
+  it("does not warn for builtin agents (reader / coder / reviewer / etc.)", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: read\n    agent: reader\n  - name: code\n    agent: coder\n  - name: vault-updates\n    agent: vault-updates\n`);
+    validate([filepath]);
+    expect(joinedLog()).not.toContain("not found in bundled");
+  });
+
+  it("does not warn for custom agent declared in .dev-vault/agents/", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "agents"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "my-custom-agent.md"),
+      `---\nname: my-custom-agent\ndescription: Custom for project\nvault: []\n---\nBody\n`,
+      "utf-8");
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: special\n    agent: my-custom-agent\n`);
+    validate([filepath]);
+    expect(joinedLog()).not.toContain("not found in bundled");
+  });
+
   it("warns when stepFile contains .. (path traversal)", () => {
     const filepath = writeWorkflowYaml(projectRoot,
       `name: flow\ndescription: test\nsteps:\n  - name: custom\n    agent: reader\n    stepFile: ../escape.md\n`);

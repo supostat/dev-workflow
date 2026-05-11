@@ -292,12 +292,27 @@ export function validate(args: string[]): void {
     );
   }
 
+  // Pre-flight agent registry: bundled agents always; custom from .dev-vault/agents/
+  // if present at cwd (project root). Closes debt 2026-04-22-loaderts finding #2
+  // (HIGH agent resolution validation). Without this, a typo in `agent:` only
+  // surfaces at runtime when the engine first tries to resolve the step —
+  // pipeline aborts mid-execution after preflight, losing accumulated work.
+  const builtinAgentsDir = join(PACKAGE_ROOT, "templates", "agents");
+  const customAgentsDir = join(process.cwd(), ".dev-vault", "agents");
+  const agentRegistry = new AgentRegistry(builtinAgentsDir, customAgentsDir);
+
   for (const step of workflow.steps) {
     const issues: string[] = [];
     if (!step.agent) issues.push("missing agent");
     if (!VALID_GATES.has(step.gate)) issues.push(`unknown gate: ${step.gate}`);
     const status = issues.length > 0 ? ` — ${issues.join(", ")}` : "";
     console.log(`  ${step.name}: ${step.agent} [${step.gate}]${status}`);
+
+    if (step.agent && !agentRegistry.has(step.agent)) {
+      warnings.push(
+        `step "${step.name}": agent "${step.agent}" not found in bundled templates/agents/ or .dev-vault/agents/`,
+      );
+    }
 
     if (step.outputBlock !== undefined && !OUTPUT_BLOCK_PATTERN.test(step.outputBlock)) {
       warnings.push(
