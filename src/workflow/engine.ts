@@ -86,6 +86,7 @@ export class WorkflowEngine {
         durationMs: null,
         attempt: 0,
         engramMemoryId: null,
+        error: null,
       };
     }
 
@@ -211,7 +212,30 @@ export class WorkflowEngine {
       const { bodyForGate } = extractEngramFeedbackSection(output);
       const feedbackResult = parseEngramFeedback(output, engramResult.memoryIds);
 
-      const gateResult = await this.checkGate(stepDef, bodyForGate, agent);
+      let gateResult: "passed" | "failed" | "paused";
+      try {
+        gateResult = await this.checkGate(stepDef, bodyForGate, agent);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(
+          `[engine] gate "${stepDef.gate}" threw for step "${stepDef.name}": ${message}\n`,
+        );
+        stepState.status = "failed";
+        stepState.error = `Gate check failed: ${message}`;
+        stepState.completedAt = nowISO();
+        stepState.durationMs = computeDurationMs(stepState.startedAt);
+        run.status = "failed";
+        run.completedAt = nowISO();
+        try {
+          this.state.save(run);
+        } catch (saveError: unknown) {
+          const saveMessage = saveError instanceof Error ? saveError.message : String(saveError);
+          process.stderr.write(
+            `[engine] failed to persist state after gate exception for step "${stepDef.name}": ${saveMessage}\n`,
+          );
+        }
+        return run;
+      }
 
       const previousStepName = this.getPreviousStep(workflow, run.currentStep);
       const parentMemoryId = previousStepName

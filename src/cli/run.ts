@@ -1,6 +1,39 @@
-import { execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve as resolvePath, isAbsolute } from "node:path";
+
+/**
+ * Hardcoded allowlist for `custom-command` gate binaries. Restricts what
+ * `gateCommand: "<bin> [args]"` from workflow YAML can invoke at runtime.
+ *
+ * Shells (bash, sh, zsh, fish) are deliberately excluded — allowing them would
+ * re-enable RCE via child-shell interpretation of args (e.g. `bash -c "rm -rf $HOME"`).
+ * For composite gate logic, users must move to a script file invoked via `node`.
+ *
+ * Adding a binary here requires a security review PR — these are all of the form
+ * "tools that read project files and exit, with no shell-like interpolation surface".
+ */
+export const ALLOWED_GATE_BINARIES: ReadonlySet<string> = new Set([
+  "npm", "pnpm", "yarn", "npx",
+  "vitest", "jest",
+  "tsc", "eslint", "prettier",
+  "node",
+]);
+
+/**
+ * Run a binary with literal args, inheriting parent stdio so the user sees
+ * test/lint output in real time. No shell — args pass through verbatim.
+ * Resolves to true iff the child exits with code 0; false on spawn error
+ * (ENOENT, EACCES) or non-zero exit. Never throws — gate semantics handle
+ * boolean. Allowlist rejection happens BEFORE this is called.
+ */
+function runGateBinary(bin: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { stdio: "inherit" });
+    child.on("error", () => resolve(false));
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { AgentRegistry } from "../agents/registry.js";
@@ -36,14 +69,18 @@ class CliStepExecutor implements StepExecutor {
   }
 }
 
-class CliGateChecker implements GateChecker {
+export class CliGateChecker implements GateChecker {
+  /**
+   * Run the project's test command (trusted source — comes from
+   * `agent.permissions.shellCommands[0]` set in agent definitions, NOT from
+   * user-supplied workflow YAML). No allowlist check: the threat model treats
+   * agent definitions as trusted (bundled, version-controlled). Empty/invalid
+   * input returns false silently — caller handles boolean as gate result.
+   */
   async checkTestsPass(command: string): Promise<boolean> {
-    try {
-      execSync(command, { stdio: "inherit" });
-      return true;
-    } catch {
-      return false;
-    }
+    const [bin, ...args] = command.trim().split(/\s+/);
+    if (!bin) return false;
+    return runGateBinary(bin, args);
   }
 
   checkReviewPass(reviewOutput: string): boolean {
@@ -58,13 +95,31 @@ class CliGateChecker implements GateChecker {
     return true;
   }
 
+  /**
+   * Run a user-supplied `gateCommand` from workflow YAML. Untrusted input —
+   * THROWS on allowlist rejection (the engine catches and marks the step
+   * failed with the message). Non-zero exit returns false (gate fails
+   * cleanly, no throw). Asymmetric with `checkTestsPass`: only this method
+   * exposes user YAML to spawn, so only this one needs the allowlist.
+   */
   async checkCustomCommand(command: string): Promise<boolean> {
-    try {
-      execSync(command, { stdio: "inherit" });
-      return true;
-    } catch {
-      return false;
+    const [bin, ...args] = command.trim().split(/\s+/);
+    if (!bin) {
+      throw new Error(
+        "gateCommand is empty after trim/split — must be \"<allowed-binary> [args]\". " +
+        `Allowed binaries: ${[...ALLOWED_GATE_BINARIES].sort().join(", ")}.`,
+      );
     }
+    if (!ALLOWED_GATE_BINARIES.has(bin)) {
+      throw new Error(
+        `gateCommand binary "${bin}" is not in the allowlist. ` +
+        `Allowed: ${[...ALLOWED_GATE_BINARIES].sort().join(", ")}. ` +
+        "Shell metacharacters (|, ;, &&, $, backtick) and arbitrary binaries are blocked " +
+        "to prevent RCE via YAML injection. To compose multiple commands, move them to a " +
+        "script file invoked via an allowlisted binary (e.g. \"node scripts/gate.js\").",
+      );
+    }
+    return runGateBinary(bin, args);
   }
 }
 

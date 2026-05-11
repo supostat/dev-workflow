@@ -3,8 +3,81 @@
 All notable changes to `@engramm/dev-workflow` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-(with the pre-1.0 caveat: minor bumps may include breaking changes when scoped).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] — 2026-05-11
+
+First stable release. Security-driven major bump: `gateCommand` execution and
+gate-checker exception handling are now hardened against arbitrary command
+execution and runtime crashes respectively.
+
+### Security (BREAKING)
+
+- **`gateCommand` no longer executes via shell.** `execSync(commandString)` in
+  `CliGateChecker.checkTestsPass` and `checkCustomCommand` is replaced with
+  promisified `execFile(bin, [args])`. Shell metacharacters (`|`, `;`, `&&`,
+  `$VAR`, backticks, redirects) no longer have any effect — they are passed
+  through as literal arguments to the binary. Closes debt
+  `2026-04-22-loaderts--missing-validation-on-gatecommand-agent-onfail.md`
+  finding #1 (CRITICAL — RCE via YAML injection).
+- **Hardcoded allowlist for `custom-command` gate binaries.** Only the
+  following binaries may be invoked via `gateCommand`: `eslint`, `jest`,
+  `node`, `npm`, `npx`, `pnpm`, `prettier`, `tsc`, `vitest`, `yarn`. Any other
+  binary — including shells (`bash`, `sh`, `zsh`, `fish`) — throws a
+  descriptive `Error` listing the allowlist. This is enforced at runtime at
+  the call boundary in `CliGateChecker.checkCustomCommand`.
+- **Note**: `checkTestsPass` does NOT use the allowlist. Its command comes
+  from `agent.permissions.shellCommands[0]` (agent definitions — trusted
+  source), not from user-supplied YAML, so its threat model differs.
+
+### Reliability
+
+- **`WorkflowEngine.executeLoop` now catches gate-checker exceptions.** Closes
+  debt `2026-04-23-gate-checker-exceptions-not-caught-in-workflowengineexecuteloop.md`.
+  Previously, an exception from `gateChecker.checkTestsPass` / `checkReviewPass` /
+  `checkCustomCommand` (e.g. `ENOENT` when `npm` is not on PATH, allowlist
+  rejection, async I/O failures) propagated out of `executeLoop`, leaving
+  workflow state unsaved and crashing the CLI with a stack trace. The engine
+  now: marks the step `failed`, writes `step.error` with the wrapped message,
+  sets `run.status = "failed"`, persists state via `state.save(run)`, and
+  returns cleanly. `StepState.error?: string` field added to types.
+
+### Migration
+
+If you have a workflow YAML using shell pipes in `gateCommand`:
+
+```yaml
+# Before (v0.x) — runs via /bin/sh -c, shell metacharacters work
+- name: gate
+  gate: custom-command
+  gateCommand: "npm test && eslint ."
+```
+
+→ After (v1.0+) — pick one:
+
+1. **Move composite logic to a script file**:
+   ```yaml
+   gateCommand: "node scripts/gate-check.js"
+   ```
+   `scripts/gate-check.js` invokes `npm test`, then `eslint`, exits non-zero
+   if either fails.
+
+2. **Split into multiple workflow steps**, each with its own gate:
+   ```yaml
+   - name: test-gate
+     gate: tests-pass
+   - name: lint-gate
+     gate: custom-command
+     gateCommand: "eslint ."
+   ```
+
+3. **Add a new binary to the allowlist via PR** (requires security review).
+   The allowlist lives in `src/cli/run.ts` as `ALLOWED_GATE_BINARIES`.
+
+If your workflow used a non-allowlisted binary (e.g. `gateCommand: "curl ..."`),
+the workflow will now fail immediately at the gate step with an error message
+listing the allowlist. There is no auto-migration path — explicit user action
+is required.
 
 ## [0.2.0] — 2026-05-10
 

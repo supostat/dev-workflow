@@ -61,6 +61,18 @@ export interface StepState {
   durationMs: number | null;
   attempt: number;
   engramMemoryId: string | null;
+  /**
+   * Set when a gate-checker throws an exception (e.g. ENOENT, command missing,
+   * allowlist rejection in CliGateChecker.checkCustomCommand). When non-null,
+   * step.status is "failed" and run.status is "failed" — the engine persists
+   * state and exits the loop cleanly instead of letting the exception propagate.
+   *
+   * Always serialized: explicit `null` rather than missing field. Mirrors
+   * `output: string | null` convention — predictable JSON shape across all
+   * StepState instances, simpler reload semantics, no conditional access at
+   * call sites.
+   */
+  error: string | null;
 }
 
 export interface TelemetryCounters {

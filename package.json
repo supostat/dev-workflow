@@ -1,6 +1,6 @@
 {
   "name": "@engramm/dev-workflow",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Development workflow engine with agents and vault for Claude Code",
   "type": "module",
   "bin": {

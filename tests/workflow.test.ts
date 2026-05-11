@@ -102,7 +102,7 @@ describe("WorkflowState", () => {
       completedAt: null,
       status: "running",
       steps: {
-        read: { status: "pending", output: null, startedAt: null, completedAt: null, durationMs: null, attempt: 0 },
+        read: { status: "pending", output: null, startedAt: null, completedAt: null, durationMs: null, attempt: 0, engramMemoryId: null, error: null },
       },
     };
 
