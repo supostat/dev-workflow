@@ -198,6 +198,35 @@ export async function engramSearch(
  * empty) for consistent payload shape; search omits the key entirely when the
  * filter is empty.
  */
+/**
+ * Build the `memory_store` JSON-RPC params payload. Shared by `engramStore`
+ * (silent fail-safe), `engramStoreStrict` (throws on daemon errors), and
+ * `EngramBridge.afterStep` (per-step audit trail with `parent_id`). Closes
+ * debt `2026-05-01-engrambridgeafterstep-refactor-to-use-engramstore-helper.md`
+ * by removing wire-shape duplication that previously had to be updated in
+ * multiple places (commits `ecdea0e`/`2260cb8` had to patch both).
+ */
+function buildMemoryStoreParams(
+  context: string,
+  action: string,
+  result: string,
+  memoryType: string,
+  tags: string[],
+  project?: string,
+  parentId?: string | null,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    context,
+    action,
+    result,
+    memory_type: memoryType,
+    tags,
+  };
+  if (project) params["project"] = project;
+  if (parentId) params["parent_id"] = parentId;
+  return params;
+}
+
 export async function engramStore(
   context: string,
   action: string,
@@ -207,14 +236,7 @@ export async function engramStore(
   project?: string,
 ): Promise<string | null> {
   try {
-    const params: Record<string, unknown> = {
-      context,
-      action,
-      result,
-      memory_type: memoryType,
-      tags,
-    };
-    if (project) params["project"] = project;
+    const params = buildMemoryStoreParams(context, action, result, memoryType, tags, project);
     const response = (await socketCallWithRetry(
       resolveSocketPath(),
       "memory_store",
@@ -249,14 +271,7 @@ export async function engramStoreStrict(
   tags: string[],
   project?: string,
 ): Promise<string> {
-  const params: Record<string, unknown> = {
-    context,
-    action,
-    result,
-    memory_type: memoryType,
-    tags,
-  };
-  if (project) params["project"] = project;
+  const params = buildMemoryStoreParams(context, action, result, memoryType, tags, project);
   let response: { id?: string } | null;
   try {
     response = (await socketCallWithRetry(
@@ -402,15 +417,15 @@ export class EngramBridge {
       : output;
 
     const tags = [this.project, this.branch, stepName, status];
-    const params: Record<string, unknown> = {
-      context: `Workflow step [${stepName}]: ${status}`,
-      action: truncatedOutput,
-      result: `Step ${stepName} ${status} on ${this.branch}`,
-      memory_type: memoryType,
+    const params = buildMemoryStoreParams(
+      `Workflow step [${stepName}]: ${status}`,
+      truncatedOutput,
+      `Step ${stepName} ${status} on ${this.branch}`,
+      memoryType,
       tags,
-    };
-    if (this.project) params["project"] = this.project;
-    if (parentId) params["parent_id"] = parentId;
+      this.project,
+      parentId,
+    );
 
     try {
       const response = (await socketCall(
