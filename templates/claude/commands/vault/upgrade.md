@@ -151,6 +151,18 @@ For each file in:
 
 Display: `<filename> — overrides builtin <name> (templates/<path>); review compatibility with current template version <X>`. Never write. No backup. No approval. Pure advisory.
 
+**Single-file advisories** (`.dev-vault/<file>` directly under root):
+
+- **`.dev-vault/communication.yaml`** (communication-config phase artifact):
+  - **Present:** display `communication.yaml — user-modified communication profiles; never overwritten by /vault:upgrade. Update profile field set manually if dev-workflow ships new fields (rare).`
+  - **Missing:** display `communication.yaml — not present; bootstrap with: dev-workflow communication-template > .dev-vault/communication.yaml`. Do NOT auto-bootstrap (user opts in).
+  - Never compare content with bundled template — default profiles intentionally diverge from template after user customization.
+
+- **`.dev-vault/.profile-state`** (runtime state from `/profile` slash, gitignored):
+  - **Present:** display `.profile-state — runtime override (active profile = <content trimmed>); reset via /profile clear`
+  - **Missing:** silent (no advisory — absence is the default state)
+  - Never read for diff or comparison; this is mutable runtime state, not config.
+
 ### Step 4: Per-category approval (numbered options)
 
 After classification, display:
