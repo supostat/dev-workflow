@@ -1,0 +1,16 @@
+name: security-audit
+description: Read-only deep audit — reader + 3 parallel reviewers, no coder, no commit
+# Pattern: pre-release security audit. Read-only by design — no coder,
+# no committer, no vault writes. The reviewer step produces findings
+# that the user manually consumes; nothing is automatically applied.
+# 3 reviewers run in parallel from the dispatcher's standard config.
+steps:
+  - name: preflight
+    agent: preflight
+  - name: read
+    agent: reader
+  - name: security-review
+    agent: reviewer
+    input: [read.output]
+    # No gate — this workflow does not block on findings; it produces
+    # them for the user to review and decide on follow-up.

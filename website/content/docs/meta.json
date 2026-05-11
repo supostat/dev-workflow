@@ -7,6 +7,7 @@
     "commands",
     "mcp",
     "quality",
-    "guides"
+    "guides",
+    "migrating-to-v1"
   ]
 }

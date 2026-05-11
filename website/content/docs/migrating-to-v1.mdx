@@ -1,0 +1,198 @@
+---
+title: Migrating to v1.0
+description: Breaking changes between v0.x and v1.0/v1.0.1 + step-by-step migration paths
+---
+
+# Migrating from v0.x to v1.0
+
+v1.0 is a security-driven major release. There are exactly **two**
+breaking changes you may need to address, plus a handful of additive
+improvements you can ignore unless you want them.
+
+If your projects don't use `gate: custom-command` in any workflow YAML,
+**you have nothing to migrate** — `npm install -g @engramm/dev-workflow@latest`
+and you're done.
+
+## Breaking changes
+
+### 1. `gateCommand` no longer executes via shell
+
+**Before (v0.x):**
+
+```yaml
+- name: lint-gate
+  gate: custom-command
+  gateCommand: "npm test && eslint ."   # shell && works
+```
+
+**After (v1.0):**
+
+`execSync(commandString)` is replaced with `spawn(bin, args, { stdio: "inherit" })`
+via the `runGateBinary` helper. Shell metacharacters (`|`, `;`, `&&`,
+`$VAR`, backticks, redirects) are passed through as literal arguments
+to the binary — they no longer have any effect.
+
+In the example above, `spawn` receives `bin="npm"` and
+`args=["test", "&&", "eslint", "."]`. npm sees the literal `"&&"` as
+its first subcommand, doesn't recognize it, and exits non-zero. The
+gate fails. `eslint` never runs.
+
+**Why:** the old form was a remote-code-execution vector — a malicious
+`.dev-vault/workflows/evil.yaml` with `gateCommand: "rm -rf $HOME"`
+would run on any developer's machine that triggered the workflow.
+See [CVE-equivalent context in CHANGELOG.md](https://github.com/supostat/dev-workflow/blob/main/CHANGELOG.md#100--2026-05-11)
+under the `1.0.0 → Security (BREAKING)` heading.
+
+### 2. Hardcoded allowlist for `custom-command` binaries
+
+Only these binaries can be invoked via `gateCommand`:
+
+```
+npm, pnpm, yarn, npx, vitest, jest, tsc, eslint, prettier, node
+```
+
+Any other binary — **including shells** (`bash`, `sh`, `zsh`, `fish`) —
+throws a descriptive error listing the allowlist. The shell exclusion
+is deliberate: `gateCommand: "bash -c 'rm -rf $HOME'"` would re-enable
+RCE via child-shell interpretation.
+
+## Migration paths
+
+Pick one based on what your gate did before:
+
+### Path 1: composite command via script file (recommended)
+
+If you had something like `npm test && eslint .`, move it to a script:
+
+```bash
+# scripts/gate-lint-test.js (or .sh — invoked via node OR a wrapper)
+import { execFileSync } from "node:child_process";
+try {
+  execFileSync("npm", ["test"], { stdio: "inherit" });
+  execFileSync("npx", ["eslint", "."], { stdio: "inherit" });
+} catch {
+  process.exit(1);
+}
+```
+
+```yaml
+- name: lint-gate
+  gate: custom-command
+  gateCommand: "node scripts/gate-lint-test.js"
+```
+
+`node` IS in the allowlist, so the gate runs. The script handles the
+composite logic in JavaScript (or via execFileSync sub-spawns, which
+themselves don't go through a shell).
+
+### Path 2: split into multiple workflow steps
+
+If your two operations are conceptually independent, give each its own
+step + gate. The pipeline still aborts on the first failure.
+
+```yaml
+- name: test-gate
+  agent: tester
+  input: [code.output]
+  gate: tests-pass
+  onFail: code
+- name: lint-gate
+  agent: tester
+  input: [code.output]
+  gate: custom-command
+  gateCommand: "npx eslint ."
+  onFail: code
+```
+
+### Path 3: add a binary to the allowlist (last resort)
+
+The allowlist lives in `src/cli/run.ts` as `ALLOWED_GATE_BINARIES`. To
+add a binary you'd need to fork or PR — and PRs require a security
+review explaining why the binary can't be replaced by a `node` script
+or a multi-step split.
+
+We expect Path 1 covers ~90% of real migrations.
+
+## Verification
+
+After updating your `gateCommand`, run:
+
+```bash
+dev-workflow validate .dev-vault/workflows/yourflow.yaml
+```
+
+It will not catch invalid `gateCommand` directly (the allowlist is
+enforced at runtime, not at validate time — that's a known design
+choice for forward-compatibility), but it will catch other YAML
+issues that the upgrade may have surfaced.
+
+Then run a dry workflow:
+
+```bash
+# In Claude Code:
+/workflow:yourflow "test task"
+```
+
+If the gate fails with `gateCommand binary "X" is not in the allowlist`,
+follow Path 1 or 3.
+
+## Other v1.0 changes (non-breaking, opt-in)
+
+### Gate-checker exceptions are caught
+
+In v0.x, an `ENOENT` from `npm` missing on PATH crashed the pipeline
+with an unhandled exception. In v1.0, `WorkflowEngine.executeLoop`
+catches gate-checker throws, sets `step.error`, marks the run failed,
+persists state, and returns cleanly.
+
+You don't need to change anything — your existing pipelines just stop
+crashing.
+
+### `StepState.error: string | null`
+
+Workflow run JSON files in `.dev-vault/workflows/run-*.json` now
+include an `error` field per step. Always serialized — null when no
+error. Useful for post-mortem analysis tools.
+
+### `dev-workflow validate` pre-flight agent resolution (1.0.1)
+
+Typo in `agent:` is now caught by `dev-workflow validate` instead of
+surfacing mid-pipeline. Run validate on your custom workflow YAMLs
+after upgrade — any agent names you mistyped will show up as warnings.
+
+### Prompt-injection defense (1.0.1)
+
+User-supplied `taskDescription` is now wrapped in a per-call hex-id
+fence (`<<<USER_INPUT:abc...>>>...<<<END_USER_INPUT:abc...>>>`) before
+being interpolated into agent prompts. Length capped at 10000 chars.
+Your agents will see fence markers in their prompts — they don't break
+anything, but if you've written custom agent templates that
+post-process `{{taskDescription}}`, be aware the value is now wrapped.
+
+### `npm link` users: PACKAGE_ROOT now consistently resolves symlinks
+
+If you previously had broken template/asset paths when dev-workflow was
+installed via `npm link` or `pnpm link --global`, this is fixed in v1.0.
+All 13 internal `PACKAGE_ROOT` resolutions now go through a single
+helper that uses `realpathSync`.
+
+## Upgrade checklist
+
+- [ ] `npm install -g @engramm/dev-workflow@latest` (or `pnpm add -g …`)
+- [ ] Scan custom workflows for `gate: custom-command`:
+      `grep -rn "gate: custom-command" .dev-vault/workflows/`
+- [ ] For each match, check the `gateCommand` value — if it contains
+      shell pipes (`|`, `&&`, `;`) or non-allowlisted binaries,
+      migrate per Path 1 or 2.
+- [ ] Run `dev-workflow validate` on each updated YAML.
+- [ ] Run each customized workflow once in a test branch with a dummy
+      task to confirm the gate fires correctly.
+- [ ] `npm audit signatures` to verify the published tarball is
+      provenance-signed (since v1.0.0).
+
+## Help
+
+If your migration hits an edge case not covered here, open a
+[Discussion](https://github.com/supostat/dev-workflow/discussions)
+with the workflow YAML + the error message. Don't file public issues
+for security questions — see [SECURITY.md](https://github.com/supostat/dev-workflow/blob/main/SECURITY.md).

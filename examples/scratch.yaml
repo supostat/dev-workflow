@@ -1,0 +1,21 @@
+name: scratch
+description: Minimal rapid-prototype loop — no review, no test gate, no vault writes
+# Pattern: for throwaway exploration / spike work. Skips review and
+# test gates. Has NO vault-updates step on purpose — scratch work
+# should NOT pollute the vault with findings/ADR/debt. If the spike
+# graduates into a real feature, run /workflow:dev on the same code
+# to add the missing ceremony.
+steps:
+  - name: preflight
+    agent: preflight
+  - name: plan
+    agent: planner
+    gate: user-approve
+  - name: code
+    agent: coder
+    input: [plan.output]
+  - name: verify
+    agent: verifier
+    input: [code.output, plan.output]
+    gate: user-approve
+    onFail: code

@@ -1,0 +1,34 @@
+name: doc-sync
+description: Documentation-only sync — planner + coder for README/mdx/CHANGELOG, no test gate
+# Pattern: lightweight workflow for documentation changes. Skips heavy
+# code review and uses a tests-pass gate that runs only the
+# docs-invariant test (pinned numeric counts in README + mdx).
+steps:
+  - name: preflight
+    agent: preflight
+  - name: read
+    agent: reader
+  - name: plan
+    agent: planner
+    input: [read.output]
+    gate: user-approve
+  - name: code
+    agent: coder
+    input: [read.output, plan.output]
+  - name: docs-invariant-gate
+    agent: tester
+    input: [code.output]
+    gate: custom-command
+    # Run ONLY the docs-invariant test — fast feedback, no full suite
+    gateCommand: "pnpm vitest run tests/docs-invariant.test.ts"
+    onFail: code
+  - name: verify
+    agent: verifier
+    input: [code.output, plan.output]
+    gate: user-approve
+    onFail: code
+  - name: commit
+    agent: committer
+    input: [code.output]
+  - name: vault-updates
+    agent: vault-updates

@@ -1,0 +1,42 @@
+name: hotfix-with-changelog
+description: Hotfix flow with mandatory CHANGELOG entry gate before commit
+# Pattern: extends the builtin hotfix workflow by inserting a
+# custom-command gate that runs a script asserting CHANGELOG.md has
+# a new entry. The script lives at scripts/check-changelog.sh and
+# exits 0 iff CHANGELOG.md was modified in the current branch's diff.
+steps:
+  - name: preflight
+    agent: preflight
+  - name: read
+    agent: reader
+  - name: code
+    agent: coder
+    input: [read.output]
+  - name: review
+    agent: reviewer
+    input: [code.output]
+    gate: review-pass
+    onFail: code
+  - name: test
+    agent: tester
+    input: [code.output]
+    gate: tests-pass
+    onFail: code
+  - name: changelog-gate
+    agent: tester
+    input: [code.output]
+    gate: custom-command
+    # Requires `node` in ALLOWED_GATE_BINARIES (it is). Script exits
+    # non-zero if CHANGELOG.md has no new entry since the parent branch.
+    gateCommand: "node scripts/check-changelog.js"
+    onFail: code
+  - name: verify
+    agent: verifier
+    input: [code.output, read.output]
+    gate: user-approve
+    onFail: code
+  - name: commit
+    agent: committer
+    input: [code.output]
+  - name: vault-updates
+    agent: vault-updates
