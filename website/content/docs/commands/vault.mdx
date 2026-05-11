@@ -57,3 +57,17 @@ Slash-команды работают внутри Claude Code (VS Code или C
 | `/vault:deps` | Карта зависимостей модулей |
 | `/vault:security-scan` | Аудит безопасности |
 | `/vault:test-gaps` | Поиск непокрытого тестами кода |
+
+## Snapshots
+
+Point-in-time recovery для vault. Thin wrappers над `dev-workflow snapshot` CLI.
+
+| Команда | Что делает |
+|---------|-----------|
+| `/vault:snapshot` | Список snapshots (newest first) |
+| `/vault:snapshot create [name]` | Создать snapshot. Default name: `snap-<ISO>` |
+| `/vault:snapshot show <name>` | JSON manifest snapshot'а |
+| `/vault:snapshot delete <name>` | Удалить snapshot (с подтверждением). Slash всегда показывает manifest до удаления |
+| `/vault:rollback <name>` | Восстановить vault. Auto-создаёт `pre-rollback-<ISO>` — rollback reversible. ВСЕГДА требует explicit `yes` подтверждение |
+
+Storage: `<vault>/snapshots/<name>/` directory copy + `manifest.json`. Excludes `snapshots/` recursive, `.edit-log.json`, `.profile-state`, `*.engram-trace.jsonl`. См. [CLI Reference / Snapshots](./cli) для underlying команд.
