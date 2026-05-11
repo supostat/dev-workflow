@@ -1,89 +1,31 @@
-import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
 import type { VaultReader } from "../lib/reader.js";
-import type { VaultWriter, AppendReason } from "../lib/writer.js";
+import type { VaultWriter } from "../lib/writer.js";
 import type { ProjectContext } from "../lib/types.js";
-import { renderTemplate } from "../lib/templates.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentContextBuilder } from "../agents/context-builder.js";
 import type { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
-import type { TaskStatus } from "../tasks/types.js";
-import { WorkflowState } from "../workflow/state.js";
-import type { TelemetryCounters } from "../workflow/types.js";
-import { engramSearch, engramStore, engramStoreStrict, engramJudge } from "../lib/engram.js";
-import { loadPipelineContext, buildAutoTags, mergeTags } from "./engram-proxy.js";
-import { parseEngramFeedback as parseEngramFeedbackFn } from "../lib/engram-feedback.js";
-import { createTasksFromPhase } from "../tasks/phase-tasks.js";
-import { createWorkflow, type WorkflowCreateInput } from "./workflow-create.js";
-import { mirrorVaultRecord } from "./vault-mirror.js";
-import { loadCommunicationConfig } from "../lib/communication.js";
-import { getActiveProfile, setActiveProfile, clearActiveProfile } from "../lib/communication-state.js";
-import type { CommunicationProfile } from "../lib/types.js";
+import type { WorkflowCreateInput } from "./workflow-create.js";
+import { requireString, optionalString } from "./handlers/helpers.js";
+import * as vault from "./handlers/vault.js";
+import * as task from "./handlers/task.js";
+import * as agent from "./handlers/agent.js";
+import * as workflow from "./handlers/workflow.js";
+import * as memory from "./handlers/memory.js";
+import * as profile from "./handlers/profile.js";
 
-const VAULT_RECORD_TYPES = new Set(["adr", "bug", "debt"]);
-
-function requireString(params: Record<string, unknown>, key: string): string {
-  const value = params[key];
-  if (typeof value !== "string" || value === "") {
-    throw new Error(`Missing required parameter: ${key}`);
-  }
-  return value;
-}
-
-function optionalString(params: Record<string, unknown>, key: string): string | undefined {
-  const value = params[key];
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") return undefined;
-  return value;
-}
-
-interface SearchMatch {
-  file: string;
-  line: number;
-  content: string;
-}
-
-function searchVaultFiles(vaultPath: string, query: string): SearchMatch[] {
-  const matches: SearchMatch[] = [];
-  const lowerQuery = query.toLowerCase();
-
-  function scanDirectory(directory: string): void {
-    if (!existsSync(directory)) return;
-
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const fullPath = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        scanDirectory(fullPath);
-      } else if (entry.name.endsWith(".md")) {
-        const content = readFileSync(fullPath, "utf-8");
-        const lines = content.split("\n");
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i]!.toLowerCase().includes(lowerQuery)) {
-            const start = Math.max(0, i - 2);
-            const end = Math.min(lines.length, i + 3);
-            matches.push({
-              file: relative(vaultPath, fullPath),
-              line: i + 1,
-              content: lines.slice(start, end).join("\n"),
-            });
-          }
-        }
-      }
-    }
-  }
-
-  scanDirectory(vaultPath);
-  return matches;
-}
-
-function slugifyTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
-}
-
+/**
+ * Thin MCP-tool dispatcher. Holds the shared dependency graph (vault
+ * reader/writer, agent registry, context builder, task manager/tracker,
+ * project context) and forwards each `tools/call` to the appropriate
+ * domain handler in `./handlers/*.ts`.
+ *
+ * The split (2026-05-11) replaced a 579-LOC monolithic class with this
+ * ~140-LOC dispatcher + six domain files (vault / task / agent /
+ * workflow / memory / profile) + shared helpers. Test surface unchanged
+ * — `tests/mcp.test.ts` exercises this class via `McpServer.handleLine`
+ * without touching the new internal layout.
+ */
 export class ToolHandlers {
   private readonly vaultReader: VaultReader;
   private readonly vaultWriter: VaultWriter;
@@ -113,86 +55,105 @@ export class ToolHandlers {
 
   async handle(toolName: string, params: Record<string, unknown>): Promise<unknown> {
     switch (toolName) {
+      // ── vault ──
       case "vault_read":
-        return this.vaultRead(requireString(params, "section"));
+        return vault.vaultRead(this.vaultReader, requireString(params, "section"));
 
       case "vault_search":
-        return this.vaultSearch(requireString(params, "query"));
+        return vault.vaultSearch(this.context.vaultPath, requireString(params, "query"));
 
       case "vault_record":
-        return this.vaultRecord(
+        return vault.vaultRecord(
+          this.vaultWriter,
+          this.context,
           requireString(params, "type"),
           requireString(params, "title"),
           requireString(params, "content"),
         );
 
       case "vault_knowledge":
-        return this.vaultKnowledge(
+        return vault.vaultKnowledge(
+          this.vaultWriter,
+          this.context,
           requireString(params, "section"),
           requireString(params, "content"),
         );
 
       case "vault_pattern":
-        return this.vaultPattern(
+        return vault.vaultPattern(
+          this.vaultWriter,
+          this.context,
           optionalString(params, "section"),
           requireString(params, "content"),
         );
 
       case "vault_status":
-        return this.vaultStatus();
-
-      case "workflow_status":
-        return this.workflowStatus(optionalString(params, "runId"));
+        return vault.vaultStatus(this.vaultReader, this.context, this.taskManager);
 
       case "intelligence_query":
-        return this.intelligenceQuery(
+        return vault.intelligenceQuery(
+          this.context,
           optionalString(params, "branch"),
           optionalString(params, "task"),
           params["limit"] as number | undefined,
         );
 
-      case "task_start":
-        return this.taskStart(requireString(params, "id"));
-
-      case "task_create_from_phase":
-        return this.taskCreateFromPhase(requireString(params, "phaseFile"));
-
+      // ── task ──
       case "task_create":
-        return this.taskCreate(
+        return task.taskCreate(
+          this.taskManager,
           requireString(params, "title"),
           optionalString(params, "description"),
         );
 
       case "task_list":
-        return this.taskList(optionalString(params, "status"));
+        return task.taskList(this.taskManager, optionalString(params, "status"));
 
       case "task_update":
-        return this.taskUpdate(
+        return task.taskUpdate(
+          this.taskManager,
           requireString(params, "id"),
           optionalString(params, "status"),
           optionalString(params, "description"),
         );
 
+      case "task_start":
+        return task.taskStart(
+          this.taskManager,
+          this.taskTracker,
+          requireString(params, "id"),
+        );
+
+      case "task_create_from_phase":
+        return task.taskCreateFromPhase(
+          this.taskManager,
+          this.context,
+          requireString(params, "phaseFile"),
+        );
+
+      // ── agent ──
       case "agent_list":
-        return this.agentList();
+        return agent.agentList(this.agentRegistry);
 
       case "agent_run":
-        return this.agentRun(
+        return agent.agentRun(
+          this.agentRegistry,
+          this.contextBuilder,
           requireString(params, "agent"),
           requireString(params, "task"),
         );
 
-      case "parse_engram_feedback":
-        return this.parseEngramFeedback(
-          requireString(params, "output"),
-          params["expectedMemoryIds"],
-        );
+      // ── workflow ──
+      case "workflow_status":
+        return workflow.workflowStatus(this.context.vaultPath, optionalString(params, "runId"));
 
       case "workflow_create":
-        return this.workflowCreate(params as unknown as WorkflowCreateInput);
+        return workflow.workflowCreate(this.context.vaultPath, params as unknown as WorkflowCreateInput);
 
+      // ── memory (engram) ──
       case "memory_search":
-        return this.memorySearch(
+        return memory.memorySearch(
+          this.context,
           requireString(params, "query"),
           {
             limit: typeof params["limit"] === "number" ? params["limit"] : undefined,
@@ -201,7 +162,8 @@ export class ToolHandlers {
         );
 
       case "memory_store":
-        return this.memoryStore(
+        return memory.memoryStore(
+          this.context,
           requireString(params, "context"),
           requireString(params, "action"),
           requireString(params, "result"),
@@ -210,370 +172,28 @@ export class ToolHandlers {
         );
 
       case "memory_judge":
-        return this.memoryJudge(
+        return memory.memoryJudge(
+          this.context,
           requireString(params, "memory_id"),
           typeof params["score"] === "number" ? params["score"] : Number(params["score"]),
           optionalString(params, "explanation"),
         );
 
+      case "parse_engram_feedback":
+        return memory.parseEngramFeedback(requireString(params, "output"), params["expectedMemoryIds"]);
+
+      // ── profile ──
       case "profile_get":
-        return this.profileGet();
+        return profile.profileGet(this.context.vaultPath);
 
       case "profile_set":
-        return this.profileSet(requireString(params, "name"));
+        return profile.profileSet(this.context.vaultPath, requireString(params, "name"));
 
       case "profile_clear":
-        return this.profileClear();
+        return profile.profileClear(this.context.vaultPath);
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
-  }
-
-  private vaultRead(section: string): string | null {
-    const readers: Record<string, () => string | null> = {
-      stack: () => this.vaultReader.readStack(),
-      conventions: () => this.vaultReader.readConventions(),
-      knowledge: () => this.vaultReader.readKnowledge(),
-      gameplan: () => this.vaultReader.readGameplan(),
-    };
-
-    const reader = readers[section];
-    if (!reader) throw new Error(`Unknown vault section: ${section}`);
-    return reader();
-  }
-
-  private vaultSearch(query: string): SearchMatch[] {
-    return searchVaultFiles(this.context.vaultPath, query);
-  }
-
-  private async vaultRecord(type: string, title: string, content: string): Promise<{ filepath: string }> {
-    if (!VAULT_RECORD_TYPES.has(type)) {
-      throw new Error(`vault_record: invalid type "${type}", expected adr|bug|debt`);
-    }
-    const slug = slugifyTitle(title);
-    const rendered = renderTemplate(`records/${type}`, {
-      title,
-      projectName: this.context.projectName,
-    });
-    const finalContent = rendered + "\n" + content;
-    const filepath = this.vaultWriter.writeRecord(type, slug, finalContent);
-
-    const mirror = await mirrorVaultRecord({
-      type,
-      title,
-      content,
-      filepath,
-      projectRoot: this.context.projectRoot,
-      projectName: this.context.projectName,
-      autoTags: buildAutoTags(loadPipelineContext(this.context)),
-    });
-    this.bumpTelemetry("vaultRecord");
-    if (mirror.stored) this.bumpTelemetry("store");
-    if (mirror.skipped) this.bumpTelemetry("skipped");
-
-    return { filepath };
-  }
-
-  private async vaultKnowledge(section: string, content: string): Promise<{ success: boolean }> {
-    this.vaultWriter.appendKnowledge(section, content);
-
-    await engramStore(
-      `Knowledge updated: ${section}`,
-      content.slice(0, 300),
-      `Section "${section}" appended in ${this.context.projectName}`,
-      "context",
-      [this.context.projectName, "knowledge", section],
-      this.context.projectName,
-    );
-    this.bumpTelemetry("store");
-
-    return { success: true };
-  }
-
-  private async vaultPattern(
-    section: string | undefined,
-    content: string,
-  ): Promise<{ success: boolean; appended: boolean; reason?: AppendReason }> {
-    if (content.includes("\n")) {
-      throw new Error("vault_pattern: content must be a single line (no newlines)");
-    }
-    if (section !== undefined && section.includes("\n")) {
-      throw new Error("vault_pattern: section must be a single line (no newlines)");
-    }
-
-    const targetSection = section ?? "Patterns";
-    const result = this.vaultWriter.appendConventions(targetSection, content);
-
-    if (!result.appended) {
-      return { success: true, appended: false, reason: result.reason };
-    }
-
-    await engramStore(
-      `Convention updated: ${targetSection}`,
-      content.slice(0, 300),
-      `Section "${targetSection}" appended in conventions.md of ${this.context.projectName}`,
-      "context",
-      [this.context.projectName, "conventions", targetSection],
-      this.context.projectName,
-    );
-    this.bumpTelemetry("store");
-
-    return { success: true, appended: true };
-  }
-
-  private async memorySearch(
-    query: string,
-    opts: { limit?: number; tags?: string[] },
-  ): Promise<unknown> {
-    if (opts.tags) {
-      for (const tag of opts.tags) {
-        if (tag.includes(",") || tag.includes("\n")) {
-          throw new Error(`memory_search: tag must not contain commas or newlines, got "${tag}"`);
-        }
-      }
-    }
-    const pipelineCtx = loadPipelineContext(this.context);
-    const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
-    const result = await engramSearch(
-      query,
-      this.context.projectName,
-      opts.limit ?? 5,
-      tags,
-    );
-    this.bumpTelemetry("search");
-    return result;
-  }
-
-  private async memoryStore(
-    context: string,
-    action: string,
-    result: string,
-    type: string,
-    opts: { tags?: string[] },
-  ): Promise<{ id: string }> {
-    if (opts.tags) {
-      for (const tag of opts.tags) {
-        if (tag.includes(",") || tag.includes("\n")) {
-          throw new Error(`memory_store: tag must not contain commas or newlines, got "${tag}"`);
-        }
-      }
-    }
-    const pipelineCtx = loadPipelineContext(this.context);
-    const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
-    const id = await engramStoreStrict(
-      context,
-      action,
-      result,
-      type,
-      tags,
-      this.context.projectName,
-    );
-    this.bumpTelemetry("store");
-    return { id };
-  }
-
-  private async memoryJudge(
-    memoryId: string,
-    score: number,
-    explanation?: string,
-  ): Promise<{ ok: true }> {
-    if (!Number.isFinite(score) || score < 0 || score > 1) {
-      throw new Error(`memory_judge: score must be a finite number in [0, 1], got ${score}`);
-    }
-    await engramJudge(memoryId, score, explanation ?? "");
-    this.bumpTelemetry("judge");
-    return { ok: true };
-  }
-
-  private bumpTelemetry(kind: keyof TelemetryCounters): void {
-    const state = new WorkflowState(this.context.vaultPath);
-    const run = state.loadCurrent();
-    if (run) state.bumpTelemetry(run.id, kind);
-  }
-
-  private taskCreate(title: string, description?: string): unknown {
-    return this.taskManager.create(title, description ?? "");
-  }
-
-  private taskList(status?: string): unknown {
-    const filter = status ? { status: status as TaskStatus } : undefined;
-    return this.taskManager.list(filter);
-  }
-
-  private taskUpdate(id: string, status?: string, description?: string): unknown {
-    const patch: Record<string, unknown> = {};
-    if (status) patch["status"] = status;
-    if (description) patch["description"] = description;
-    return this.taskManager.update(id, patch as { status?: TaskStatus; description?: string });
-  }
-
-  private profileGet(): unknown {
-    const config = loadCommunicationConfig(this.context.vaultPath);
-    if (config === null) {
-      return { configured: false, active: null, default: null, available: [], config: null };
-    }
-    const stateActive = getActiveProfile(this.context.vaultPath);
-    const effective = stateActive ?? config.active_profile;
-    const profile: CommunicationProfile | null = config.profiles[effective] ?? null;
-    return {
-      configured: true,
-      active: stateActive,
-      default: config.active_profile,
-      effective,
-      available: Object.keys(config.profiles).sort(),
-      config: profile,
-    };
-  }
-
-  private profileSet(name: string): unknown {
-    const config = loadCommunicationConfig(this.context.vaultPath);
-    if (config === null) {
-      throw new Error(`profile_set: communication.yaml not found in ${this.context.vaultPath}`);
-    }
-    if (!Object.prototype.hasOwnProperty.call(config.profiles, name)) {
-      const available = Object.keys(config.profiles).sort().join(", ");
-      throw new Error(`profile_set: unknown profile '${name}' — available: ${available}`);
-    }
-    setActiveProfile(this.context.vaultPath, name);
-    return {
-      ok: true,
-      active: name,
-      config: config.profiles[name],
-    };
-  }
-
-  private profileClear(): unknown {
-    clearActiveProfile(this.context.vaultPath);
-    return { ok: true };
-  }
-
-  private vaultStatus(): unknown {
-    const sectionInfo = (content: string | null) => {
-      if (!content) return { filled: false, lines: 0 };
-      const lines = content.split("\n").length;
-      return { filled: lines > 8, lines };
-    };
-
-    const tasks = this.taskManager.list();
-    const statusCounts: Record<string, number> = {};
-    for (const task of tasks) {
-      statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
-    }
-
-    const workflowState = new WorkflowState(this.context.vaultPath);
-    const currentRun = workflowState.loadCurrent();
-
-    return {
-      project: this.context.projectName,
-      branch: this.context.branch,
-      sections: {
-        stack: sectionInfo(this.vaultReader.readStack()),
-        conventions: sectionInfo(this.vaultReader.readConventions()),
-        knowledge: sectionInfo(this.vaultReader.readKnowledge()),
-        gameplan: sectionInfo(this.vaultReader.readGameplan()),
-      },
-      tasks: {
-        total: tasks.length,
-        ...statusCounts,
-      },
-      workflow: currentRun ? {
-        active: true,
-        name: currentRun.workflowName,
-        step: currentRun.currentStep,
-        status: currentRun.status,
-      } : null,
-    };
-  }
-
-  private async intelligenceQuery(branch?: string, task?: string, limit?: number): Promise<unknown> {
-    const query = [branch ?? this.context.branch, task].filter(Boolean).join(" ");
-    const memories = await engramSearch(query, this.context.projectName, limit ?? 15);
-    return memories.map((memory) => ({
-      id: memory.id,
-      category: memory.memory_type,
-      content: memory.context,
-      score: memory.score,
-      action: memory.action,
-    }));
-  }
-
-  private taskCreateFromPhase(phaseFile: string): unknown {
-    const fullPath = phaseFile.startsWith("/") ? phaseFile : join(this.context.projectRoot, phaseFile);
-    return createTasksFromPhase(fullPath, this.taskManager);
-  }
-
-  private taskStart(id: string): unknown {
-    const task = this.taskManager.get(id);
-    const slug = task.title
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-    const branchName = `task/${slug}`;
-
-    this.taskTracker.linkBranch(id, branchName);
-
-    return {
-      id: task.id,
-      title: task.title,
-      status: "in-progress",
-      branch: branchName,
-    };
-  }
-
-  private agentList(): unknown {
-    return this.agentRegistry.list().map((agent) => ({
-      name: agent.name,
-      description: agent.description,
-      vaultSections: agent.vaultSections,
-      permissions: agent.permissions,
-    }));
-  }
-
-  private workflowStatus(runId?: string): unknown {
-    const state = new WorkflowState(this.context.vaultPath);
-    if (runId) {
-      try {
-        return state.load(runId);
-      } catch {
-        return { message: `Workflow run not found: ${runId}` };
-      }
-    }
-    const current = state.loadCurrent();
-    if (!current) {
-      return { message: "No active workflow." };
-    }
-    return current;
-  }
-
-  private async agentRun(agentName: string, task: string): Promise<unknown> {
-    const agent = this.agentRegistry.get(agentName);
-    const prepared = await this.contextBuilder.prepare(agent, { taskDescription: task });
-    return {
-      prompt: prepared.resolvedPrompt,
-      permissions: agent.permissions,
-    };
-  }
-
-  private parseEngramFeedback(output: string, expectedMemoryIdsRaw: unknown): {
-    judgments: Array<{ id: string; score: number; explanation: string }>;
-    fallbackIds: string[];
-  } {
-    const expectedMemoryIds = Array.isArray(expectedMemoryIdsRaw)
-      ? expectedMemoryIdsRaw.filter((id): id is string => typeof id === "string")
-      : [];
-    const result = parseEngramFeedbackFn(output, expectedMemoryIds);
-    return {
-      judgments: Array.from(result.judgments.entries()).map(([id, judgment]) => ({
-        id,
-        score: judgment.score,
-        explanation: judgment.explanation,
-      })),
-      fallbackIds: result.fallbackIds,
-    };
-  }
-
-  private workflowCreate(input: WorkflowCreateInput): { filepath: string } {
-    return createWorkflow(input, this.context.vaultPath);
   }
 }

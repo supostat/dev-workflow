@@ -670,6 +670,95 @@ describe("ToolHandlers", () => {
       await expect(env.handlers.handle("profile_set", { name: "__proto__" }))
         .rejects.toThrow(/unknown profile '__proto__'/);
     });
+
+  });
+
+  describe("workflow_status / workflow_create / memory_*", () => {
+    it("workflow_status with no active run → 'No active workflow.'", async () => {
+      const result = await env.handlers.handle("workflow_status", {}) as { message: string };
+      expect(result.message).toBe("No active workflow.");
+    });
+
+    it("workflow_status with unknown runId → 'Workflow run not found' message", async () => {
+      const result = await env.handlers.handle("workflow_status", {
+        runId: "run-nonexistent-xyz",
+      }) as { message: string };
+      expect(result.message).toContain("Workflow run not found");
+    });
+
+    it("workflow_status with valid runId → returns the run object", async () => {
+      const runPath = join(env.context.vaultPath, "workflows", "run-2026-05-11-X.json");
+      const run = {
+        id: "run-2026-05-11-X",
+        workflowName: "dev",
+        taskId: null,
+        taskDescription: "Test task",
+        currentStep: "code",
+        startedAt: "2026-05-11T10:00:00Z",
+        completedAt: "2026-05-11T11:00:00Z",
+        status: "completed",
+        steps: {},
+      };
+      writeFileSync(runPath, JSON.stringify(run), "utf-8");
+      const result = await env.handlers.handle("workflow_status", {
+        runId: "run-2026-05-11-X",
+      }) as { id: string; workflowName: string };
+      expect(result.id).toBe("run-2026-05-11-X");
+      expect(result.workflowName).toBe("dev");
+    });
+
+    it("memory_search happy path with engram unreachable → fail-safe empty array", async () => {
+      // ENGRAM_SOCKET_PATH stubbed in beforeEach → engramSearch returns []
+      const result = await env.handlers.handle("memory_search", {
+        query: "anything",
+        tags: ["test-tag"],
+        limit: 10,
+      });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([]);
+    });
+
+    it("memory_judge accepts valid score and returns {ok:true} even when engram unreachable", async () => {
+      // engramJudge silently fails on bad socket; memoryJudge wrap still returns {ok:true}
+      const result = await env.handlers.handle("memory_judge", {
+        memory_id: "mem-anywhere",
+        score: 0.75,
+      }) as { ok: true };
+      expect(result.ok).toBe(true);
+    });
+
+    it("memory_judge rejects score outside [0, 1]", async () => {
+      await expect(env.handlers.handle("memory_judge", {
+        memory_id: "mem-x",
+        score: 1.5,
+      })).rejects.toThrow(/score must be a finite number in \[0, 1\]/);
+      await expect(env.handlers.handle("memory_judge", {
+        memory_id: "mem-x",
+        score: -0.1,
+      })).rejects.toThrow(/score must be a finite number in \[0, 1\]/);
+      await expect(env.handlers.handle("memory_judge", {
+        memory_id: "mem-x",
+        score: Number.NaN,
+      })).rejects.toThrow(/score must be a finite number in \[0, 1\]/);
+    });
+
+    it("task_create_from_phase accepts relative path (joined with projectRoot)", async () => {
+      const phasePath = join(env.context.projectRoot, "phase-rel.md");
+      writeFileSync(phasePath, "## Tasks\n\n- [ ] Relative subtask\n\n## End\n", "utf-8");
+      const result = await env.handlers.handle("task_create_from_phase", {
+        phaseFile: "phase-rel.md",
+      }) as { created: string[]; skipped: string[] };
+      expect(result.created.length).toBe(1);
+    });
+
+    it("task_create_from_phase accepts absolute path (no join)", async () => {
+      const phasePath = join(env.context.projectRoot, "phase-abs.md");
+      writeFileSync(phasePath, "## Tasks\n\n- [ ] Absolute subtask\n\n## End\n", "utf-8");
+      const result = await env.handlers.handle("task_create_from_phase", {
+        phaseFile: phasePath, // already absolute
+      }) as { created: string[]; skipped: string[] };
+      expect(result.created.length).toBe(1);
+    });
   });
 });
 
