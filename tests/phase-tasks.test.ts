@@ -68,15 +68,24 @@ describe("phase-tasks", () => {
     expect(tasks).not.toContain("# Comment line");
   });
 
-  it("parseTasksFromPhase: KNOWN-BUG — regex uses \\Z (no JS support) — terminator section required", () => {
-    // Document the existing behavior: a phase file with ## Tasks but no
-    // subsequent ## section or --- separator parses as empty. Logged in
-    // gameplan backlog as LOW bug 2026-05-11 to be fixed separately.
+  it("parseTasksFromPhase: end-of-input terminates the section (no trailing ## or --- needed)", () => {
+    // Regression test for the regex fix that replaced `\Z` (not a JS
+    // anchor — silently matched literal `Z`) with `$` (end-of-input
+    // without `m` flag). Before fix, files without trailing section/
+    // separator parsed as empty array.
     const path = join(projectRoot, "no-terminator.md");
     writeFileSync(path,
       "## Tasks\n\n- [ ] Lonely task\n", // no closing section, no ---
       "utf-8");
-    expect(parseTasksFromPhase(path)).toEqual([]);
+    expect(parseTasksFromPhase(path)).toEqual(["- [ ] Lonely task"]);
+  });
+
+  it("parseTasksFromPhase: end-of-input with no trailing newline also works", () => {
+    const path = join(projectRoot, "no-newline.md");
+    writeFileSync(path,
+      "## Tasks\n\n- [ ] First\n- [ ] Second", // no final \n
+      "utf-8");
+    expect(parseTasksFromPhase(path)).toEqual(["- [ ] First", "- [ ] Second"]);
   });
 
   it("parseTasksFromPhase: --- separator works as terminator (frontmatter close)", () => {

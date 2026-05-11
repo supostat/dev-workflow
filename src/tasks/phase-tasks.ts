@@ -12,7 +12,12 @@ export function parseTasksFromPhase(phaseFilePath: string): string[] {
   }
 
   const content = readFileSync(phaseFilePath, "utf-8");
-  const tasksMatch = content.match(/## Tasks\n([\s\S]*?)(?=\n## |\n---|\Z)/);
+  // Terminator is the FIRST of: next ## section, a horizontal --- divider,
+  // or end-of-input ($). Without the `m` flag, `$` matches end-of-string
+  // (or just before a trailing newline) in JS regex — replaces the previous
+  // `\Z` which is not a JS regex anchor and silently matched literal `Z`,
+  // causing phase files without a trailing section/divider to parse as empty.
+  const tasksMatch = content.match(/## Tasks\n([\s\S]*?)(?=\n## |\n---|$)/);
   if (!tasksMatch) return [];
 
   const tasksSection = tasksMatch[1]!;

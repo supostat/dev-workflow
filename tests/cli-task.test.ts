@@ -239,7 +239,7 @@ describe("task CLI — E2E", () => {
   it("create-from-phase: parses ## Tasks list and creates each", () => {
     const phaseFile = join(projectRoot, "phase-x.md");
     writeFileSync(phaseFile,
-      `---\nphase: x\n---\n# Phase X\n\n## Tasks\n\n- [ ] First subtask\n- [ ] Second subtask\n- [ ] Third subtask\n\n## End\n`,
+      `---\nphase: x\n---\n# Phase X\n\n## Tasks\n\n- [ ] First subtask\n- [ ] Second subtask\n- [ ] Third subtask\n`,
       "utf-8");
 
     task(["create-from-phase", "phase-x.md"]);
@@ -254,7 +254,7 @@ describe("task CLI — E2E", () => {
   it("create-from-phase: skips tasks that already exist", () => {
     const phaseFile = join(projectRoot, "phase-y.md");
     writeFileSync(phaseFile,
-      `---\nphase: y\n---\n## Tasks\n\n- [ ] Dup task\n\n## End\n`, "utf-8");
+      `---\nphase: y\n---\n## Tasks\n\n- [ ] Dup task\n`, "utf-8");
 
     task(["create-from-phase", "phase-y.md"]);
     logOutput.length = 0;
@@ -272,7 +272,7 @@ describe("task CLI — E2E", () => {
 
   it("create-from-phase: accepts absolute path", () => {
     const phaseFile = join(projectRoot, "phase-abs.md");
-    writeFileSync(phaseFile, "## Tasks\n\n- [ ] Absolute path task\n\n## End\n", "utf-8");
+    writeFileSync(phaseFile, "## Tasks\n\n- [ ] Absolute path task\n", "utf-8");
 
     task(["create-from-phase", phaseFile]); // absolute
     expect(process.exitCode).not.toBe(1);

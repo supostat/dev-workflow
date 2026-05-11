@@ -744,7 +744,7 @@ describe("ToolHandlers", () => {
 
     it("task_create_from_phase accepts relative path (joined with projectRoot)", async () => {
       const phasePath = join(env.context.projectRoot, "phase-rel.md");
-      writeFileSync(phasePath, "## Tasks\n\n- [ ] Relative subtask\n\n## End\n", "utf-8");
+      writeFileSync(phasePath, "## Tasks\n\n- [ ] Relative subtask\n", "utf-8");
       const result = await env.handlers.handle("task_create_from_phase", {
         phaseFile: "phase-rel.md",
       }) as { created: string[]; skipped: string[] };
@@ -753,7 +753,7 @@ describe("ToolHandlers", () => {
 
     it("task_create_from_phase accepts absolute path (no join)", async () => {
       const phasePath = join(env.context.projectRoot, "phase-abs.md");
-      writeFileSync(phasePath, "## Tasks\n\n- [ ] Absolute subtask\n\n## End\n", "utf-8");
+      writeFileSync(phasePath, "## Tasks\n\n- [ ] Absolute subtask\n", "utf-8");
       const result = await env.handlers.handle("task_create_from_phase", {
         phaseFile: phasePath, // already absolute
       }) as { created: string[]; skipped: string[] };
