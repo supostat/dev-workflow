@@ -82,6 +82,16 @@ if [[ -z "${TARGET}" ]]; then
   exit 2
 fi
 
+# SECURITY: reject relative paths. Doc promises absolute; without this guard
+# `bash sync-from-templates.sh ../../../some-project` from a CI runner would
+# resolve relative to the runner's cwd — surprise location, possibly outside
+# intended scope. Closes debt 2026-04-21 finding #1 (HIGH).
+if [[ "${TARGET}" != /* ]]; then
+  echo "Error: target path must be absolute (got: ${TARGET})" >&2
+  echo "       Use a leading slash, e.g. /Users/you/project or \"\$(pwd)/project\"." >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_VAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TEMPLATES_DIR="${DEV_VAULT_ROOT}/templates"
@@ -90,6 +100,27 @@ if [[ ! -d "${TARGET}" ]]; then
   echo "Error: target directory not found: ${TARGET}" >&2
   exit 1
 fi
+
+# SECURITY: reject symlinks inside target's .claude/{commands,agents} BEFORE
+# rsync. rsync's default behavior is to follow symlinks (writes through the
+# link, hitting the target outside our directories). An attacker with write
+# access to .claude/ could place `commands/foo.md -> /etc/cron.daily/payload`
+# and have rsync overwrite the cron file when we sync templates. Closes debt
+# 2026-04-21 finding #2 (MEDIUM, escalated to ship alongside HIGH).
+for subdir in ".claude/commands" ".claude/agents"; do
+  full="${TARGET}/${subdir}"
+  [[ ! -d "${full}" ]] && continue
+  if find "${full}" -type l -print -quit 2>/dev/null | grep -q .; then
+    echo "Error: symlinks detected in ${full} — refusing to sync (rsync follows symlinks)." >&2
+    echo "       Offending entries:" >&2
+    find "${full}" -type l 2>/dev/null | while IFS= read -r link; do
+      target="$(readlink "${link}")"
+      echo "         ${link} -> ${target}" >&2
+    done
+    echo "       Remove or replace these symlinks with regular files before retry." >&2
+    exit 1
+  fi
+done
 
 if [[ ! -d "${TEMPLATES_DIR}" ]]; then
   echo "Error: templates directory not found: ${TEMPLATES_DIR}" >&2
