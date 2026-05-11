@@ -5,6 +5,126 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-11
+
+Same-day patch on top of v1.0.0. Eight additive / bug-fix commits — no
+breaking changes, no API removals, no removed CLI commands. Ships
+security fixes (downstream sync script + prompt-injection vector +
+prototype pollution) and developer-experience wins (pre-flight agent
+validation, trace-file GC, init.ts test coverage).
+
+### Security
+
+- **`sync-from-templates.sh` rejects relative paths and symlinks in target.**
+  `bash scripts/sync-from-templates.sh ../some-project` from a CI runner
+  would have resolved relative to runner cwd — surprise location. And
+  `rsync` followed symlinks by default, letting an attacker who can
+  write to `<target>/.claude/` overwrite arbitrary host files via a
+  symlink-as-template. Both holes closed: absolute-path guard + pre-rsync
+  `find -type l` scan that lists offending entries and aborts. Closes
+  debt `2026-04-21-sync-from-templates-path-validation.md`. (`6e28ab1`)
+
+- **Prompt-injection defense for `taskDescription`.** New
+  `src/lib/escape-user-input.ts` `escapeUserInput(value, label?)` wraps
+  user-controlled strings in a per-call hex-id-fenced block via
+  `node:crypto.randomBytes`. Attacker cannot forge a matching end marker
+  without the runtime id. Any matching fence markers in the input are
+  scrubbed before wrapping (defense even with arbitrary id strings).
+  Length capped at 10000 chars with a visible truncation marker
+  (DoS guard). Wired at `WorkflowEngine.executeLoop` for
+  `run.taskDescription` — every agent prompt that interpolates
+  `{{taskDescription}}` now sees the fenced form. Closes debt
+  `2026-04-09-prompt-interpolation-no-escaping.md`. (`a69bd62`)
+
+- **`WorkflowState` rejects `__proto__` / `constructor` / `prototype`
+  during JSON parse.** All three `JSON.parse` call-sites in `state.ts`
+  (load, list, bumpTelemetry) now route through a private
+  `parseSafeJson` helper with a reviver that drops reserved keys. A
+  malicious run-state file with `{"__proto__":{...}}` would have
+  polluted Object.prototype globally; threat vector required write
+  access to `.dev-vault/workflows/`, but the cost is one Set.has per
+  key. (`6c55fa5`)
+
+### Developer experience
+
+- **`dev-workflow validate` pre-flight agent resolution check.** Without
+  this, a typo in `agent:` only surfaced at runtime when the engine
+  first tried to resolve the step — pipeline aborted mid-execution
+  after preflight, losing accumulated work. `validate` now loads an
+  `AgentRegistry` from the bundled `templates/agents/` + optional
+  `<cwd>/.dev-vault/agents/`, and emits a warning for any step whose
+  `agent` is not found in either source. Closes debt
+  `2026-04-22-loaderts...md` finding #2. (`de2e0a5`)
+
+### Reliability
+
+- **Lazy GC for stale engram trace files at session-start.** Without
+  bound, the `<vault>/workflow-state/runs/*.engram-trace.jsonl`
+  directory accumulated 5-10 files/day × 30-100 KB each — MB-GB over
+  months. New `gcEngramTraces(runsDir, {maxAgeMs?, maxFiles?})` in
+  `engram-trace.ts` deletes traces older than 30 days OR beyond the
+  newest 100, skipping the file pointed to by `ENGRAM_TRACE_FILE`
+  (active write). Fire-and-forget at session-start, silent on errors.
+  Closes debt
+  `2026-05-01-engram-trace-file-rotationarchival-policy.md`. (`0e7d15f`)
+
+### Internals (no user-visible change)
+
+- **`buildMemoryStoreParams` helper centralizes `memory_store` params
+  shape.** Three call paths (`engramStore` silent fail-safe,
+  `engramStoreStrict` throws-on-error, `EngramBridge.afterStep`
+  per-step audit) all built the same shape inline. Previous wire-
+  format migrations (commits `ecdea0e` / `2260cb8`) had to patch all
+  three. Helper deduplicates without changing socket-call semantics
+  (engramStore retries, afterStep is fire-and-forget). Wire-format
+  pinning tests pass unchanged. Closes debt
+  `2026-05-01-engrambridgeafterstep-refactor-to-use-engramstore-helper.md`. (`5825f15`)
+
+- **CHANGELOG accuracy fix for the v1.0.0 entry**: the v1.0.0 entry
+  originally mentioned "promisified `execFile`", but the shipped
+  implementation uses `spawn(bin, args, { stdio: "inherit" })` via the
+  `runGateBinary` helper. `promisify(execFile)` was tried during CODE
+  iter1 but `ExecFileOptions` does not accept `stdio: "inherit"` —
+  output would silently buffer, bad UX for long-running gates. Entry
+  now reflects shipped reality. (`d2ca153`)
+
+### Tests
+
+- 3 MCP `tools/call` error-path tests added: `params=null` and
+  `params.name` missing both return JSON-RPC invalid-params (-32602);
+  handler-throw is wrapped as `result.isError: true` (NOT an error
+  envelope), with original request ID echoed so the client can
+  correlate. The third case pins the MCP contract — a future change to
+  throw JSON-RPC errors would break compliant clients. (`202881f`)
+
+- 9 E2E tests for `src/cli/init.ts` (was 364 LOC without a dedicated
+  test file). Real-fixture pattern: `mkdtempSync` + `execFileSync` git
+  init + `process.chdir` save/restore + console capture. Covers
+  CLAUDE.md, `.claude/settings.json` valid + hooks block, `.mcp.json`
+  wired to `dev-workflow serve`, `.claude/commands/` copied,
+  `.claude/agents/` copied, `.dev-vault/` scaffolded with all four
+  sections, not-a-git-repo error path, idempotency without `--force`,
+  settings.json merge preserves user fields. (`57b18f7`)
+
+- 17 unit tests for `src/lib/interpolate.ts` (was 0). Single-pass
+  substitution property pinned: `{{a}}` resolving to `{{b}}` does NOT
+  re-interpolate to `b`'s value — defense-in-depth against late-
+  binding injection. (Included in `a69bd62`.)
+
+- 13 unit tests for `src/lib/escape-user-input.ts`. Forge prevention,
+  truncation boundary, multi-line preserve, custom label. (Included
+  in `a69bd62`.)
+
+- 7 unit tests for `gcEngramTraces`. maxAge-only delete, maxFiles-cap
+  delete, active-file skip, non-trace-files ignored, missing-directory
+  no-throw. (Included in `0e7d15f`.)
+
+- 3 tests for `WorkflowState` `__proto__` poisoned-JSON rejection (load
+  + list paths, constructor / prototype variants). (Included in
+  `6c55fa5`.)
+
+**Test totals**: 687 → **742** (+55 across the patch).
+
 ## [1.0.0] — 2026-05-11
 
 First stable release. Security-driven major bump: `gateCommand` execution and
