@@ -1,10 +1,9 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { interpolate } from "./interpolate.js";
 import { todayDate } from "./fs-helpers.js";
+import { PACKAGE_ROOT } from "./package-root.js";
 
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TEMPLATES_DIR = join(PACKAGE_ROOT, "templates");
 
 const BUILTIN_TEMPLATES: Record<string, string> = {

@@ -1,7 +1,6 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join, dirname, resolve as resolvePath, isAbsolute } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve as resolvePath, isAbsolute } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { AgentRegistry } from "../agents/registry.js";
@@ -15,8 +14,7 @@ import { loadCustomWorkflows, parseWorkflowYaml } from "../workflow/loader.js";
 import { validateOnFailRouting } from "../workflow/validate.js";
 import type { PreparedAgent } from "../agents/types.js";
 import type { WorkflowDefinition } from "../workflow/types.js";
-
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 const WORKFLOW_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const OUTPUT_BLOCK_PATTERN = /^[A-Z][A-Z0-9_]{1,64}$/;

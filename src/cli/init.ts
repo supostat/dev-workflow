@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
 import { detectStack, renderStackMarkdown } from "../lib/stack-detect.js";
@@ -9,8 +8,7 @@ import { icon, section, keyValue } from "../lib/output.js";
 import { renderTemplate } from "../lib/templates.js";
 import { isEngramAvailable } from "../lib/engram.js";
 import { buildSettingsJson } from "../lib/settings-template.js";
-
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 interface InitOptions {
   force: boolean;

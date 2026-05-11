@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 import { init } from "./init.js";
 import { status } from "./status.js";
 import { run, resume, validate } from "./run.js";
@@ -131,7 +131,7 @@ switch (command) {
   case "version":
   case "--version":
   case "-v": {
-    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
+    const pkgPath = join(PACKAGE_ROOT, "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { name: string; version: string };
     console.log(`${pkg.name}@${pkg.version}`);
     break;

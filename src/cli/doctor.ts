@@ -1,14 +1,12 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
 import { AgentRegistry } from "../agents/registry.js";
 import { getBuiltinWorkflows } from "../workflow/builtin.js";
 import { icon } from "../lib/output.js";
-
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 function fileLineCount(filepath: string): number {
   if (!existsSync(filepath)) return 0;

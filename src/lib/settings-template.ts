@@ -1,8 +1,5 @@
-import { realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const PACKAGE_ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
+import { join } from "node:path";
+import { PACKAGE_ROOT } from "./package-root.js";
 
 export function buildSettingsJson(): string {
   const distDir = join(PACKAGE_ROOT, "dist");

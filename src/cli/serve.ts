@@ -1,5 +1,4 @@
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { VaultWriter } from "../lib/writer.js";
@@ -9,8 +8,7 @@ import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import { ToolHandlers } from "../mcp/handlers.js";
 import { McpServer } from "../mcp/server.js";
-
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 export function serve(): void {
   const context = detectContext();

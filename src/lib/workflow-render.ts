@@ -1,9 +1,7 @@
-import { readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { StepDefinition, WorkflowDefinition } from "../workflow/types.js";
-
-const PACKAGE_ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
+import { PACKAGE_ROOT } from "./package-root.js";
 
 const BUILTIN_STEP_FILES: Record<string, string> = {
   reader: "templates/claude/commands/workflow/steps/read.md",

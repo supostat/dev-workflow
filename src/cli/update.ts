@@ -1,10 +1,8 @@
 import { existsSync, cpSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { icon, keyValue } from "../lib/output.js";
-
-const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 export function update(): void {
   const context = detectContext();
