@@ -13,6 +13,7 @@ import {
 } from "../lib/engram-feedback.js";
 import type { EngramFeedbackResult } from "../lib/engram-feedback.js";
 import { todayDate } from "../lib/fs-helpers.js";
+import { escapeUserInput } from "../lib/escape-user-input.js";
 import { extractVerdict, extractNextTarget, isAllowedNextTarget } from "./output-parser.js";
 
 export interface WorkflowResolver {
@@ -196,8 +197,14 @@ export class WorkflowEngine {
       const engramMemoryIdsList = engramResult.memoryIds.length === 0
         ? "(none)"
         : engramResult.memoryIds.map((id) => `- ${id}`).join("\n");
+      // Wrap user-controlled taskDescription in a uniquely-fenced block so
+      // agent prompts can distinguish unescaped user content from orchestrator
+      // instructions. Closes debt 2026-04-09 (prompt-interpolation no escaping).
+      // Defense properties: (a) per-call random fence id — attacker cannot
+      // forge a matching end marker; (b) any embedded `<<<LABEL:id>>>` markers
+      // in user value are scrubbed; (c) length cap at 10000 chars.
       const variables: Record<string, string> = {
-        taskDescription: run.taskDescription,
+        taskDescription: escapeUserInput(run.taskDescription),
         engramContext,
         engramMemoryIds: engramMemoryIdsList,
         ...previousOutputs,
