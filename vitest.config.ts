@@ -16,16 +16,23 @@ export default defineConfig({
         "src/hooks/**",
       ],
       // Baseline established 2026-05-11 after enabling coverage-v8.
-      // Measured: lines 68.14%, functions 73.95%, statements 67.26%, branches 63.95%.
-      // Thresholds set ~2pp below baseline as a regression floor — narrow enough
-      // to catch coverage erosion, wide enough to absorb day-to-day noise.
-      // Raise (ratchet) when meaningful new tests land; never lower without
-      // ADR-level justification.
+      //
+      // History (oldest → newest):
+      //   1. Initial baseline (commit 02c9ca3): lines 68.14 / fn 73.95 / stmt 67.26 / br 63.95
+      //      → thresholds 66 / 72 / 65 / 62
+      //   2. After CLI backfill batch (5 test files, +88 tests, 742 → 830):
+      //      lines 82.14 / fn 84.54 / stmt 80.56 / br 73.11
+      //      → thresholds 80 / 82 / 78 / 71
+      //
+      // Ratcheting policy: thresholds set ~2pp below measured baseline as a
+      // regression floor — narrow enough to catch coverage erosion, wide enough
+      // to absorb day-to-day noise. Raise when meaningful new tests land;
+      // never lower without ADR-level justification.
       thresholds: {
-        lines: 66,
-        functions: 72,
-        statements: 65,
-        branches: 62,
+        lines: 80,
+        functions: 82,
+        statements: 78,
+        branches: 71,
       },
     },
   },
