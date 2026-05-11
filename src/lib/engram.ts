@@ -53,7 +53,7 @@ async function socketCallWithRetry(
   }
 }
 
-interface EngramMemory {
+export interface EngramMemory {
   id: string;
   memory_type: string;
   context: string;

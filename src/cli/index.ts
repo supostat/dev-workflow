@@ -21,6 +21,7 @@ import { engramTrace } from "./engram-trace.js";
 import { runWorkflowCommand } from "./workflow.js";
 import { runVaultCommand } from "./vault.js";
 import { snapshot } from "./snapshot.js";
+import { engramStats } from "./engram-stats.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -127,6 +128,9 @@ switch (command) {
     break;
   case "snapshot":
     snapshot(args.slice(1));
+    break;
+  case "engram-stats":
+    engramStats(args.slice(1)).catch(handleAsyncError);
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);
