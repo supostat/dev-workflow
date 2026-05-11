@@ -15,7 +15,10 @@ execution and runtime crashes respectively.
 
 - **`gateCommand` no longer executes via shell.** `execSync(commandString)` in
   `CliGateChecker.checkTestsPass` and `checkCustomCommand` is replaced with
-  promisified `execFile(bin, [args])`. Shell metacharacters (`|`, `;`, `&&`,
+  `spawn(bin, args, { stdio: "inherit" })` via a new `runGateBinary` helper.
+  `spawn` is chosen over `promisify(execFile)` because the latter does not
+  accept `stdio: "inherit"` and would silently buffer output — bad UX for
+  long-running gate runs (test suites). Shell metacharacters (`|`, `;`, `&&`,
   `$VAR`, backticks, redirects) no longer have any effect — they are passed
   through as literal arguments to the binary. Closes debt
   `2026-04-22-loaderts--missing-validation-on-gatecommand-agent-onfail.md`
