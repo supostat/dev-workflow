@@ -169,6 +169,37 @@ describe("WorkflowState", () => {
 
     expect(state.list()).toHaveLength(3);
   });
+
+  it("load() strips __proto__ key from poisoned JSON (no prototype pollution)", () => {
+    const filepath = join(vaultPath, "workflows", "run-poison.json");
+    writeFileSync(filepath,
+      '{"id":"run-poison","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"__proto__":{"polluted":"YES"}}',
+      "utf-8");
+    state.load("run-poison");
+    expect((({}) as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, "polluted")).toBe(false);
+  });
+
+  it("load() strips constructor and prototype keys too", () => {
+    const filepath = join(vaultPath, "workflows", "run-poison2.json");
+    writeFileSync(filepath,
+      '{"id":"run-poison2","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"constructor":{"polluted2":"x"},"prototype":{"polluted3":"x"}}',
+      "utf-8");
+    const loaded = state.load("run-poison2");
+    expect(Object.prototype.hasOwnProperty.call(loaded, "constructor")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(loaded, "prototype")).toBe(false);
+    expect((({}) as Record<string, unknown>)["polluted2"]).toBeUndefined();
+    expect((({}) as Record<string, unknown>)["polluted3"]).toBeUndefined();
+  });
+
+  it("list() also strips reserved keys", () => {
+    const filepath = join(vaultPath, "workflows", "run-poison-list.json");
+    writeFileSync(filepath,
+      '{"id":"run-poison-list","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"__proto__":{"listPollution":"BAD"}}',
+      "utf-8");
+    state.list();
+    expect((({}) as Record<string, unknown>)["listPollution"]).toBeUndefined();
+  });
 });
 
 describe("WorkflowEngine", () => {

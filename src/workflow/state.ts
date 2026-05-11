@@ -11,6 +11,23 @@ const EMPTY_TELEMETRY: TelemetryCounters = {
   skipped: 0,
 };
 
+/**
+ * JSON keys that, if interpreted as own-properties of a parsed object, would
+ * mutate `Object.prototype` and pollute every object in the runtime. The
+ * reviver in {@link parseSafeJson} drops these keys before they reach the
+ * caller. Defense-in-depth — closes gameplan MEDIUM "WorkflowState __proto__
+ * pollution guard": run JSONs live in `.dev-vault/workflows/` which requires
+ * write-access to attack, but the cost of this check is one regex per key.
+ */
+const RESERVED_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+function parseSafeJson<T>(content: string): T {
+  return JSON.parse(content, (key, value): unknown => {
+    if (RESERVED_KEYS.has(key)) return undefined;
+    return value;
+  }) as T;
+}
+
 export class WorkflowState {
   private readonly workflowsDir: string;
   public readonly vaultPath: string;
@@ -36,7 +53,7 @@ export class WorkflowState {
     if (!existsSync(filepath)) return;
     let run: WorkflowRun;
     try {
-      run = JSON.parse(readFileSync(filepath, "utf-8")) as WorkflowRun;
+      run = parseSafeJson<WorkflowRun>(readFileSync(filepath, "utf-8"));
     } catch {
       return;
     }
@@ -52,7 +69,7 @@ export class WorkflowState {
     if (!existsSync(filepath)) {
       throw new Error(`Workflow run not found: ${runId}`);
     }
-    return JSON.parse(readFileSync(filepath, "utf-8")) as WorkflowRun;
+    return parseSafeJson<WorkflowRun>(readFileSync(filepath, "utf-8"));
   }
 
   loadCurrent(): WorkflowRun | null {
@@ -73,7 +90,7 @@ export class WorkflowState {
     for (const file of files) {
       try {
         const content = readFileSync(join(this.workflowsDir, file), "utf-8");
-        runs.push(JSON.parse(content) as WorkflowRun);
+        runs.push(parseSafeJson<WorkflowRun>(content));
       } catch {
         continue;
       }
