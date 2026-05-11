@@ -1,4 +1,4 @@
 {
   "title": "Концепции",
-  "pages": ["vault", "agents", "workflows", "intelligence", "hooks"]
+  "pages": ["vault", "agents", "workflows", "intelligence", "hooks", "communication"]
 }

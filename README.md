@@ -26,7 +26,7 @@ dev-workflow gives it a **strict protocol**: every task goes through an 11-step 
 - **Intelligence** — pattern graph with scoring (recency, frequency, context match)
 - **Phase mode** — break large specs into phases, code each subtask separately
 - **Interactive & autonomous** — ask before commit (default) or auto-commit for swarm use
-- **20 MCP tools** — programmatic access to vault, tasks, intelligence, memory, workflows, agents (via `.mcp.json`)
+- **23 MCP tools** — programmatic access to vault, tasks, intelligence, memory, workflows, agents, communication profiles (via `.mcp.json`)
 - **Engram memory** — persistent long-term store with semantic search via Voyage AI embeddings; auto-decorated with pipeline tags (step/branch/run/task)
 - **3 hooks** — SessionStart, SessionEnd, TaskCompleted
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
@@ -124,6 +124,7 @@ Violation = immediate pipeline abort.
 | `/session:resume` | Restore session context |
 | `/session:handover` | Save detailed session notes |
 | `/session:review` | Multi-perspective code review (5 perspectives) |
+| `/profile [<name>\|clear]` | Switch communication profile (language/tone/verbosity) — see [Communication Profiles](https://supostat.github.io/dev-workflow/docs/concepts/communication) |
 
 ### Git
 
@@ -142,6 +143,7 @@ dev-workflow update                      # Update commands/agents from package
 dev-workflow templates-root              # Print absolute path to bundled templates/
 dev-workflow settings-template           # Print bundled .claude/settings.json (absolute paths)
 dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)
+dev-workflow communication-template      # Print bundled communication.yaml template (4 profiles)
 dev-workflow engram-trace <runId>        # Show engram socket trace summary [--raw]
 dev-workflow workflow show <name> [--bodies]   # Inspect workflow structure
 dev-workflow workflow graph <name> [--ascii]   # Render DAG (Mermaid default)
@@ -160,7 +162,7 @@ dev-workflow serve                       # Start MCP server
 
 ## MCP Tools
 
-20 tools available via MCP server:
+23 tools available via MCP server:
 
 | Tool | Description |
 |------|------------|
@@ -184,6 +186,9 @@ dev-workflow serve                       # Start MCP server
 | `memory_search` | Search Engram memories with auto-decoration (step/branch/run/task tags) |
 | `memory_store` | Store Engram memory with auto-decoration; throws daemon errors to caller |
 | `memory_judge` | Rate Engram memory's usefulness (0.0–1.0) |
+| `profile_get` | Read communication profile state (active + default + available + config) |
+| `profile_set` | Activate communication profile (validates name; persists to `.dev-vault/.profile-state`) |
+| `profile_clear` | Reset communication profile state (delete `.profile-state`; fallback to yaml default) |
 
 ## Migration: 0.1.x → 0.2.0
 

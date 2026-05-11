@@ -39,3 +39,25 @@ description: Управление контекстом сессий — resume, 
 ```
 
 5 перспектив: Security, Quality, Conventions, Completeness, Pragmatism. Каждая оценивает diff независимо, результат агрегируется в один вердикт.
+
+## /profile
+
+Управление активным communication profile (язык, тон, verbosity, expertise level — см. [Communication Profiles](../concepts/communication)). Slash работает только при наличии `.dev-vault/communication.yaml` (bootstrap: `dev-workflow communication-template > .dev-vault/communication.yaml`).
+
+```
+/profile                  # show current + available
+/profile <name>           # activate by name (validates against profiles map)
+/profile clear            # reset to yaml default (delete .profile-state)
+```
+
+**Хранение состояния**: активный profile persist'ится в `.dev-vault/.profile-state` (gitignored, plain text, single profile name). Yaml `active_profile` field — fallback default когда state file отсутствует.
+
+**Backend**: 3 MCP tools (`profile_get` / `profile_set` / `profile_clear`) — slash thin wrapper. Validation через `Object.prototype.hasOwnProperty.call` — защита от prototype pollution names.
+
+**Session-start hook** показывает активный profile в session-start additionalContext block (после engram-health, перед SPEC drift):
+
+```
+🎙️  Active profile: senior_fast (yaml-default) — language=ru, tone=terse, verbosity=brief, output=code_first
+```
+
+Source label: `(state)` если из `.profile-state`, `(yaml-default)` если из yaml.

@@ -1,0 +1,175 @@
+---
+title: Communication Profiles
+description: Voice/tone/verbosity layer для агента — отделён от security/git/philosophy в CLAUDE.md
+---
+
+# Communication Profiles
+
+Configuration-driven voice/tone/verbosity layer для общения агента с пользователем. Названные профили (`onboarding`, `senior_fast`, `code_review`, `bilingual`) переключаются атомарно через `/profile <name>` без редактирования CLAUDE.md.
+
+## Зачем
+
+Один человек работает в разных контекстах — каждый требует своего стиля общения:
+
+- **Onboarding** на новом стеке (junior на TS/React пришёл из Go) → развернутые объяснения, terminology, ссылки, alternatives
+- **Senior debugging** production-инцидента → terse, code-first, минимум воды, root cause + fix
+- **Code review** для PR / hand-off / audit → formal тон, structured findings (Severity/Location/Fix)
+- **Кросс-language** работа с международной командой → switch RU↔EN, code/commits всегда EN
+
+До этого слоя — переключение между режимами требовало ручного редактирования CLAUDE.md или явного запроса каждый раз ("отвечай терсе" / "развернуто объясни"). Теперь — `/profile senior_fast` за одну команду.
+
+## Layering invariant — отделение от CLAUDE.md
+
+**Два независимых слоя**, которые **не пересекаются**:
+
+| Слой | Source of truth | Отвечает за |
+|---|---|---|
+| `CLAUDE.md` (project root) | Static, hand-edited | Security (OWASP), git rules (no co-author, English commits), philosophy (Production-only, Consistency > local opt), permission boundaries, vault write triggers |
+| `.dev-vault/communication.yaml` (optional) | Static, hand-edited (4 default профиля) | Voice (language), tone (friendly/terse/formal), verbosity (brief/detailed/structured), output format (code_first / with_alternatives / review_template), expertise level (junior/senior) |
+
+**Communication.yaml не может override security/git/philosophy invariants.** CLAUDE.md не диктует voice/tone — это динамически переключается через `/profile`.
+
+Когда `communication.yaml` отсутствует — слой просто не применяется, поведение fallback'ит к default'ам без блокировки сессии.
+
+## 4 default профиля
+
+`dev-workflow communication-template > .dev-vault/communication.yaml` создаёт bundled пример с этими 4 профилями. Edit под себя.
+
+| Профиль | Use case | Ключевые поля |
+|---|---|---|
+| `onboarding` | Junior на новом стеке, нужны развернутые объяснения | `tone: friendly`, `verbosity: detailed`, `expertise: junior`, `explanations: with_alternatives` |
+| `senior_fast` | Daily debugging / production incident — terse, code-first | `tone: terse`, `verbosity: brief`, `expertise: senior`, `output: code_first`, `ask_before_acting: false` |
+| `code_review` | PR review / hand-off / audit — formal, structured | `tone: formal`, `verbosity: structured`, `output_format: review_template`, `emojis: false`, `severity_levels: [CRITICAL, HIGH, MEDIUM, LOW]` |
+| `bilingual` | Mixed RU/EN team — auto-switch language | `language: auto`, `fallback_language: en`, `code_comments: en`, `commit_messages: en`, `docs_language: en`, `session_logs: ru` |
+
+Default `active_profile: senior_fast` (используется при отсутствии state file).
+
+## YAML структура
+
+```yaml
+active_profile: senior_fast    # default когда .profile-state отсутствует
+
+profiles:
+  onboarding:
+    language: ru               # required
+    tone: friendly             # optional
+    verbosity: detailed
+    expertise: junior
+    explanations: with_alternatives
+
+  senior_fast:
+    language: ru
+    tone: terse
+    verbosity: brief
+    expertise: senior
+    output: code_first
+    ask_before_acting: false
+
+  # ... etc
+```
+
+**Allowed values** (parser строго validate'ит — invalid throws с file:line):
+
+- `language`, `fallback_language`, `code_comments`, `commit_messages`, `docs_language`, `session_logs`: `ru | en | auto`
+- `tone`: `friendly | terse | formal`
+- `verbosity`: `brief | detailed | structured`
+- `expertise`: `junior | senior`
+- `output`, `explanations`: `code_first | with_alternatives | review_template`
+- `ask_before_acting`, `emojis`: `true | false` (lowercase strict)
+- `output_format`: free-form string
+- `severity_levels`: inline array `[CRITICAL, HIGH, MEDIUM, LOW]`
+
+Required: `language` для каждого профиля. Все остальные поля опциональны. Unknown поля → throw с whitelist (защита от typos).
+
+## State mechanism — Option B (separate file, gitignored)
+
+Активный profile хранится в **отдельном gitignored файле** `.dev-vault/.profile-state` (NOT top-level field в communication.yaml).
+
+**Decision rationale** (см. ADR `2026-05-10-profile-based-yaml-communication-config`):
+
+- **Clean git** для downstream проектов где `.dev-vault/` коммитится — переключение profile не пачкает diff
+- **Single Responsibility** — config (yaml, parsed) ≠ runtime state (text, mutable)
+- **No race** с user manual edits communication.yaml — yaml-write не конфликтует с slash-write
+- Симметрично с established `.dev-vault/workflow-state/` pattern
+
+Format: plain text, single line с trailing newline:
+```
+$ cat .dev-vault/.profile-state
+onboarding
+```
+
+**Effective profile resolution**: state file overrides yaml-default. Если `.profile-state` отсутствует → fallback на `active_profile` field из yaml.
+
+## Slash `/profile`
+
+```
+/profile                  # show: active + default + available + key fields
+/profile <name>           # activate (validates against profiles map)
+/profile clear            # reset to yaml default (delete .profile-state)
+```
+
+Slash — thin wrapper над 3 MCP tools (см. [MCP tools — Communication profiles](../mcp/tools#communication-profiles)). Прямой вызов через MCP полезен для CLI automation.
+
+**Validation**: `profile_set` проверяет name через `Object.prototype.hasOwnProperty.call(config.profiles, name)` — защита от prototype pollution идентификаторов (`__proto__`, `constructor`, `prototype`). Profiles map уже declared через `Object.create(null)` в parser — defense-in-depth at 2 layers.
+
+## Session-start integration
+
+`session-start` hook читает active profile + emit additionalContext block после engram health, перед SPEC drift warning:
+
+```
+🎙️  Active profile: senior_fast (yaml-default) — language=ru, tone=terse, verbosity=brief, output=code_first
+```
+
+Source label показывает источник:
+- `(state)` — из `.profile-state` (active override)
+- `(yaml-default)` — из yaml `active_profile` (fallback default)
+
+**Backwards compat**: если `communication.yaml` missing → block silent (не emit'ится). Existing sessions без profile config — no behavior change.
+
+**Edge cases**:
+- Malformed yaml (parse error) → block silent (fail-safe), parser-detail errors surface через `/profile` direct call
+- State file references non-existent profile → ⚠️ drift warning block с suggestion run `/profile`
+
+## CLI: bootstrap + inspection
+
+| CLI | Назначение |
+|---|---|
+| `dev-workflow communication-template` | Печать bundled `templates/project/communication-yaml.example` с 4 default profiles. Bootstrap: `dev-workflow communication-template > .dev-vault/communication.yaml` |
+
+См. также [CLI Reference](../commands/cli) для полного списка.
+
+## /vault:upgrade interaction
+
+`/vault:upgrade` Category F (User customization advisory, READ-ONLY) включает single-file advisories для:
+
+- **`.dev-vault/communication.yaml`**:
+  - Present → "user-modified communication profiles; никогда не overwritten"
+  - Missing → "bootstrap with: dev-workflow communication-template > .dev-vault/communication.yaml"
+  - Никогда diff content vs bundled template (default profiles intentionally diverge после user customization)
+
+- **`.dev-vault/.profile-state`**:
+  - Present → "runtime override (active profile = `<content>`); reset via /profile clear"
+  - Missing → silent (absence = default state)
+
+`/vault:upgrade` НИКОГДА не overwrite этих файлов — это user content под Category F READ-ONLY.
+
+## Foundation API (для extensions)
+
+Если нужно интегрировать profiles в свой инструмент:
+
+```typescript
+import {
+  loadCommunicationConfig,        // → CommunicationConfig | null
+  getActiveProfile,                // → string | null (state override)
+  setActiveProfile,                // (vaultPath, name) → void (validate + write)
+  clearActiveProfile,              // (vaultPath) → void (no-op if missing)
+} from "@engramm/dev-workflow";
+
+import type { CommunicationProfile, CommunicationConfig } from "@engramm/dev-workflow";
+```
+
+Все функции в `src/lib/` — foundation layer, zero dependencies. Полный type-safe.
+
+## ADR
+
+См. `.dev-vault/architecture/2026-05-10-profile-based-yaml-communication-config--dev-vaultcommunicationyaml-with-4-named-profiles.md` для канонического design decision (Option B — separate state file vs Option A — top-level yaml field; alternatives B/C/D/E rejected с trigger-условиями для revisit).

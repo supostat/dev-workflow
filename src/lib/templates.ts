@@ -175,10 +175,11 @@ This project uses [dev-workflow](https://github.com/supostat/dev-workflow) for s
 | \`/intake "prompt"\` | Classify free-form input and recommend a workflow |
 | \`/vault:from-spec\` | Fill vault from SPEC.md (new project) |
 | \`/vault:analyze\` | Fill vault from codebase (existing project) |
-| \`/workflow:dev "task"\` | Full 10-step pipeline: plan, code, review, test, verify, commit |
+| \`/workflow:dev "task"\` | Full 11-step pipeline: plan, plan-fix, code, review, test, verify, commit |
 | \`/session:resume\` | Restore session context |
 | \`/session:review\` | Multi-perspective code review |
 | \`/session:handover\` | Save session context |
+| \`/profile [<name>\\|clear]\` | Switch communication profile (language/tone/verbosity) — see Communication Profiles below |
 
 ### Routing free-form input
 
@@ -195,6 +196,21 @@ Project knowledge is stored in \`.dev-vault/\`:
 - \`conventions.md\` — code conventions
 - \`knowledge.md\` — architecture, gotchas, patterns
 - \`gameplan.md\` — roadmap and phases
+- \`communication.yaml\` (optional) — voice/tone/verbosity profiles (see Communication Profiles below)
+- \`.profile-state\` (optional, gitignored) — active profile runtime state set by \`/profile <name>\`
+
+### Communication Profiles
+
+Layering invariant — two independent layers:
+
+1. **\`CLAUDE.md\`** (this file) — invariant rules: security (OWASP), git, philosophy (Production-only, Consistency > local optimization), permission boundaries, vault write triggers.
+2. **\`.dev-vault/communication.yaml\`** (optional) — voice/tone/verbosity layer: \`language\` (ru/en/auto), \`tone\` (friendly/terse/formal), \`verbosity\` (brief/detailed/structured), \`output\` (code_first/with_alternatives/review_template), expertise level. 4 default profiles: \`onboarding\` / \`senior_fast\` / \`code_review\` / \`bilingual\`.
+
+**They do NOT overlap**: communication.yaml cannot override security/git/philosophy invariants. CLAUDE.md does not dictate voice/tone — that is dynamically switched via \`/profile\`.
+
+**Bootstrap**: \`dev-workflow communication-template > .dev-vault/communication.yaml\`, then \`/profile <name>\` to activate.
+
+**Persistence**: active profile is stored in gitignored \`.dev-vault/.profile-state\` (single-line plain text); yaml \`active_profile\` field = fallback default.
 
 ### Workflow
 
