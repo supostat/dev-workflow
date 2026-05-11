@@ -736,6 +736,38 @@ describe("McpServer.handleLine", () => {
     expect(result.content[0]!.text).toContain("Stack");
   });
 
+  it("tools/call returns invalid-params (-32602) when params is null", async () => {
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call", params: null,
+    }));
+    expect(response!.error!.code).toBe(-32602);
+    expect(response!.error!.message).toContain("missing tool name");
+  });
+
+  it("tools/call returns invalid-params (-32602) when params.name is missing", async () => {
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call", params: { arguments: { foo: "bar" } },
+    }));
+    expect(response!.error!.code).toBe(-32602);
+    expect(response!.error!.message).toContain("missing tool name");
+  });
+
+  it("tools/call wraps handler-throw as isError result (NOT JSON-RPC error envelope)", async () => {
+    // Handler throws on unknown tool name. Spec says: tool-level failures
+    // surface as `result.isError: true`, not as JSON-RPC error code. Both
+    // success ID echo AND error path must be preserved so the client can
+    // correlate response to its request.
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 42, method: "tools/call",
+      params: { name: "nonexistent_tool_xyz", arguments: {} },
+    }));
+    expect(response!.id).toBe(42);
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { content: Array<{ text: string }>; isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain("Unknown tool");
+  });
+
   it("returns method not found for unknown method", async () => {
     const response = await server.handleLine(JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "unknown/method",
