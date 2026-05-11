@@ -68,7 +68,7 @@ switch (command) {
     init({ force: args.includes("--force"), detectOnly: args.includes("--detect") });
     break;
   case "status":
-    status();
+    status(args.slice(1));
     break;
   case "run":
     run(args.slice(1)).catch(handleAsyncError);

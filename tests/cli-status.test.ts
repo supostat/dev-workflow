@@ -170,4 +170,136 @@ describe("status CLI — E2E", () => {
     status();
     expect(logJoined()).toContain("status-test");
   });
+
+  // ── --json output (audit #9) ──────────────────────────────────────────────
+
+  function parseJsonOutput(): Record<string, unknown> {
+    const out = logJoined();
+    return JSON.parse(out) as Record<string, unknown>;
+  }
+
+  it("--json emits valid JSON with stable top-level keys", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "tasks"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"),
+      "---\nupdated: 2026-01-01\n---\n" + Array(15).fill("line").join("\n"), "utf-8");
+    status(["--json"]);
+    const json = parseJsonOutput();
+    expect(json["project"]).toBeDefined();
+    expect(json["branch"]).toBeDefined();
+    expect(json["parentBranch"]).toBeDefined();
+    expect(json["vault"]).toBeDefined();
+    expect(json["tasks"]).toBeDefined();
+    expect(json["currentTask"]).toBeNull();
+    expect(json["workflow"]).toBeNull();
+    expect(json["recentSessions"]).toEqual([]);
+  });
+
+  it("--json does NOT emit the pretty-print box drawing", () => {
+    mkdirSync(join(projectRoot, ".dev-vault"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
+    status(["--json"]);
+    const out = logJoined();
+    expect(out).not.toContain("┌");
+    expect(out).not.toContain("│");
+    expect(out).not.toContain("└");
+    expect(out).not.toContain("Tasks");
+  });
+
+  it("--json no-vault: vault.exists is false, sections all 'missing'", () => {
+    status(["--json"]);
+    const json = parseJsonOutput();
+    const vault = json["vault"] as Record<string, unknown>;
+    expect(vault["exists"]).toBe(false);
+    const sections = vault["sections"] as Record<string, { label: string; filled: boolean; lines: number }>;
+    expect(sections["stack"]!.label).toBe("missing");
+    expect(sections["stack"]!.filled).toBe(false);
+    expect(sections["stack"]!.lines).toBe(0);
+  });
+
+  it("--json filled vault: sections have lines count and filled=true", () => {
+    mkdirSync(join(projectRoot, ".dev-vault"), { recursive: true });
+    const filled = "---\nupdated: 2026-01-01\n---\n" + Array(20).fill("line").join("\n");
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), filled, "utf-8");
+    status(["--json"]);
+    const json = parseJsonOutput();
+    const sections = (json["vault"] as Record<string, unknown>)["sections"] as Record<string, { filled: boolean; lines: number }>;
+    expect(sections["stack"]!.filled).toBe(true);
+    expect(sections["stack"]!.lines).toBeGreaterThan(8);
+  });
+
+  it("--json tasks with mixed statuses: byStatus has per-status counts", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "tasks"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
+    const taskBody = (id: string, st: string) =>
+      `---\nid: ${id}\ntitle: ${id}\nstatus: ${st}\npriority: medium\ncreated: 2026-01-01\nupdated: 2026-01-01\nbranch: null\nworkflowRun: null\n---\n`;
+    writeFileSync(join(projectRoot, ".dev-vault", "tasks", "task-001.md"), taskBody("task-001", "pending"), "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "tasks", "task-002.md"), taskBody("task-002", "done"), "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "tasks", "task-003.md"), taskBody("task-003", "done"), "utf-8");
+    status(["--json"]);
+    const json = parseJsonOutput();
+    const tasks = json["tasks"] as { total: number; byStatus: Record<string, number> };
+    expect(tasks.total).toBe(3);
+    expect(tasks.byStatus["pending"]).toBe(1);
+    expect(tasks.byStatus["done"]).toBe(2);
+  });
+
+  it("--json active workflow: workflow object with all expected fields", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "workflows"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
+    const run = {
+      id: "run-json-test",
+      workflowName: "dev",
+      taskId: null,
+      taskDescription: "test",
+      currentStep: "code",
+      startedAt: "2026-05-11T10:00:00Z",
+      completedAt: null,
+      status: "running",
+      steps: {
+        read: { status: "completed", output: "x", startedAt: null, completedAt: null, durationMs: null, attempt: 1, engramMemoryId: null, error: null },
+        code: { status: "running", output: null, startedAt: null, completedAt: null, durationMs: null, attempt: 1, engramMemoryId: null, error: null },
+      },
+    };
+    writeFileSync(join(projectRoot, ".dev-vault", "workflows", "run-json-test.json"),
+      JSON.stringify(run), "utf-8");
+    status(["--json"]);
+    const json = parseJsonOutput();
+    const workflow = json["workflow"] as { name: string; id: string; currentStep: string; status: string; completedSteps: number; totalSteps: number };
+    expect(workflow.name).toBe("dev");
+    expect(workflow.id).toBe("run-json-test");
+    expect(workflow.currentStep).toBe("code");
+    expect(workflow.status).toBe("running");
+    expect(workflow.completedSteps).toBe(1);
+    expect(workflow.totalSteps).toBe(2);
+  });
+
+  it("--json recent sessions: list of {date} objects", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "daily"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "daily", "2026-05-11.md"),
+      "---\ndate: 2026-05-11\n---\nlog\n", "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "daily", "2026-05-10.md"),
+      "---\ndate: 2026-05-10\n---\nlog\n", "utf-8");
+    status(["--json"]);
+    const json = parseJsonOutput();
+    const sessions = json["recentSessions"] as Array<{ date: string }>;
+    expect(sessions.length).toBe(2);
+    expect(sessions.some((s) => s.date === "2026-05-11")).toBe(true);
+    expect(sessions.some((s) => s.date === "2026-05-10")).toBe(true);
+  });
+
+  it("--json + not-in-git-repo: error + exitCode=1 (stderr, no JSON)", () => {
+    const nonGit = mkdtempSync(join(tmpdir(), "cli-status-non-git-json-"));
+    process.chdir(nonGit);
+    try {
+      status(["--json"]);
+      expect(process.exitCode).toBe(1);
+      expect(errJoined()).toContain("Not a git repository");
+      // No JSON on stdout — error went to stderr
+      expect(logJoined()).toBe("");
+    } finally {
+      process.chdir(projectRoot);
+      rmSync(nonGit, { recursive: true, force: true });
+    }
+  });
 });
