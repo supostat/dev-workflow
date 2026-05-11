@@ -79,7 +79,7 @@ interface ResolvedStepFile {
   source: string;
 }
 
-interface ResolvedSubagentInfo {
+export interface ResolvedSubagentInfo {
   subagent: ResolvedSubagent;
   provenance: string;
 }
@@ -131,7 +131,7 @@ function resolveStepFileForRead(step: StepDefinition): string | null {
   return null;
 }
 
-function resolveSubagent(step: StepDefinition): ResolvedSubagentInfo {
+export function resolveSubagent(step: StepDefinition): ResolvedSubagentInfo {
   if (step.subagent !== undefined) {
     return { subagent: step.subagent, provenance: "explicit" };
   }
