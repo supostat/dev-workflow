@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engramSearch, formatEngramResults, isEngramAvailable, engramHealth, PENDING_JUDGMENTS_THRESHOLD } from "../lib/engram.js";
+import { gcEngramTraces } from "../lib/engram-trace.js";
 import { formatEngramHealthWarning } from "./engram-health-warning.js";
 import { formatActiveProfileBlock } from "./active-profile-block.js";
 import { loadCustomWorkflows } from "../workflow/loader.js";
@@ -30,6 +31,18 @@ export async function run(): Promise<void> {
   if (!reader.exists()) {
     hookSuccess(`No .dev-vault/ found in ${context.projectName}. Run 'dev-workflow init' to set up.`);
     return;
+  }
+
+  // Fire-and-forget GC of stale engram-trace JSONL files. Closes debt
+  // 2026-05-01 trace rotation/archival policy (Option 1: lazy GC at
+  // session-start). Defaults: keep last 100 files OR last 30 days,
+  // whichever is more permissive. Active in-flight trace is skipped by
+  // matching against ENGRAM_TRACE_FILE env (typically unset at session-
+  // start — no risk of clobbering an active write).
+  try {
+    gcEngramTraces(join(context.vaultPath, "workflow-state", "runs"));
+  } catch {
+    // GC failures are silent — observability hygiene, not core.
   }
 
   const vaultData = reader.readAll(context.branch);
