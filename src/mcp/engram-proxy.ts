@@ -8,14 +8,33 @@ export interface PipelineContext {
   taskId?: string;
 }
 
-// Concurrent runs caveat: WorkflowState.loadCurrent() returns the most recent
-// running/paused run. Two parallel pipelines (rare; CI scenarios) may attribute
-// memories to the wrong run. Acceptable for first cut — revisit when concurrent
-// pipelines become a typical pattern.
+// Concurrent runs: ENGRAM_RUN_ID env (set by workflow_start) takes priority
+// over state.loadCurrent(). This closes the concurrent-runs caveat per
+// ADR 2026-05-13 — subagent processes inherit ENV, ensuring each call
+// attributes memories to its own run instead of the most-recent one.
 //
 // Phase tag deferred per ADR 2026-04-30 (WorkflowRun lacks phase field).
 // Add when phase is persisted in WorkflowRun.
 export function loadPipelineContext(ctx: ProjectContext): PipelineContext {
+  const envRunId = process.env["ENGRAM_RUN_ID"];
+  if (envRunId !== undefined && envRunId.length > 0) {
+    // ENGRAM_RUN_ID set by workflow_start handler — has priority over state lookup
+    // Closes concurrent-runs caveat: each subagent process inherits ENV, no cross-run contamination
+    try {
+      const state = new WorkflowState(ctx.vaultPath);
+      const run = state.load(envRunId);
+      return {
+        branch: ctx.branch,
+        step: run.currentStep,
+        runId: envRunId,
+        taskId: run.taskId ?? undefined,
+      };
+    } catch {
+      // Run not in state (orphan trace) — preserve env runId, no step/taskId
+      return { branch: ctx.branch, runId: envRunId };
+    }
+  }
+  // Fallback: read most-recent run from state (legacy single-run scenarios)
   try {
     const state = new WorkflowState(ctx.vaultPath);
     const run = state.loadCurrent();

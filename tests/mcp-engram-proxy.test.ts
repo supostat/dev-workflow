@@ -132,7 +132,12 @@ describe("mergeTags", () => {
 describe("loadPipelineContext", () => {
   let projectRoot: string;
 
+  beforeEach(() => {
+    delete process.env["ENGRAM_RUN_ID"];
+  });
+
   afterEach(() => {
+    delete process.env["ENGRAM_RUN_ID"];
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
@@ -176,6 +181,108 @@ describe("loadPipelineContext", () => {
       step: undefined,
       runId: undefined,
       taskId: undefined,
+    });
+  });
+
+  // ADR 2026-05-13: ENGRAM_RUN_ID env priority over state.loadCurrent()
+  it("env-priority-happy-path: uses ENGRAM_RUN_ID and enriches from state", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-abc123def456",
+      currentStep: "plan",
+      taskId: "task-042",
+      status: "running",
+    });
+    process.env["ENGRAM_RUN_ID"] = "run-abc123def456";
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "plan",
+      runId: "run-abc123def456",
+      taskId: "task-042",
+    });
+  });
+
+  it("env-overrides-recent-run: env runId wins even when another run is more recent", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    // Older run — what env points to
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-target",
+      currentStep: "code",
+      taskId: "task-target",
+      status: "running",
+    });
+    // Force later startedAt for "run-recent" so loadCurrent would prefer it
+    const workflowsDir = join(env.context.vaultPath, "workflow-state", "runs");
+    const recent = {
+      id: "run-recent",
+      workflowName: "dev",
+      taskId: "task-recent",
+      taskDescription: "newer",
+      currentStep: "review",
+      startedAt: new Date(Date.now() + 60_000).toISOString(),
+      completedAt: null,
+      status: "running",
+      steps: {},
+    };
+    writeFileSync(
+      join(workflowsDir, `${recent.id}.json`),
+      JSON.stringify(recent, null, 2),
+      "utf-8",
+    );
+    process.env["ENGRAM_RUN_ID"] = "run-target";
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "code",
+      runId: "run-target",
+      taskId: "task-target",
+    });
+  });
+
+  it("env-set-but-run-missing: returns orphan trace context (runId only)", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    process.env["ENGRAM_RUN_ID"] = "run-orphan";
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      runId: "run-orphan",
+    });
+  });
+
+  it("empty-string-env-treated-as-unset: falls back to loadCurrent", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-fallback",
+      currentStep: "plan",
+      taskId: "task-fb",
+      status: "running",
+    });
+    process.env["ENGRAM_RUN_ID"] = "";
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "plan",
+      runId: "run-fallback",
+      taskId: "task-fb",
+    });
+  });
+
+  it("env-not-set-current-behavior: loadCurrent returns most recent run", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-current",
+      currentStep: "verify",
+      taskId: "task-curr",
+      status: "running",
+    });
+    expect(process.env["ENGRAM_RUN_ID"]).toBeUndefined();
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "verify",
+      runId: "run-current",
+      taskId: "task-curr",
     });
   });
 });
