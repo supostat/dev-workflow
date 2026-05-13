@@ -4,7 +4,9 @@ import { collectEngramStats, type EngramStats } from "../lib/engram-stats.js";
 function parseRunCount(args: string[]): number {
   const idx = args.indexOf("--runs");
   if (idx === -1 || idx >= args.length - 1) return 10;
-  const value = Number(args[idx + 1]);
+  const rawValue = args[idx + 1];
+  if (rawValue === "all") return Infinity;
+  const value = Number(rawValue);
   if (!Number.isFinite(value) || value < 1) return 10;
   return Math.floor(value);
 }

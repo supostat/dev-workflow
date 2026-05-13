@@ -148,6 +148,25 @@ describe("engram-stats CLI — E2E", () => {
     expect(json.scope.runCount).toBe(1); // single existing run, default limit 10
   });
 
+  it("--runs all: includes all available runs (bypasses default 10 limit)", async () => {
+    for (let i = 1; i <= 3; i++) {
+      writeMinimalRun(`run-all-${i}`);
+    }
+    await engramStats(["--runs", "all", "--json"]);
+    const json = JSON.parse(logJoined()) as { scope: { runCount: number }; recentRuns: Array<{ id: string }> };
+    expect(json.scope.runCount).toBe(3);
+    expect(json.recentRuns.length).toBe(3);
+  });
+
+  it("--runs ALL (uppercase): rejected as non-numeric, falls back to default 10", async () => {
+    for (let i = 1; i <= 11; i++) {
+      writeMinimalRun(`run-upper-${i}`);
+    }
+    await engramStats(["--runs", "ALL", "--json"]);
+    const json = JSON.parse(logJoined()) as { scope: { runCount: number } };
+    expect(json.scope.runCount).toBe(10);
+  });
+
   it("warnings: store>0 + judge=0 produces missed-feedback warning", async () => {
     writeMinimalRun("run-warn", { search: 0, store: 12, judge: 0, vaultRecord: 0, skipped: 0 });
     await engramStats(["--json"]);
