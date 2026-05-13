@@ -39,3 +39,4 @@ out/
 .turbo/
 .next/
 .engram/
+.dev-workflow-upgrade-backup
