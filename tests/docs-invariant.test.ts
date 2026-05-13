@@ -132,3 +132,76 @@ describe("docs-invariant: CLI command coverage", () => {
     });
   }
 });
+
+describe("docs-invariant: Path D subagent dispatch wording (commit dcda8bb..., ADR 2026-05-13)", () => {
+  // Conversational orchestrator MUST dispatch every pipeline subagent via
+  // `subagent_type: general-purpose` (Path D). Pins the prose so future edits
+  // don't regress: built-in Explore subagent is FULLY ISOLATED from MCP, the
+  // only way subagents can call `mcp__dev-workflow__memory_*` is via
+  // general-purpose dispatch.
+  const dispatchMd = readSrc("templates/claude/commands/workflow/_dispatch.md");
+
+  it("_dispatch.md references subagent_type: general-purpose at least once", () => {
+    expect(dispatchMd).toMatch(/subagent_type:\s*general-purpose/);
+  });
+
+  it("_dispatch.md does NOT instruct passing subagent_type: Explore or Full", () => {
+    expect(dispatchMd).not.toMatch(/subagent_type:\s*(Explore|Full)\b/);
+  });
+
+  // The 7 step files describe subagent dispatch directives. After Path D none
+  // of them should say "Launch **Explore**" or "Launch **Full**" — that prose
+  // pattern previously led the conversational orchestrator to pick the wrong
+  // built-in subagent_type.
+  const stepFiles = [
+    "read.md",
+    "plan.md",
+    "plan-review.md",
+    "review.md",
+    "verify.md",
+    "coder.md",
+    "plan-fix.md",
+  ];
+
+  for (const stepFile of stepFiles) {
+    it(`steps/${stepFile} uses "Dispatch" not "Launch Explore/Full"`, () => {
+      const content = readSrc(`templates/claude/commands/workflow/steps/${stepFile}`);
+      expect(content).not.toMatch(/Launch\s+\*\*(?:Explore|Full)\*\*/);
+    });
+  }
+
+  // Agents launched via the dev pipeline (or /intake) must carry the
+  // explicit `## Dispatch context` preamble that compensates for the
+  // looser general-purpose tool surface with prompt-level prohibitions.
+  // preflight + vault-updates are orchestrator-only stubs (never dispatched
+  // as subagents). architect/debugger/tester are not part of the dev pipeline.
+  const dispatchedAgents = [
+    "reader.md",
+    "planner.md",
+    "plan-reviewer.md",
+    "reviewer.md",
+    "verifier.md",
+    "coder.md",
+    "committer.md",
+    "intake.md",
+  ];
+
+  for (const agentFile of dispatchedAgents) {
+    it(`agents/${agentFile} contains ## Dispatch context preamble`, () => {
+      const content = readSrc(`templates/agents/${agentFile}`);
+      expect(content).toMatch(/^## Dispatch context$/m);
+    });
+  }
+
+  // The pre-Path D `## Dispatch` heading (sans "context") used to describe
+  // orchestration prose inside agent templates. Path D deleted both
+  // occurrences (plan-reviewer.md, verifier.md) and replaced them with the
+  // new `## Dispatch context` preamble. Re-introducing a bare `## Dispatch`
+  // heading would shadow the new one and resurface the wrong dispatch story.
+  for (const agentFile of dispatchedAgents) {
+    it(`agents/${agentFile} does NOT contain legacy bare "## Dispatch" heading`, () => {
+      const content = readSrc(`templates/agents/${agentFile}`);
+      expect(content).not.toMatch(/^## Dispatch$/m);
+    });
+  }
+});

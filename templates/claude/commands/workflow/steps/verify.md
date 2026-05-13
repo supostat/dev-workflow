@@ -11,7 +11,7 @@ Before launching the subagent, orchestrator MUST:
 
 ## Step 8.1: Launch subagent
 
-Launch **Explore** subagent:
+Dispatch a general-purpose subagent with the verifier agent prompt (permission class: Explore):
 
 ```
 You are a verification agent. Check if the implementation matches the ORIGINAL TASK.

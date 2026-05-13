@@ -13,7 +13,7 @@ Before launching reviewers, orchestrator MUST:
 Then run `git diff` to capture actual changes.
 Pass CODE_DONE summary + diff + `engramContextBlock` + memory id bullet list (derived from `engramMemories.map(m => m.id)` for template substitution) to each reviewer.
 
-Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
+Dispatch 3 general-purpose subagents in parallel — one Agent tool call with 3 tool uses — each with a reviewer agent prompt (permission class: Explore):
 
 ## REVIEW:security
 

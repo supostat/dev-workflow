@@ -18,11 +18,11 @@ Before launching the subagent, the orchestrator inspects the prior `plan-review.
 - If `plan-review.output` contains `Verdict: APPROVED` (or no `Verdict:` line at all), this step is a **no-op pass-through**. The orchestrator emits a synthetic `PLAN_PATCHED` block with `Skipped: plan-review approved, no remarks` and advances directly to `code`. No subagent is launched.
 - If `plan-review.output` contains `Verdict: NEEDS_REVISION` and a non-empty `PLAN_REMARKS` block, proceed to Step 3.5.2.
 
-This guards against running a Full subagent for the common-case approved-plan path.
+This guards against dispatching a Full-class subagent for the common-case approved-plan path.
 
 ## Step 3.5.2: Launch subagent
 
-Launch **Full** subagent (coder agent in PLAN_FIX mode):
+Dispatch a general-purpose subagent with the coder agent prompt in PLAN_FIX mode (permission class: Full, scoped to `.dev-vault/plans/`):
 
 ```
 You are a coder agent in PLAN_FIX mode. Apply surgical edits to the saved plan file based on review remarks.

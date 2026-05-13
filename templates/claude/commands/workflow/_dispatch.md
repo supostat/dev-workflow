@@ -109,29 +109,41 @@ markdown (the prompt that tells the orchestrator how to run this step):
    resolved: no stepFile, no .dev-vault/workflow-steps/<name>.md, agent
    "<agent>" not in builtin table or .dev-vault/agents/`.
 
-## Subagent resolution
+## Permission-class resolution
 
-For each step, determine the subagent type:
+For each step, determine the **permission-class label** (`Explore` /
+`Full` / `bash`). The label drives prompt-level permission directives and
+the permission-matrix gate — it is **not** the Claude Code `subagent_type`
+parameter passed to the Agent tool. The conversational orchestrator
+always dispatches with `subagent_type: general-purpose` (the only type
+reachable from a surface with MCP access — built-in `Explore` is fully
+isolated from MCP per ADR 2026-05-13). Role enforcement lives in the
+agent template's `## Dispatch context` + `## Permissions (VIOLATION =
+ABORT)` preamble and is honoured by the model under explicit directive.
 
-1. **Explicit `subagent:` in YAML** — use that (`Explore` / `Full` / `bash`).
+1. **Explicit `subagent:` in YAML** — use that label (`Explore` / `Full` / `bash`).
 2. **Builtin table** — if the step's `agent` is in the table above:
    - reader, planner, plan-reviewer, reviewer, verifier → `Explore`
    - coder, committer → `Full`
    - tester → `bash` (orchestrator runs build/test directly)
-3. **Custom agent permissions** — read `.dev-vault/agents/<agent>.md`
+3. **Custom agent labels** — read `.dev-vault/agents/<agent>.md`
    frontmatter:
    - `write: []` (empty) → `Explore` (read-only)
    - `write: [<pattern>, ...]` (non-empty) → `Full`
 
-Orchestrator-only steps (`preflight`, `vault-updates`) have no subagent —
-the orchestrator executes their step file directly.
+Orchestrator-only steps (`preflight`, `vault-updates`) have no subagent
+dispatch — the orchestrator executes their step file directly.
 
 Enforcement algorithm (used at Step execution):
-1. Resolve subagent type via rules above.
-2. Map `step.agent` (or step name for orchestrator-only) to the permission
-   matrix row below.
-3. Assert subagent type compatible with the row (e.g. `reader` must be
+1. Resolve the permission-class label via the rules above.
+2. Map `step.agent` (or step name for orchestrator-only) to the
+   permission matrix row below.
+3. Assert the label is compatible with the row (e.g. `reader` must be
    `Explore`; `coder` must be `Full`). Abort on mismatch.
+4. Dispatch the agent via `subagent_type: general-purpose` with the
+   resolved agent template prompt — the template's `## Dispatch context`
+   preamble already encodes the permission directive that matches the
+   label.
 
 ## Output block resolution
 
@@ -201,9 +213,13 @@ Apply `step.gate` from YAML after the subagent completes:
 
 ## Permission matrix (violation = ABORT)
 
+The `Permission class` column is the role label resolved above — it
+drives prompt-level enforcement, not the dispatch parameter. The
+orchestrator always launches agents via `subagent_type: general-purpose`.
+
 ```
-Agent          Read   Write   Bash              Subagent
-─────────────  ─────  ──────  ────────────────  ────────
+Agent          Read   Write   Bash              Permission class
+─────────────  ─────  ──────  ────────────────  ────────────────
 reader         yes    no      no                Explore
 planner        yes    no      no                Explore
 plan-reviewer  yes    no      no                Explore
@@ -224,8 +240,8 @@ vault-updates  yes    no              no                yes (via MCP vault_recor
 ```
 
 Custom agents — permissions from their frontmatter (`read`, `write`,
-`shell`, `git`). Orchestrator enforces subagent type based on `write:`
-(see Subagent resolution).
+`shell`, `git`). Orchestrator resolves the permission-class label from
+`write:` (see Permission-class resolution).
 
 ## Start workflow run
 
@@ -258,7 +274,7 @@ the error to the user and stop. No state is written on failure.
 ```
 For each step in workflow.steps:
   1. Resolve orchestration markdown (Step resolution, above)
-  2. Resolve subagent type (Subagent resolution, above)
+  2. Resolve permission-class label (Permission-class resolution, above)
   3. Build the subagent prompt from the step file, inserting:
      - vault sections (stack / conventions / knowledge / gameplan) as
        static context
@@ -314,20 +330,22 @@ steps as reference.
 
 ## Enforcement
 
-Before running any subagent, verify its subagent type is compatible with
-the step's permissions per the matrix above. Concrete algorithm:
+Before running any subagent, verify the resolved permission-class label
+is compatible with the step's permissions per the matrix above. Concrete
+algorithm:
 
-1. Resolve subagent type (Subagent resolution section).
+1. Resolve permission-class label (Permission-class resolution section).
 2. Look up `step.agent` in the permission matrix.
-3. Assert subagent type matches the matrix row.
-4. At subagent launch, include the row's capabilities in the prompt; any
-   tool invocation outside those capabilities aborts the step.
+3. Assert the label matches the matrix row.
+4. Dispatch via `subagent_type: general-purpose`. The agent template's
+   `## Dispatch context` preamble carries the explicit per-role
+   permission directive that the model honours.
 
-Violation → ABORT with message: `agent "<agent>" launched as "<subagent>"
-but permission matrix allows "<expected>"`.
+Violation → ABORT with message: `agent "<agent>" resolved as permission
+class "<label>" but permission matrix allows "<expected>"`.
 
-| Role | Subagent | On violation |
-|------|----------|--------------|
+| Role | Permission class | On violation |
+|------|------------------|--------------|
 | reader / planner / plan-reviewer / reviewer / verifier | Explore | Write/Bash → ABORT |
 | coder | Full | git commit/push → ABORT |
 | tester | bash (orchestrator) | N/A (orchestrator runs build/test) |
@@ -355,7 +373,7 @@ Body layout:
 
 Enumerate each step in `workflow.steps` in order, one bullet per step:
 
-- **<STEP NAME UPPERCASED>** [<subagent type>] — <one-line summary derived from the step's output / verdict>
+- **<STEP NAME UPPERCASED>** [<permission class>] — <one-line summary derived from the step's output / verdict>
 
 ### Findings (if any)
 
@@ -380,7 +398,9 @@ shows whatever its YAML declares.
   once per pipeline and passes content to agents — do not re-read per step.
 - Context passes between steps as named blocks (step-output keyed by
   `<step.name>.output`).
-- Permission matrix is law. Explore agents only read.
+- Permission matrix is law. `Explore`-class agents only read; enforcement
+  is encoded as a directive in each agent's `## Dispatch context`
+  preamble and honoured under `subagent_type: general-purpose`.
 - CODER is the only agent allowed to modify project files.
 - REVIEWER never fixes code — only reports issues.
 - COMMIT performs `git add` + `git diff` + `git commit`, nothing else.

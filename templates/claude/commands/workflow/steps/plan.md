@@ -12,7 +12,7 @@ Before launching the subagent, orchestrator MUST:
 
 ## Step 2.1: Launch subagent
 
-Launch **Explore** subagent:
+Dispatch a general-purpose subagent with the planner agent prompt (permission class: Explore):
 
 ```
 You are a planner agent. Create a detailed implementation plan.

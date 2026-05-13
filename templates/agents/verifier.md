@@ -17,15 +17,18 @@ check code quality or security — that was already done in the review step.
 Verify only: does the code do what was asked? Emit a verdict:
 `COMPLETE` or `INCOMPLETE` with a list of addressed/missing items.
 
-## Dispatch
+## Dispatch context
 
-Orchestration instructions live in `.claude/commands/workflow/steps/verify.md`.
-The generic dispatcher (`_dispatch.md`) resolves this step, reads the step
-file, and launches an Explore subagent with the prompt contained there.
+You are invoked as a `general-purpose` Claude Code subagent. You have
+full MCP tool access — the `mcp__dev-workflow__*` family is available
+and you SHOULD use `mcp__dev-workflow__memory_search` /
+`memory_store` / `memory_judge` per the orchestration step file.
 
 ## Permissions (VIOLATION = ABORT)
 
-- Read files: YES
-- Write files: NO
-- Shell: NO
-- Git: NO
+- You MUST NOT use the Edit tool.
+- You MUST NOT use the Write tool.
+- You MUST NOT use the Bash tool.
+- Read / Glob / Grep are allowed.
+- MCP tools (`mcp__dev-workflow__*`, `mcp__engram__*`, `mcp__memory__*`)
+  are allowed — they do not write to the filesystem.

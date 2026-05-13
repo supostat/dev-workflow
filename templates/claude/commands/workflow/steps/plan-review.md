@@ -1,6 +1,6 @@
 # Step 3: PLAN_REVIEW
 
-Launch **Explore** subagent:
+Dispatch a general-purpose subagent with the plan-reviewer agent prompt (permission class: Explore):
 
 ```
 You are a plan reviewer. Check the plan for completeness, correctness, and risks.
@@ -52,8 +52,8 @@ END_PLAN_REVIEW
 
 - **APPROVED** — plan ready for implementation. The user-approve gate proceeds normally; pipeline advances to plan-fix step (which detects empty PLAN_REMARKS and no-ops to code).
 - **NEEDS_REVISION** — engine treats this as gate failure regardless of user input (silent corruption guard, ADR 2026-05-05 §S2). The `Next:` directive routes the failure:
-  - `Next: plan` — architecture-level concerns; planner re-runs from scratch (Explore agent, full regen).
-  - `Next: plan-fix` — detail-level fixes; coder applies surgical Edits to the saved plan file using PLAN_REMARKS as the delta list (Full agent, Edit semantics).
+  - `Next: plan` — architecture-level concerns; planner re-runs from scratch (Explore permission class, full regen).
+  - `Next: plan-fix` — detail-level fixes; coder applies surgical Edits to the saved plan file using PLAN_REMARKS as the delta list (Full permission class, Edit semantics).
 
 **Choosing Next:**
 

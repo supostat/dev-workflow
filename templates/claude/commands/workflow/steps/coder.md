@@ -12,7 +12,7 @@ Before launching the subagent, orchestrator MUST:
 
 ## Step 4.1: Launch subagent
 
-Launch **Full** subagent:
+Dispatch a general-purpose subagent with the coder agent prompt (permission class: Full — Edit/Write within plan scope enforced via the agent's preamble):
 
 ```
 You are a coder agent. The ONLY agent allowed to modify files.

@@ -13,7 +13,7 @@ Before launching the subagent, orchestrator MUST:
 
 ## Step 1.1: Launch subagent
 
-Launch **Explore** subagent with this prompt:
+Dispatch a general-purpose subagent with the reader agent prompt (permission class: Explore — read-only enforced via the agent's preamble):
 
 ```
 You are a reader agent. Gather context for the task below.
