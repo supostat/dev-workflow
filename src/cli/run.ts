@@ -44,7 +44,10 @@ import type { StepExecutor, GateChecker } from "../workflow/engine.js";
 import { WorkflowState } from "../workflow/state.js";
 import { getBuiltinWorkflow, getBuiltinWorkflows } from "../workflow/builtin.js";
 import { loadCustomWorkflows, parseWorkflowYaml } from "../workflow/loader.js";
-import { validateOnFailRouting } from "../workflow/validate.js";
+import {
+  validateCustomAgentPermissions,
+  validateOnFailRouting,
+} from "../workflow/validate.js";
 import type { PreparedAgent } from "../agents/types.js";
 import type { WorkflowDefinition, StepDefinition } from "../workflow/types.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
@@ -412,6 +415,7 @@ export function validate(args: string[]): void {
   }
 
   warnings.push(...validateOnFailRouting(workflow));
+  warnings.push(...validateCustomAgentPermissions(customAgentsDir));
 
   if (warnings.length > 0) {
     console.log("");

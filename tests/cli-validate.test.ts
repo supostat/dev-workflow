@@ -141,13 +141,60 @@ describe("validate CLI command", () => {
   it("does not warn for custom agent declared in .dev-vault/agents/", () => {
     mkdirSync(join(projectRoot, ".dev-vault", "agents"), { recursive: true });
     writeFileSync(join(projectRoot, ".dev-vault", "agents", "my-custom-agent.md"),
-      `---\nname: my-custom-agent\ndescription: Custom for project\nvault: []\n---\nBody\n`,
+      `---\nname: my-custom-agent\ndescription: Custom for project\nvault: []\n---\n## Permissions (VIOLATION = ABORT)\n\n- Read allowed.\n\nBody\n`,
       "utf-8");
     const filepath = writeWorkflowYaml(projectRoot,
       `name: flow\ndescription: test\nsteps:\n  - name: special\n    agent: my-custom-agent\n`);
     validate([filepath]);
     expect(joinedLog()).not.toContain("not found in bundled");
+    expect(joinedLog()).not.toContain('missing canonical "## Permissions');
   });
+
+  it("warns when custom agent in .dev-vault/agents/ lacks canonical Permissions block", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "agents"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "leaky.md"),
+      `---\nname: leaky\ndescription: missing Permissions block\nwrite: []\n---\nBody without canonical heading\n`,
+      "utf-8");
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: special\n    agent: leaky\n`);
+    validate([filepath]);
+    const log = joinedLog();
+    expect(log).toContain('custom agent "leaky" at .dev-vault/agents/leaky.md');
+    expect(log).toContain('missing canonical "## Permissions (VIOLATION = ABORT)" block');
+    expect(log).toContain("agent inherits full general-purpose tool surface");
+  });
+
+  it("scans ALL custom agents regardless of workflow references (project-hygiene scope)", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "agents"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "used.md"),
+      `---\nname: used\ndescription: referenced by workflow\n---\n## Permissions (VIOLATION = ABORT)\n\n- ok\n`,
+      "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "unused.md"),
+      `---\nname: unused\ndescription: NOT referenced by workflow\n---\nBody without canonical heading\n`,
+      "utf-8");
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: a\n    agent: used\n`);
+    validate([filepath]);
+    expect(joinedLog()).toContain('custom agent "unused" at .dev-vault/agents/unused.md');
+    expect(joinedLog()).not.toContain('custom agent "used"');
+  });
+
+  it("does not warn when .dev-vault/agents/ does not exist", () => {
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: a\n    agent: reader\n`);
+    validate([filepath]);
+    const log = joinedLog();
+    expect(log).not.toContain("missing canonical");
+    expect(log).not.toContain("failed to parse");
+  });
+
+  // Note: the helper's "failed to parse" path is currently unreachable through
+  // the `validate` CLI because `AgentRegistry` constructor (run.ts:384) throws
+  // uncaught on the same malformed file before our helper runs at line 415.
+  // The defensive try/catch in `validateCustomAgentPermissions` is kept for
+  // use from non-validate callers and for the day AgentRegistry becomes
+  // skip-and-warn — see debt
+  // `.dev-vault/debt/2026-05-13-agentregistry-constructor-throws-uncaught-on-malformed-agent-files...`.
 
   it("warns when stepFile contains .. (path traversal)", () => {
     const filepath = writeWorkflowYaml(projectRoot,

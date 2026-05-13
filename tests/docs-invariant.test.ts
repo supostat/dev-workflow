@@ -204,4 +204,15 @@ describe("docs-invariant: Path D subagent dispatch wording (commit dcda8bb..., A
       expect(content).not.toMatch(/^## Dispatch$/m);
     });
   }
+
+  // The canonical permissions block is the prompt-level enforcement that
+  // compensates for general-purpose's wide tool surface. A dispatched agent
+  // missing this block effectively gets unrestricted access regardless of
+  // its frontmatter declarations. Symmetric with the Dispatch context pin.
+  for (const agentFile of dispatchedAgents) {
+    it(`agents/${agentFile} contains canonical "## Permissions (VIOLATION = ABORT)" block`, () => {
+      const content = readSrc(`templates/agents/${agentFile}`);
+      expect(content).toMatch(/^## Permissions \(VIOLATION = ABORT\)$/m);
+    });
+  }
 });

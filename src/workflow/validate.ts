@@ -1,4 +1,10 @@
+import { existsSync, readdirSync } from "node:fs";
+import { basename, join } from "node:path";
+import { parseAgentFile } from "../agents/loader.js";
+import type { AgentDefinition } from "../agents/types.js";
 import type { StepDefinition, WorkflowDefinition } from "./types.js";
+
+const CANONICAL_PERMISSIONS_HEADING = "## Permissions (VIOLATION = ABORT)";
 
 type BuiltinSubagentType = "Explore" | "Full" | "bash";
 
@@ -79,5 +85,53 @@ export function validateOnFailRouting(workflow: WorkflowDefinition): string[] {
   }
 
   warnings.push(...detectOnFailCycles(workflow));
+  return warnings;
+}
+
+/**
+ * Validate that every custom agent template under `.dev-vault/agents/` carries
+ * the canonical `## Permissions (VIOLATION = ABORT)` block.
+ *
+ * After Path D (ADR `2026-05-13-conversational-workflow-subagents-are-mcp-isolated`)
+ * the conversational orchestrator dispatches every pipeline subagent via
+ * `subagent_type: general-purpose`, which has the full Claude Code tool surface
+ * (Edit, Write, Bash, MCP). Role enforcement is now carried by the prompt-level
+ * Permissions block in the agent template. A custom user agent that omits the
+ * block inherits the full surface regardless of its frontmatter `write` /
+ * `shell` / `git` declarations — those declarations are documentation only at
+ * the conversational layer.
+ *
+ * Missing directory → no warnings (silent). Unreadable directory → no warnings.
+ * Per-file parse error → one `failed to parse` warning, siblings continue.
+ */
+export function validateCustomAgentPermissions(customAgentsDir: string): string[] {
+  if (!existsSync(customAgentsDir)) return [];
+
+  let entries: string[];
+  try {
+    entries = readdirSync(customAgentsDir).filter((entry) => entry.endsWith(".md"));
+  } catch {
+    return [];
+  }
+
+  const warnings: string[] = [];
+  for (const entry of entries) {
+    const filepath = join(customAgentsDir, entry);
+    let definition: AgentDefinition;
+    try {
+      definition = parseAgentFile(filepath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      warnings.push(
+        `custom agent ".dev-vault/agents/${basename(filepath)}" failed to parse: ${message}`,
+      );
+      continue;
+    }
+    if (!definition.systemPrompt.includes(CANONICAL_PERMISSIONS_HEADING)) {
+      warnings.push(
+        `custom agent "${definition.name}" at .dev-vault/agents/${basename(filepath)} is missing canonical "${CANONICAL_PERMISSIONS_HEADING}" block — agent inherits full general-purpose tool surface regardless of frontmatter write/shell/git declarations`,
+      );
+    }
+  }
   return warnings;
 }
