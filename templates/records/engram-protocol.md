@@ -3,7 +3,7 @@
 Search/store/chains/tags/failure-store handled automatically by workflow engine.
 These rules apply to **mid-work agent behavior** — when Claude makes decisions during task execution.
 
-API reference: `~/.engram/AGENT.md`
+API reference: `<project>/.engram/AGENT.md` (bundled by `engram init`; canonical source lives at the engram repo root as `AGENT.md`)
 
 ### Tool surface — proxy vs direct
 
