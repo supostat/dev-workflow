@@ -94,6 +94,8 @@ Format: `- <memory_id>: <score 0.0-1.0> — <brief explanation>`
 
 Score scale: 0.8-1.0 applied, 0.5-0.7 relevant, 0.2-0.4 marginal, 0.0-0.1 not useful.
 
+If no memories were retrieved (Retrieved memories list is empty or `(none)`), emit `(no memories retrieved for query N)` on its own line under Judgments. Do NOT fabricate placeholder lines like `none-returned: 0.1 — ...` — the parser rejects unknown memory IDs (see `src/lib/engram-feedback.ts:55`), so placeholder lines are silently dropped and produce zero recorded judgments.
+
 Retrieved memories:
 {{engramMemoryIds}}
 

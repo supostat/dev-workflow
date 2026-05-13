@@ -110,6 +110,8 @@ END_VERIFY
 Retrieved memories:
 [engramMemoryIds as bullets, or "(none)"]
 
+If no memories were retrieved (Retrieved memories list is empty or `(none)`), emit `(no memories retrieved for query N)` on its own line under Judgments. Do NOT fabricate placeholder lines like `none-returned: 0.1 — ...` — the parser rejects unknown memory IDs (see `src/lib/engram-feedback.ts:55`), so placeholder lines are silently dropped and produce zero recorded judgments.
+
 Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
 

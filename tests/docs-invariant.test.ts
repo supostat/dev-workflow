@@ -216,3 +216,47 @@ describe("docs-invariant: Path D subagent dispatch wording (commit dcda8bb..., A
     });
   }
 });
+
+describe("docs-invariant: Engram Feedback empty-case guidance (run-432abc570e51)", () => {
+  // After run-8e26aa913c50 surfaced a coverage reviewer emitting a placeholder
+  // `none-returned: 0.1 — ...` line when memory_search returned 0 results, the
+  // templates were updated to explicitly tell subagents to emit
+  // `(no memories retrieved for query N)` instead. Regex anchors on two stable
+  // substrings ("no memories retrieved" + "placeholder") so partial reverts
+  // still fail the test.
+  const EMPTY_CASE_REGEX = /no memories retrieved[\s\S]*?placeholder/ims;
+
+  const EMPTY_CASE_FILES = [
+    "templates/agents/reader.md",
+    "templates/agents/planner.md",
+    "templates/agents/coder.md",
+    "templates/agents/reviewer.md",
+    "templates/agents/architect.md",
+    "templates/agents/debugger.md",
+    "templates/claude/commands/workflow/steps/read.md",
+    "templates/claude/commands/workflow/steps/plan.md",
+    "templates/claude/commands/workflow/steps/plan-fix.md",
+    "templates/claude/commands/workflow/steps/coder.md",
+    "templates/claude/commands/workflow/steps/review.md",
+    "templates/claude/commands/workflow/steps/verify.md",
+  ];
+
+  it("EMPTY_CASE_FILES has exactly 12 entries (sanity)", () => {
+    expect(EMPTY_CASE_FILES.length).toBe(12);
+  });
+
+  for (const path of EMPTY_CASE_FILES) {
+    it(`${path} contains empty-case Engram guidance`, () => {
+      expect(readSrc(path)).toMatch(EMPTY_CASE_REGEX);
+    });
+  }
+
+  it("review.md contains empty-case guidance in all 3 reviewer blocks", () => {
+    // The three reviewer prompt blocks (security/quality/coverage) are
+    // intentionally parallel — losing the guidance from just one is the
+    // exact regression the docs-invariant guards against.
+    const content = readSrc("templates/claude/commands/workflow/steps/review.md");
+    const matches = content.match(/no memories retrieved[\s\S]*?placeholder/gims);
+    expect(matches?.length).toBe(3);
+  });
+});
