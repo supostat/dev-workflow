@@ -5,9 +5,9 @@
 Before launching the subagent, orchestrator MUST:
 
 1. Call `mcp__dev-workflow__memory_search({ query: "plan " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock` (bullet list `- [<type>] <context> — <action>`, or `"(none)"`).
+2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 2.2. Build `engramContextBlock` (bullet list `- [<type>] <context> — <action>`, or `"(none)"`).
 3. Note any `antipattern` records — the planner MUST address them explicitly.
-4. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable, log `[engram] search skipped for Step 2` to stderr, set `engramMemoryIds = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+4. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable, log `[engram] search skipped for Step 2` to stderr, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
 
 ## Step 2.1: Launch subagent
 
@@ -110,14 +110,17 @@ Retrieved memories:
 Judgments:
 ```
 
-## Step 2.2: Parse feedback + judge (orchestrator, AFTER subagent)
+## Step 2.2: Apply judgments via step_complete (orchestrator, AFTER subagent)
 
 After subagent returns `output`:
 
-1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. For each `{id, score, explanation}` in `result.judgments`: `mcp__dev-workflow__memory_judge({ memory_id: id, score, explanation })`.
-3. For each `id` in `result.fallbackIds`: `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback for this memory" })`.
-4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 2` to stderr. Continue.
+1. Call `mcp__dev-workflow__step_complete({ stepName: "plan", beforeSearchMemoryIds: engramMemories, output })`.
+2. Result includes:
+   - `judgmentsApplied`: count of explicit judgments parsed from the `## Engram Feedback` section
+   - `fallbackIds`: ids without agent feedback (NO blanket fallback applied — Phase 1 design value per ADR 2026-05-13). Unjudged memories remain visible in `pendingJudgments` daemon counter.
+   - `antipatternIdsInBefore` + `antipatternJudgmentDistribution`: observability fields for Phase 1.5 design-by-data decision
+3. If `fallbackIds.length > 0`: log `[engram] step plan: <N> unjudged memories: <ids>` to stderr.
+4. **Fail-safe:** if `step_complete` tool unavailable, log `[engram] step_complete skipped for Step 2` to stderr. Continue — do not abort pipeline.
 
 **Phase mode addition:** if task is a phase file, add to prompt:
 ```

@@ -5,12 +5,12 @@
 Before launching reviewers, orchestrator MUST:
 
 1. Call `mcp__dev-workflow__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock`.
+2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 5.2. Build `engramContextBlock`.
 3. The SAME memory set is shared across all 3 reviewers — each reviewer provides their own judgments in their own output.
-4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemoryIds = []`, continue.
+4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemories = []`, continue.
 
 Then run `git diff` to capture actual changes.
-Pass CODE_DONE summary + diff + `engramContextBlock` + `engramMemoryIds` to each reviewer.
+Pass CODE_DONE summary + diff + `engramContextBlock` + memory id bullet list (derived from `engramMemories.map(m => m.id)` for template substitution) to each reviewer.
 
 Launch **3 Explore subagents in parallel** (one Agent call with 3 tool uses):
 
@@ -183,14 +183,14 @@ Retrieved memories:
 Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
 
-## Step 5.2: Parse feedback + judge (orchestrator, AFTER all 3 reviewers)
+## Step 5.2: Apply judgments via step_complete (orchestrator, AFTER all 3 reviewers)
 
 After all 3 reviewers return their outputs (security, quality, coverage):
 
-1. For EACH reviewer output, call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. Three reviewers × same memory set = 3 judgments per memory. Apply each: `mcp__dev-workflow__memory_judge({ memory_id, score, explanation })`. Engram daemon will aggregate.
-3. For IDs in `fallbackIds` of ALL 3 reviewers (i.e., no reviewer judged): `mcp__dev-workflow__memory_judge({ memory_id: id, score: 0.5, explanation: "No agent feedback from any reviewer" })`.
-4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 5`. Continue.
+1. For EACH reviewer output, call `mcp__dev-workflow__step_complete({ stepName: "review", beforeSearchMemoryIds: engramMemories, output: <reviewer output> })`.
+2. Three calls with same `stepName="review"` and same `engramMemories` — engram daemon aggregates scores per memory automatically across reviewers (ADR 2026-05-13).
+3. NO blanket fallback per ADR 2026-05-13 — each call returns its own `fallbackIds`. To find memories that ZERO reviewers judged, intersect the three `fallbackIds` arrays. If the intersection is non-empty, log to stderr: `[engram] step review: <N> memories unjudged by all 3 reviewers: <ids>`.
+4. **Fail-safe:** if `step_complete` tool unavailable, log `[engram] step_complete skipped for Step 5` to stderr. Continue — do not abort pipeline.
 
 ## Step 5.3: Extract gate body (orchestrator, BEFORE gate check)
 

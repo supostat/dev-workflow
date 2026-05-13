@@ -5,8 +5,8 @@
 Before launching the subagent, orchestrator MUST:
 
 1. Call `mcp__dev-workflow__memory_search({ query: "verify " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemoryIds` and build `engramContextBlock`.
-3. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 8`, set empty, continue.
+2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 8.2. Build `engramContextBlock`.
+3. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 8`, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`, continue.
 
 ## Step 8.1: Launch subagent
 
@@ -112,14 +112,17 @@ Retrieved memories:
 Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 ```
 
-## Step 8.2: Parse feedback + judge (orchestrator, AFTER subagent)
+## Step 8.2: Apply judgments via step_complete (orchestrator, AFTER subagent)
 
 After subagent returns `output`:
 
-1. `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. Per judgment: `mcp__dev-workflow__memory_judge({ memory_id, score, explanation })`.
-3. Per fallback id: `mcp__dev-workflow__memory_judge({ memory_id, score: 0.5, explanation: "No agent feedback" })`.
-4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 8`. Continue.
+1. Call `mcp__dev-workflow__step_complete({ stepName: "verify", beforeSearchMemoryIds: engramMemories, output })`.
+2. Result includes:
+   - `judgmentsApplied`: count of explicit judgments parsed from the `## Engram Feedback` section
+   - `fallbackIds`: ids without agent feedback (NO blanket fallback applied — Phase 1 design value per ADR 2026-05-13). Unjudged memories remain visible in `pendingJudgments` daemon counter.
+   - `antipatternIdsInBefore` + `antipatternJudgmentDistribution`: observability fields for Phase 1.5 design-by-data decision
+3. If `fallbackIds.length > 0`: log `[engram] step verify: <N> unjudged memories: <ids>` to stderr.
+4. **Fail-safe:** if `step_complete` tool unavailable, log `[engram] step_complete skipped for Step 8` to stderr. Continue — do not abort pipeline.
 
 **COMPLETE** → Step 9.
 

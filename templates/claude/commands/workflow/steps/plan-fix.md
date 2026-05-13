@@ -7,8 +7,8 @@ Apply surgical edits to the saved plan based on review remarks.
 Before launching the subagent, orchestrator MUST:
 
 1. Call `mcp__dev-workflow__memory_search({ query: "plan-fix " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemoryIds = results.map(m => m.id)` and build `engramContextBlock`.
-3. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 3.5`, continue.
+2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 3.5.3. Build `engramContextBlock`.
+3. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 3.5`, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`, continue.
 
 ## Step 3.5.1: Skip-if-no-remarks check (orchestrator, BEFORE subagent)
 
@@ -99,14 +99,17 @@ Retrieved memories:
 Judgments:
 ```
 
-## Step 3.5.3: Parse feedback + judge (orchestrator, AFTER subagent)
+## Step 3.5.3: Apply judgments via step_complete (orchestrator, AFTER subagent)
 
 After subagent returns `output`:
 
-1. Call `mcp__dev-workflow__parse_engram_feedback({ output, expectedMemoryIds: engramMemoryIds })`.
-2. Per judgment: `mcp__dev-workflow__memory_judge({ memory_id, score, explanation })`.
-3. Per fallback id: `mcp__dev-workflow__memory_judge({ memory_id, score: 0.5, explanation: "No agent feedback for this memory" })`.
-4. **Fail-safe:** if tools unavailable, log `[engram] feedback skipped for Step 3.5`. Continue.
+1. Call `mcp__dev-workflow__step_complete({ stepName: "plan-fix", beforeSearchMemoryIds: engramMemories, output })`.
+2. Result includes:
+   - `judgmentsApplied`: count of explicit judgments parsed from the `## Engram Feedback` section
+   - `fallbackIds`: ids without agent feedback (NO blanket fallback applied — Phase 1 design value per ADR 2026-05-13). Unjudged memories remain visible in `pendingJudgments` daemon counter.
+   - `antipatternIdsInBefore` + `antipatternJudgmentDistribution`: observability fields for Phase 1.5 design-by-data decision
+3. If `fallbackIds.length > 0`: log `[engram] step plan-fix: <N> unjudged memories: <ids>` to stderr.
+4. **Fail-safe:** if `step_complete` tool unavailable, log `[engram] step_complete skipped for Step 3.5` to stderr. Continue — do not abort pipeline.
 
 After plan-fix completes, the engine advances to the next step in the array (`code`). The patched plan is now the source of truth for code implementation.
 
