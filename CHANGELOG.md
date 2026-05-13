@@ -5,6 +5,259 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-13
+
+Two-day minor release accumulating 27 commits since v1.0.1. Three new
+MCP tools that close the long-standing split-brain between the slash
+orchestration path and the programmatic `WorkflowEngine.executeLoop`
+path; a `phase` field on `WorkflowRun` with auto-tagged engram
+correlation; three new `engram-stats` analytic sections; a `--runs all`
+syntax for unbounded output; vault snapshots/rollback as a first-class
+CLI; structured `--json` output on `dev-workflow status` and
+`workflow run --dry-run`; OSS hygiene templates and a migration guide.
+No removed CLI commands, no removed MCP tools, no breaking changes to
+existing schemas.
+
+### Added
+
+- **`mcp__dev-workflow__step_complete`** finalizes a pipeline step:
+  parses the agent's `## Engram Feedback` block server-side, applies
+  each judgment via `engramJudge` (silent fail-safe, capped at 20 per
+  call), and emits antipattern observability (ids retrieved at BEFORE
+  search + score-distribution buckets). NO blanket fallback — memories
+  without explicit feedback land in `fallbackIds` for orchestrator-level
+  handling, preserving "pending count" as a true integrity metric.
+  Defense-in-depth at the MCP boundary: UUID regex on every memory id,
+  non-empty memoryType, output length cap (50 KB), JUDGE_CAP=20.
+  Closes the judgment-loop gap on the slash orchestration path —
+  `WorkflowEngine` already auto-judged on the `dev-workflow run` path,
+  but conversational orchestrators were systematically skipping the
+  per-step parse+judge instructions. One MCP call replaces five inline
+  step-file directives. (`348ed12`)
+
+- **`mcp__dev-workflow__workflow_start`** mirrors `WorkflowEngine.start`
+  core logic for the slash orchestration path: generates a
+  `run-<12hex>` id via `crypto.randomUUID`, resolves the workflow
+  definition (custom → templates → builtins), builds the
+  `WorkflowRun` with all per-step `StepState` slots initialized,
+  persists to `<vault>/workflow-state/runs/run-<id>.json`, sets
+  `ENGRAM_TRACE_FILE` and `ENGRAM_RUN_ID` env vars for downstream
+  trace correlation. Validation at the MCP boundary: workflowName
+  regex (E001), taskDescription non-empty (E002), taskId pattern
+  `^task-\d{3,}$` if provided (E003), unknown workflow (E004), step
+  name regex on each definition step (E005, prototype-pollution
+  guard). Differs from the engine's `generateRunId` (date-seq) — uses
+  prefixed-hex for concurrent-runs friendliness. Existing
+  `workflow_create` is unrelated and unchanged (registers custom
+  workflow YAML). (`0a8a47e`)
+
+- **`mcp__dev-workflow__step_start`** updates `run.currentStep` at the
+  start of each pipeline step so engram trace tags reflect the active
+  step instead of staying frozen on the run's initial currentStep
+  value. Symmetric pair with `step_complete`. Validation: stepName
+  regex (E001), runId regex `^run-[a-f0-9]{12}$` (E002), no active
+  run (E003), run not in state — fail loud (E004). Resolution order
+  for runId: explicit param → `ENGRAM_RUN_ID` env → throw. Without
+  this, every memory_search/judge event tagged `step:<first-step>`
+  for the entire run on the slash path. (`06eda14`)
+
+- **`phase` field on `WorkflowRun`** plus `phase:<name>` auto-tag on
+  every engram event. New `src/lib/gameplan-parser.ts` extracts the
+  active phase from `gameplan.md` via a hybrid sourcing strategy:
+  frontmatter `current-phase` field first (structured), `**Active:
+  \`<name>\`**` body marker fallback (compatible with existing
+  gameplans). Both sources validated against a strict kebab-case regex
+  before becoming a tag (defense against prototype-pollution
+  candidates like `__proto__`). Snapshot semantics — captured at
+  run-init, persisted in the run JSON, mid-run gameplan edits do not
+  propagate. Both `WorkflowEngine.start` and the new `workflow_start`
+  handler populate the field. (`6c5441a`)
+
+- **Three new `engram-stats` analytic sections**, all derived from the
+  existing trace JSONL files (no schema change):
+  - `crossRunReuse` — global `{ total, reused, percent }` for
+    pattern/antipattern memories retrieved in one run and judged in a
+    different one. Filters by `memory_type` inside the search result
+    array (not the search event itself, since memory_search params
+    carry no type). Same-run reuse excluded — that's a feedback loop,
+    not knowledge transfer.
+  - `perStepHitRate` — global aggregate keyed by step name:
+    `{ searches, nonEmpty, percent }`. Non-empty detection via
+    `JSON.parse + Array.isArray + length > 0`, correctly classifying
+    the `null` literal (4 chars, valid JSON but not array) as empty.
+  - `missingStepComplete` — per `(run, step)` tuple where memory_search
+    fired with non-empty results but no memory_judge followed (visible
+    signature of a skipped `step_complete` handler call). Sort: runId
+    descending, step ascending as tiebreaker.
+  All three pure aggregators extracted to
+  `src/lib/engram-stats-aggregators.ts` to keep `engram-stats.ts`
+  under the 300-LOC convention. (`7a92f3b`)
+
+- **`dev-workflow engram-stats` CLI dashboard.** Aggregates last N runs
+  from local trace JSONL + run JSON artifacts (offline-safe, no
+  daemon required). Six sections: daemon health (live engramHealth),
+  byMethod (search/store/judge counts + errors + avg ms), byMemoryType,
+  byStep, recentRuns, warnings (store>0+judge=0 = missed feedback,
+  vaultRecord>0+store=0 = mirror miss). Plus best-effort live
+  enrichment via `engramSearch(branch:<current>)` for top 5 recent
+  memories. Stable `EngramStats` JSON contract for tooling. New
+  `/vault:engram-stats` slash wrapper. (`2e2b94e`)
+
+- **Vault snapshots + rollback**: `dev-workflow snapshot
+  {create|list|show|rollback|delete}` for point-in-time vault
+  recovery. Storage under `<vault>/snapshots/<name>/` with a
+  `manifest.json` (`SnapshotMeta` interface stable). Exclusions:
+  `snapshots/` recursive, `.edit-log.json`, `.profile-state`,
+  `*.engram-trace.jsonl`. Rollback always creates a safety snapshot
+  first (reversible). Name validation `/^[a-z0-9][a-z0-9._-]{0,79}$/i`
+  (path-traversal guard). Symlinks deliberately skipped on both
+  snapshot and rollback (security: outward leak + inward
+  overwrite attack vectors). New `/vault:snapshot` and
+  `/vault:rollback` slash wrappers — the rollback slash always shows
+  a pre-rollback manifest preview and requires exact `yes` (no fuzzy
+  match). (`974295b`, `5604211`)
+
+- **`dev-workflow workflow run --dry-run --json`**. Enhanced dry-run
+  preview includes subagent resolution (Explore/Full/bash/orch),
+  input refs, outputBlock, stepFile, gateCommand, maxAttempts. New
+  `--json` mode for tooling integration — stable `DryRunPreview` and
+  `DryRunStepPreview` interfaces exported. (`22d67e0`)
+
+- **`dev-workflow status --json`**. Structured-output mode for CI
+  dashboards, status bars, scripts. Extracted `collectStatus()` →
+  typed `StatusSnapshot` (exported). Post-1.0.x field shape locked,
+  additive-only. Error path keeps stderr + exitCode=1 (stdout stays
+  parseable). (`b7093c6`)
+
+- **`dev-workflow engram-stats --runs all`** explicit unbounded
+  override. `parseRunCount` accepts the literal string `all` and
+  returns `Infinity`; `slice(0, Infinity)` returns the full array.
+  Case-sensitive (lowercase only) per Unix flag convention. Numeric
+  path `--runs N` unchanged; invalid non-numeric values still fall
+  back to the default 10. (`65f6b57`)
+
+- **`examples/` gallery + OSS hygiene templates + migration guide.**
+  Four runnable example workflows demonstrating distinct
+  customization patterns (custom gate command, docs-invariant gate,
+  no-review minimal flow, read-only security audit). New
+  `CONTRIBUTING.md`, simplified `CODE_OF_CONDUCT.md`,
+  `.github/ISSUE_TEMPLATE/{bug_report,feature_request,config}.md`
+  (config disables blank issues + links Security Advisory),
+  `.github/PULL_REQUEST_TEMPLATE.md`. New
+  `website/content/docs/migrating-to-v1.mdx` documents 3 paths for
+  v1.0.0 `gateCommand` breaking change (allowlist PR, multi-step
+  split, script file). (`0d39159`)
+
+### Changed
+
+- **Step files routed through the `step_complete` MCP boundary.** All
+  six step files (`read`, `plan`, `plan-fix`, `coder`, `review`,
+  `verify`) replaced their inline `Step X.2` "parse feedback + judge"
+  blocks with a single `step_complete({stepName, runId,
+  beforeSearchMemoryIds, output})` call. `review.md` uses a 3-call
+  variant — same `stepName="review"` and same `engramMemories` across
+  three reviewer outputs; engram daemon aggregates scores per memory
+  automatically. (`ec01f75`)
+
+- **All six step files start each step with `step_start`.** Pattern:
+  `Step X.0` first item is `step_start({stepName, runId})`, then
+  `memory_search`. `review.md` calls `step_start` once for the whole
+  review (three reviewers share the same `step:review` tag). Without
+  this, every BEFORE-search would inherit the run's initial
+  currentStep value. (`06eda14`)
+
+- **`loadPipelineContext` reads `ENGRAM_RUN_ID` env with priority over
+  `WorkflowState.loadCurrent()`.** Closes the concurrent-runs caveat:
+  parallel orchestrator instances now each inherit their own run id
+  through the env, attributing memory tags to the correct run instead
+  of the most-recent shared one. Empty-string env treated as unset
+  (defensive). When env is set but `state.load(envRunId)` fails, the
+  context returns `{ branch, runId }` (orphan-trace mode) — env runId
+  wins over state for the runId field specifically. (`6144761`)
+
+- **`WorkflowState` run-state directory migrated from
+  `<vault>/workflows/run-*.json` to `<vault>/workflow-state/runs/`.**
+  Three surfaces previously disagreed on the path:
+  `WorkflowState.save` wrote to `workflows/` mixed with custom-
+  workflow YAML, `ENGRAM_TRACE_FILE` env pointed at
+  `workflow-state/runs/`, and `engram-stats` filtered runs there.
+  Aligned on the latter. `workflows/` is now reserved for YAML
+  definitions from `workflow_create`. (Absorbed in `0a8a47e`.) Six
+  existing test files updated to use the new path. No legacy run JSON
+  files existed at the old location on any audited install.
+
+- **`_dispatch.md` opens with a top-of-file MANDATORY FIRST ACTION
+  rule.** Requires `workflow_start` to be the orchestrator's first
+  tool call — before any file read, subagent launch, or bash command.
+  The deeper "Start workflow run" section already existed but sat at
+  line 218 of a 350-line dispatcher prompt; compressed-pipeline
+  reading routinely skipped it. The top-of-file directive states the
+  rule, the cost of skipping it (no run state, orphaned traces, zero
+  metrics), and the failure-mode recovery protocol (abort, call
+  retroactively, resume from PREFLIGHT). (`01c4b65`)
+
+- **`engram-protocol.md` `AGENT.md` path fixed for per-project deploy.**
+  Template injected into downstream `CLAUDE.md` referenced the legacy
+  global `~/.engram/AGENT.md`. After engram's per-project pivot,
+  `AGENT.md` lives at `<project>/.engram/AGENT.md` (bundled by
+  `engram init`). One-line replacement. (`e92a514`)
+
+- **`memory_store` error message names every missing field.** Before:
+  the handler threw `Missing required parameter: action` on the first
+  field check, opaque to the calling agent which often retried with a
+  different single-field shape. Now: aggregates `context / action /
+  result / type`, reports all missing/empty fields at once, points
+  back to `tools/list` for the full schema with descriptions. Three
+  tests pin the message format. (`ca744d3`)
+
+### Fixed
+
+- **`parseTasksFromPhase` regex `\Z` → `$`.** Phase files without a
+  trailing newline parsed as empty because `\Z` is not supported in
+  JavaScript regex (silently matched the literal character `Z`). Five
+  test fixtures cleaned of `## End` workaround. Regression test for
+  no-trailing-newline edge case. (`eac23a7`)
+
+### Internal
+
+- **`src/mcp/handlers.ts` split from 579 LOC to a 190-LOC dispatcher +
+  seven domain files** (vault / task / agent / workflow / memory /
+  profile / helpers). Public API unchanged — class signature,
+  constructor, `handle()` method all preserved. Domain functions take
+  explicit deps as args; the dispatcher holds the shared graph.
+  Namespace imports `import * as vault from "./handlers/vault.js"`
+  keep the switch statement readable. (`b596cf0`)
+
+- **JSDoc on `addRunToBucket` helper** in `engram-stats-aggregators.ts`
+  expanded with parameter intent, mutation contract, and the
+  algorithm-vs-storage rationale for `Map<runId, Set<memoryId>>` over
+  alternative structures. (`9377d55`)
+
+### Tests / governance
+
+- **`SECURITY.md` vulnerability disclosure policy.** Private GitHub
+  Security Advisory preferred + email fallback. SLA: 72h ack / 7d
+  triage / 14d CRITICAL fix. Scope covers shell injection, prompt
+  injection, path traversal, prototype pollution, agent permission
+  escapes, supply-chain. Historic v1.0.0 / v1.0.1 fixes referenced as
+  seed. (`02c9ca3`)
+
+- **`@vitest/coverage-v8` baseline thresholds** in `vitest.config.ts`:
+  lines 80 / functions 82 / statements 78 / branches 71 — set 2pp
+  below measured to provide a regression floor. New `pnpm
+  test:coverage` script. (`02c9ca3`)
+
+- **CLI test backfill batch — +88 tests / six new files.** Each file
+  mirrors the `cli-init.test.ts` real-fixture pattern (mkdtempSync +
+  execFileSync git init + console capture). Coverage jumped from
+  68.14% lines to 82.14% on this batch. Files covered:
+  `cli/task.ts` (26 tests, all seven subcommands), `cli/doctor.ts`
+  (15), `cli/status.ts` (11), `cli/search.ts` (10),
+  `cli/vault-io.ts` (13 round-trip), `cli/serve.ts` (2 wiring),
+  `tasks/phase-tasks.ts` (11). Bug found during backfill:
+  `parseTasksFromPhase` regex `\Z` (fixed in `eac23a7`).
+  (`26b8247`, `5da202c`, `0ae1860`, `1a6b985`, `4c0aa8f`, `307c453`)
+
 ## [1.0.1] — 2026-05-11
 
 Same-day patch on top of v1.0.0. Eight additive / bug-fix commits — no
