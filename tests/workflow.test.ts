@@ -83,7 +83,7 @@ describe("WorkflowState", () => {
   beforeEach(() => {
     projectRoot = join(tmpdir(), `dev-vault-state-test-${Date.now()}`);
     vaultPath = join(projectRoot, ".dev-vault");
-    mkdirSync(join(vaultPath, "workflows"), { recursive: true });
+    mkdirSync(join(vaultPath, "workflow-state", "runs"), { recursive: true });
     state = new WorkflowState(vaultPath);
   });
 
@@ -171,7 +171,7 @@ describe("WorkflowState", () => {
   });
 
   it("load() strips __proto__ key from poisoned JSON (no prototype pollution)", () => {
-    const filepath = join(vaultPath, "workflows", "run-poison.json");
+    const filepath = join(vaultPath, "workflow-state", "runs", "run-poison.json");
     writeFileSync(filepath,
       '{"id":"run-poison","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"__proto__":{"polluted":"YES"}}',
       "utf-8");
@@ -181,7 +181,7 @@ describe("WorkflowState", () => {
   });
 
   it("load() strips constructor and prototype keys too", () => {
-    const filepath = join(vaultPath, "workflows", "run-poison2.json");
+    const filepath = join(vaultPath, "workflow-state", "runs", "run-poison2.json");
     writeFileSync(filepath,
       '{"id":"run-poison2","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"constructor":{"polluted2":"x"},"prototype":{"polluted3":"x"}}',
       "utf-8");
@@ -193,7 +193,7 @@ describe("WorkflowState", () => {
   });
 
   it("list() also strips reserved keys", () => {
-    const filepath = join(vaultPath, "workflows", "run-poison-list.json");
+    const filepath = join(vaultPath, "workflow-state", "runs", "run-poison-list.json");
     writeFileSync(filepath,
       '{"id":"run-poison-list","workflowName":"x","taskId":null,"taskDescription":"t","currentStep":"a","startedAt":"2026-01-01T00:00:00Z","completedAt":null,"status":"completed","steps":{},"__proto__":{"listPollution":"BAD"}}',
       "utf-8");

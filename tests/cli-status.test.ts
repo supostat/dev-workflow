@@ -137,7 +137,7 @@ describe("status CLI — E2E", () => {
   });
 
   it("active workflow run: shows workflow name + step + status", () => {
-    mkdirSync(join(projectRoot, ".dev-vault", "workflows"), { recursive: true });
+    mkdirSync(join(projectRoot, ".dev-vault", "workflow-state", "runs"), { recursive: true });
     writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
     const run = {
       id: "run-2026-05-11-001",
@@ -154,7 +154,7 @@ describe("status CLI — E2E", () => {
         code: { status: "running", output: null, startedAt: null, completedAt: null, durationMs: null, attempt: 1, engramMemoryId: null, error: null },
       },
     };
-    writeFileSync(join(projectRoot, ".dev-vault", "workflows", "run-2026-05-11-001.json"),
+    writeFileSync(join(projectRoot, ".dev-vault", "workflow-state", "runs", "run-2026-05-11-001.json"),
       JSON.stringify(run), "utf-8");
     status();
     const out = logJoined();
@@ -244,7 +244,7 @@ describe("status CLI — E2E", () => {
   });
 
   it("--json active workflow: workflow object with all expected fields", () => {
-    mkdirSync(join(projectRoot, ".dev-vault", "workflows"), { recursive: true });
+    mkdirSync(join(projectRoot, ".dev-vault", "workflow-state", "runs"), { recursive: true });
     writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "---\nupdated: 2026-01-01\n---\nx\n", "utf-8");
     const run = {
       id: "run-json-test",
@@ -260,7 +260,7 @@ describe("status CLI — E2E", () => {
         code: { status: "running", output: null, startedAt: null, completedAt: null, durationMs: null, attempt: 1, engramMemoryId: null, error: null },
       },
     };
-    writeFileSync(join(projectRoot, ".dev-vault", "workflows", "run-json-test.json"),
+    writeFileSync(join(projectRoot, ".dev-vault", "workflow-state", "runs", "run-json-test.json"),
       JSON.stringify(run), "utf-8");
     status(["--json"]);
     const json = parseJsonOutput();

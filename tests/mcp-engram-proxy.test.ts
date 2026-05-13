@@ -67,7 +67,7 @@ function writeActiveRun(vaultPath: string, fields: {
   taskId?: string | null;
   status?: string;
 }): void {
-  const workflowsDir = join(vaultPath, "workflows");
+  const workflowsDir = join(vaultPath, "workflow-state", "runs");
   mkdirSync(workflowsDir, { recursive: true });
   const run = {
     id: fields.id ?? "run-001",
@@ -167,7 +167,7 @@ describe("loadPipelineContext", () => {
   it("falls back to branch-only when state directory has corrupt JSON", () => {
     const env = createTestContext();
     projectRoot = env.projectRoot;
-    const workflowsDir = join(env.context.vaultPath, "workflows");
+    const workflowsDir = join(env.context.vaultPath, "workflow-state", "runs");
     mkdirSync(workflowsDir, { recursive: true });
     writeFileSync(join(workflowsDir, "run-bad.json"), "{ broken json", "utf-8");
     // WorkflowState skips corrupt files silently — context still returns branch only

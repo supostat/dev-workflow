@@ -215,6 +215,30 @@ Custom agents — permissions from their frontmatter (`read`, `write`,
 `shell`, `git`). Orchestrator enforces subagent type based on `write:`
 (see Subagent resolution).
 
+## Start workflow run
+
+After workflow routing has settled (the concrete YAML is resolved + mode
+detected) but BEFORE the pipeline loop begins, the orchestrator MUST call
+`mcp__dev-workflow__workflow_start` to register a run state file. The
+returned `runId` threads through every subsequent `step_complete` call so
+engram judgments correlate to the run.
+
+```
+Call: mcp__dev-workflow__workflow_start({
+  workflowName: <resolved workflow name>,
+  taskDescription: <task description from args / task file>,
+  taskId: <task-NNN if args resolved to a vault task, else omit>,
+})
+
+Returns: { runId: "run-<12hex>", traceFilePath: "<vault>/workflow-state/runs/<runId>.engram-trace.jsonl" }
+
+Capture `runId` — it is REQUIRED on every step_complete call below.
+```
+
+Validation errors (E001 invalid workflowName / E002 empty taskDescription /
+E003 invalid taskId / E004 unknown workflow) abort the dispatch — surface
+the error to the user and stop. No state is written on failure.
+
 ## Pipeline execution
 
 ### Normal mode

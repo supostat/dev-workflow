@@ -242,6 +242,30 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
+      name: "workflow_start",
+      description: "Initiate a workflow run from the slash-orchestrator path. Resolves the workflow by name (custom YAML → templates → builtins), creates a run state file at <vault>/workflow-state/runs/run-<12hex>.json, and sets ENGRAM_TRACE_FILE + ENGRAM_RUN_ID env vars for engram trace correlation. Returns the generated runId (prefixed-hex format `run-<12hex>`) and the trace file path. Validation: workflowName must match /^[a-z0-9][a-z0-9_-]{0,63}$/ (E001); taskDescription non-empty after trim (E002); taskId, if provided, must match /^task-\\d{3,}$/ (E003); unknown workflow throws E004.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          workflowName: {
+            type: "string",
+            pattern: "^[a-z0-9][a-z0-9_-]{0,63}$",
+            description: "Workflow name (lowercase kebab-case, 1-64 chars). Resolved against .dev-vault/workflows/, templates/workflows/, and builtins.",
+          },
+          taskDescription: {
+            type: "string",
+            description: "Free-form task description threaded into every step prompt",
+          },
+          taskId: {
+            type: "string",
+            pattern: "^task-\\d{3,}$",
+            description: "Optional. Link the run to a vault task (e.g. 'task-021')",
+          },
+        },
+        required: ["workflowName", "taskDescription"],
+      },
+    },
+    {
       name: "memory_search",
       description: "Search Engram memories with auto-decoration (step/branch/run/task tags from active pipeline). Direct mcp__engram__memory_search remains available as escape hatch for explicit project/tag control.",
       inputSchema: {

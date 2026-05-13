@@ -56,9 +56,9 @@ Agent {{projectName}}: {{taskDescription}}
 }
 
 describe("getToolDefinitions", () => {
-  it("returns 24 tool definitions", () => {
+  it("returns 25 tool definitions", () => {
     const tools = getToolDefinitions();
-    expect(tools).toHaveLength(24);
+    expect(tools).toHaveLength(25);
   });
 
   it("includes profile_get / profile_set / profile_clear", () => {
@@ -141,7 +141,7 @@ describe("ToolHandlers", () => {
   });
 
   it("vault_record bumps telemetry counters on the active workflow run", async () => {
-    const workflowsDir = join(env.context.vaultPath, "workflows");
+    const workflowsDir = join(env.context.vaultPath, "workflow-state", "runs");
     mkdirSync(workflowsDir, { recursive: true });
     const run = {
       id: "run-mirror-test",
@@ -687,7 +687,9 @@ describe("ToolHandlers", () => {
     });
 
     it("workflow_status with valid runId → returns the run object", async () => {
-      const runPath = join(env.context.vaultPath, "workflows", "run-2026-05-11-X.json");
+      const runsDir = join(env.context.vaultPath, "workflow-state", "runs");
+      mkdirSync(runsDir, { recursive: true });
+      const runPath = join(runsDir, "run-2026-05-11-X.json");
       const run = {
         id: "run-2026-05-11-X",
         workflowName: "dev",
@@ -813,7 +815,7 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", id: 1, method: "tools/list",
     }));
     const result = response!.result as { tools: Array<unknown> };
-    expect(result.tools).toHaveLength(24);
+    expect(result.tools).toHaveLength(25);
   });
 
   it("handles tools/call", async () => {

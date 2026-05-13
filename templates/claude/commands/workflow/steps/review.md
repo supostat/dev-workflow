@@ -187,8 +187,9 @@ Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 
 After all 3 reviewers return their outputs (security, quality, coverage):
 
-1. For EACH reviewer output, call `mcp__dev-workflow__step_complete({ stepName: "review", beforeSearchMemoryIds: engramMemories, output: <reviewer output> })`.
-2. Three calls with same `stepName="review"` and same `engramMemories` — engram daemon aggregates scores per memory automatically across reviewers (ADR 2026-05-13).
+1. For EACH reviewer output, call `mcp__dev-workflow__step_complete({ stepName: "review", runId, beforeSearchMemoryIds: engramMemories, output: <reviewer output> })`.
+   <!-- INVARIANT: all 3 calls receive the SAME runId — the run-scoped identifier from workflow_start, NOT a per-reviewer one. Splitting runId per reviewer would break engram trace aggregation. -->
+2. Three calls with same `stepName="review"`, same `runId`, and same `engramMemories` — engram daemon aggregates scores per memory automatically across reviewers (ADR 2026-05-13).
 3. NO blanket fallback per ADR 2026-05-13 — each call returns its own `fallbackIds`. To find memories that ZERO reviewers judged, intersect the three `fallbackIds` arrays. If the intersection is non-empty, log to stderr: `[engram] step review: <N> memories unjudged by all 3 reviewers: <ids>`.
 4. **Fail-safe:** if `step_complete` tool unavailable, log `[engram] step_complete skipped for Step 5` to stderr. Continue — do not abort pipeline.
 

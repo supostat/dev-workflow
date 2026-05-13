@@ -150,6 +150,14 @@ export class ToolHandlers {
       case "workflow_create":
         return workflow.workflowCreate(this.context.vaultPath, params as unknown as WorkflowCreateInput);
 
+      case "workflow_start":
+        return workflow.workflowStart(
+          this.context.vaultPath,
+          params["workflowName"],
+          params["taskDescription"],
+          params["taskId"],
+        );
+
       // ── memory (engram) ──
       case "memory_search":
         return memory.memorySearch(

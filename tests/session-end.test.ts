@@ -7,7 +7,7 @@ import { run } from "../src/hooks/session-end.js";
 import type { WorkflowRun } from "../src/workflow/types.js";
 
 function writeRun(vaultPath: string, run: WorkflowRun): void {
-  const dir = join(vaultPath, "workflows");
+  const dir = join(vaultPath, "workflow-state", "runs");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${run.id}.json`), JSON.stringify(run, null, 2), "utf-8");
 }
@@ -43,7 +43,7 @@ describe("session-end hook — telemetry summary and warnings", () => {
     process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
     projectRoot = mkdtempSync(join(tmpdir(), "session-end-test-"));
     execSync("git init -q", { cwd: projectRoot });
-    mkdirSync(join(projectRoot, ".dev-vault", "workflows"), { recursive: true });
+    mkdirSync(join(projectRoot, ".dev-vault", "workflow-state", "runs"), { recursive: true });
     // scaffold minimal vault so VaultReader.exists() returns true
     writeFileSync(join(projectRoot, ".dev-vault", "stack.md"), "# Stack\n", "utf-8");
     writeFileSync(join(projectRoot, ".dev-vault", "knowledge.md"), "# Knowledge\n", "utf-8");

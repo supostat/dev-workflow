@@ -16,7 +16,7 @@ const EMPTY_TELEMETRY: TelemetryCounters = {
  * mutate `Object.prototype` and pollute every object in the runtime. The
  * reviver in {@link parseSafeJson} drops these keys before they reach the
  * caller. Defense-in-depth — closes gameplan MEDIUM "WorkflowState __proto__
- * pollution guard": run JSONs live in `.dev-vault/workflows/` which requires
+ * pollution guard": run JSONs live in `.dev-vault/workflow-state/runs/` which requires
  * write-access to attack, but the cost of this check is one regex per key.
  */
 const RESERVED_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
@@ -34,7 +34,7 @@ export class WorkflowState {
 
   constructor(vaultPath: string) {
     this.vaultPath = vaultPath;
-    this.workflowsDir = join(vaultPath, "workflows");
+    this.workflowsDir = join(vaultPath, "workflow-state", "runs");
   }
 
   save(run: WorkflowRun): void {

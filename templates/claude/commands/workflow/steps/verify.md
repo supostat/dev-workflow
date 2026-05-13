@@ -116,7 +116,7 @@ Judgments (format: `- <memory_id>: <score 0.0-1.0> — <explanation>`):
 
 After subagent returns `output`:
 
-1. Call `mcp__dev-workflow__step_complete({ stepName: "verify", beforeSearchMemoryIds: engramMemories, output })`.
+1. Call `mcp__dev-workflow__step_complete({ stepName: "verify", runId, beforeSearchMemoryIds: engramMemories, output })`.
 2. Result includes:
    - `judgmentsApplied`: count of explicit judgments parsed from the `## Engram Feedback` section
    - `fallbackIds`: ids without agent feedback (NO blanket fallback applied — Phase 1 design value per ADR 2026-05-13). Unjudged memories remain visible in `pendingJudgments` daemon counter.

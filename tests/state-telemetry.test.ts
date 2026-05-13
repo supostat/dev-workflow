@@ -25,7 +25,7 @@ describe("WorkflowState.bumpTelemetry", () => {
 
   beforeEach(() => {
     vaultPath = mkdtempSync(join(tmpdir(), "wf-telemetry-"));
-    mkdirSync(join(vaultPath, "workflows"), { recursive: true });
+    mkdirSync(join(vaultPath, "workflow-state", "runs"), { recursive: true });
   });
 
   afterEach(() => {
@@ -85,7 +85,7 @@ describe("WorkflowState.bumpTelemetry", () => {
 
   it("silent no-op when run JSON is corrupt", () => {
     writeFileSync(
-      join(vaultPath, "workflows", "run-bad.json"),
+      join(vaultPath, "workflow-state", "runs", "run-bad.json"),
       "{ this is not json",
       "utf-8",
     );
@@ -93,7 +93,7 @@ describe("WorkflowState.bumpTelemetry", () => {
     const state = new WorkflowState(vaultPath);
     expect(() => state.bumpTelemetry("run-bad", "search")).not.toThrow();
     // File untouched
-    expect(readFileSync(join(vaultPath, "workflows", "run-bad.json"), "utf-8")).toBe("{ this is not json");
+    expect(readFileSync(join(vaultPath, "workflow-state", "runs", "run-bad.json"), "utf-8")).toBe("{ this is not json");
   });
 
   it("preserves existing telemetry across bumps", () => {
