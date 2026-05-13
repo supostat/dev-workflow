@@ -9,6 +9,18 @@ This file is an internal reference — you should not need to invoke
 `/workflow:_dispatch` directly. Use `/workflow:dev`, `/workflow:hotfix`, or a
 custom `/workflow:<your-flow>` instead.
 
+## ⚠️ MANDATORY FIRST ACTION — invoke `workflow_start` BEFORE ANY OTHER TOOL CALL
+
+The orchestrator MUST invoke `mcp__dev-workflow__workflow_start({ workflowName, taskDescription, taskId? })` as its very first tool call, **before** reading any file, launching any subagent, or running any bash command. The returned `runId` MUST be threaded into every subsequent `mcp__dev-workflow__step_start` and `mcp__dev-workflow__step_complete` call in this pipeline.
+
+**Why this is mandatory** (not advisory): without `workflow_start`, no `WorkflowRun` is persisted in `<vault>/workflow-state/runs/`, `ENGRAM_TRACE_FILE` / `ENGRAM_RUN_ID` env vars stay unset, engram traces are orphaned, per-step metrics in `engram-stats` stay at zero, and the structural fix shipped in Phase 2 of the engram-hardening phase reverts to behavioural-only discipline.
+
+**Failure mode**: if you skip `workflow_start` and run subagents first, abort the pipeline, call `workflow_start` retroactively, and resume from PREFLIGHT. Do not paper over the gap by tagging later events to a synthetic runId.
+
+**Resolution order for `runId` in subsequent calls**: the explicit `runId` parameter from `workflow_start` is the source of truth. Do not let agents derive it from `process.env["ENGRAM_RUN_ID"]` reading — pass it explicitly.
+
+See `## Start workflow run` (later in this file) for the exact parameters and integration with the pipeline-execution loop. This top-of-file directive exists because the linear-reading orchestrator can otherwise skip the deeper section under compressed-pipeline mode.
+
 ## Input contract
 
 - `workflow`: string — name of the workflow to run (e.g. `dev`, `hotfix`,
