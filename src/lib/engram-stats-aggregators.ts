@@ -87,7 +87,13 @@ function isReusedAcrossRuns(
   return false;
 }
 
-/** Append `runId` to the run-id set for `memoryId`, creating the set lazily. */
+/**
+ * Mutate `bucket` in place by appending `runId` to the run-id Set for
+ * `memoryId`. The Set is created lazily on first call per memoryId,
+ * avoiding pre-allocation of empty Sets for every potential memoryId key.
+ * Used by cross-run aggregators (retrievedByRun, judgedByRun Maps) to track
+ * which runs touched a given memory id via memory_search or memory_judge events.
+ */
 function addRunToBucket(
   bucket: Map<string, Set<string>>,
   memoryId: string,
