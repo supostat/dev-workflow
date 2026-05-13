@@ -161,15 +161,25 @@ export class ToolHandlers {
           },
         );
 
-      case "memory_store":
+      case "memory_store": {
+        const fields = ["context", "action", "result", "type"] as const;
+        const missing = fields.filter((f) => typeof params[f] !== "string" || params[f] === "");
+        if (missing.length > 0) {
+          throw new Error(
+            `memory_store requires four non-empty string fields (context, action, result, type). ` +
+            `Missing or empty: ${missing.join(", ")}. ` +
+            `Each field stores a distinct aspect of the memory — call tools/list for the full schema with descriptions.`,
+          );
+        }
         return memory.memoryStore(
           this.context,
-          requireString(params, "context"),
-          requireString(params, "action"),
-          requireString(params, "result"),
-          requireString(params, "type"),
+          params["context"] as string,
+          params["action"] as string,
+          params["result"] as string,
+          params["type"] as string,
           { tags: Array.isArray(params["tags"]) ? params["tags"] as string[] : undefined },
         );
+      }
 
       case "memory_judge":
         return memory.memoryJudge(

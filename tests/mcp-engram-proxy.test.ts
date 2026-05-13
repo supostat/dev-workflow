@@ -356,6 +356,55 @@ describe("memory_store handler — strict error surfacing (ADR 2026-05-06)", () 
 
     expect(vi.mocked(engramStoreStrict)).not.toHaveBeenCalled();
   });
+
+  it("error lists all missing fields and explains the four-field contract", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "all in one blob, forgot the rest",
+      }),
+    ).rejects.toThrow(
+      /memory_store requires four non-empty string fields.*Missing or empty: action, result, type.*tools\/list/s,
+    );
+
+    expect(vi.mocked(engramStoreStrict)).not.toHaveBeenCalled();
+  });
+
+  it("error names the single missing field when three of four are present", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "x",
+        result: "y",
+        type: "pattern",
+      }),
+    ).rejects.toThrow(/Missing or empty: action\b/);
+
+    expect(vi.mocked(engramStoreStrict)).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty-string fields, not just missing ones", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    await expect(
+      handlers.handle("memory_store", {
+        context: "x",
+        action: "",
+        result: "y",
+        type: "pattern",
+      }),
+    ).rejects.toThrow(/Missing or empty: action/);
+
+    expect(vi.mocked(engramStoreStrict)).not.toHaveBeenCalled();
+  });
 });
 
 describe("memory_judge MCP handler", () => {
