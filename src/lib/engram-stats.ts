@@ -4,6 +4,12 @@ import type { WorkflowRun, TelemetryCounters } from "../workflow/types.js";
 import type { EngramTraceEvent } from "./engram-trace.js";
 import { engramHealth, engramSearch } from "./engram.js";
 import type { EngramMemory, EngramHealthStatus } from "./engram.js";
+import {
+  aggregateCrossRunReuse,
+  aggregatePerStepHitRate,
+  detectMissingStepComplete,
+  type AnnotatedEvent,
+} from "./engram-stats-aggregators.js";
 
 /**
  * Stable shape for `dev-workflow engram-stats --json` consumers.
@@ -19,6 +25,30 @@ export interface EngramStats {
   live: {
     health: EngramHealthStatus | null; // null = engram daemon unavailable
     topMemories: EngramMemory[];        // empty when engram unavailable
+  };
+  /**
+   * Cross-run reuse of pattern/antipattern memories.
+   * `reused` = memories retrieved (via memory_search) in one run AND judged
+   * (via memory_judge) in a DIFFERENT run. Same-run reuse not counted.
+   * `total` = unique pattern/antipattern memory ids retrieved across all runs.
+   */
+  crossRunReuse: { total: number; reused: number; percent: number };
+  /**
+   * Per-step memory_search non-empty result hit rate.
+   * Keyed by step name (from `step:<name>` tag auto-decorated by appendEngramTrace).
+   * `nonEmpty` counts searches where response_summary parses as a non-empty array.
+   * Truncated/unparseable responses count as empty (conservative under-report).
+   */
+  perStepHitRate: Record<string, { searches: number; nonEmpty: number; percent: number }>;
+  /**
+   * Per (run, step) tuples where memory_search returned results but no memory_judge
+   * call followed in the same step — indicates skipped feedback loop. Same step
+   * missing in multiple runs produces multiple entries (sorted by runId desc).
+   */
+  missingStepComplete: {
+    totalRuns: number;
+    affectedRuns: Array<{ runId: string; step: string; searches: number; judges: number }>;
+    count: number;
   };
 }
 
@@ -223,10 +253,14 @@ export async function collectEngramStats(
 
   const recentRuns: RunSummary[] = [];
   const allEvents: EngramTraceEvent[] = [];
+  const annotatedEvents: AnnotatedEvent[] = [];
   for (const { run } of recentEntries) {
     const events = readTrace(vaultPath, run.id);
     recentRuns.push(summarizeRun(run, events.length > 0));
     allEvents.push(...events);
+    for (const event of events) {
+      annotatedEvents.push({ ...event, run_id: run.id });
+    }
   }
 
   const live = await gatherLive(options);
@@ -239,5 +273,8 @@ export async function collectEngramStats(
     recentRuns,
     warnings: detectWarnings(recentRuns),
     live,
+    crossRunReuse: aggregateCrossRunReuse(annotatedEvents),
+    perStepHitRate: aggregatePerStepHitRate(annotatedEvents),
+    missingStepComplete: detectMissingStepComplete(annotatedEvents, recentRuns.length),
   };
 }

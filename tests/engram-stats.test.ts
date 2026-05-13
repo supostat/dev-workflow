@@ -229,4 +229,252 @@ describe("collectEngramStats", () => {
     expect(stats.byMethod["memory_search"]?.count).toBe(1);
     expect(stats.recentRuns.length).toBe(1);
   });
+
+  // -------------------------------------------------------------------------
+  // crossRunReuse
+  // -------------------------------------------------------------------------
+
+  it("crossRunReuse: empty events → zero", async () => {
+    writeRun(makeRun("run-cr-empty"));
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse).toEqual({ total: 0, reused: 0, percent: 0 });
+  });
+
+  it("crossRunReuse: pattern retrieved in run-A, judged in run-B → counts as reused", async () => {
+    writeRun(makeRun("run-cr-A", { startedAt: "2026-05-11T10:00:00Z" }));
+    writeRun(makeRun("run-cr-B", { startedAt: "2026-05-11T11:00:00Z" }));
+    const mem = JSON.stringify([{ id: "mem-1", memory_type: "pattern", context: "x" }]);
+    writeTrace("run-cr-A", [
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: mem, duration_ms: 100 },
+    ]);
+    writeTrace("run-cr-B", [
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-1", score: 0.9 }, ok: true, response_summary: "", duration_ms: 50 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse.total).toBe(1);
+    expect(stats.crossRunReuse.reused).toBe(1);
+    expect(stats.crossRunReuse.percent).toBe(100);
+  });
+
+  it("crossRunReuse: same-run retrieve + judge does NOT count", async () => {
+    writeRun(makeRun("run-cr-same"));
+    const mem = JSON.stringify([{ id: "mem-1", memory_type: "pattern" }]);
+    writeTrace("run-cr-same", [
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: mem, duration_ms: 100 },
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-1", score: 0.9 }, ok: true, response_summary: "", duration_ms: 50 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse.total).toBe(1);
+    expect(stats.crossRunReuse.reused).toBe(0);
+    expect(stats.crossRunReuse.percent).toBe(0);
+  });
+
+  it("crossRunReuse: antipattern type counted; non-pattern types (decision/bugfix) excluded", async () => {
+    writeRun(makeRun("run-cr-types-A", { startedAt: "2026-05-11T10:00:00Z" }));
+    writeRun(makeRun("run-cr-types-B", { startedAt: "2026-05-11T11:00:00Z" }));
+    const mem = JSON.stringify([
+      { id: "mem-anti", memory_type: "antipattern" },
+      { id: "mem-dec", memory_type: "decision" },
+      { id: "mem-bug", memory_type: "bugfix" },
+    ]);
+    writeTrace("run-cr-types-A", [
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: mem, duration_ms: 100 },
+    ]);
+    writeTrace("run-cr-types-B", [
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-anti" }, ok: true, response_summary: "", duration_ms: 50 },
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-dec" }, ok: true, response_summary: "", duration_ms: 50 },
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-bug" }, ok: true, response_summary: "", duration_ms: 50 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    // only mem-anti is in retrieved set (decision/bugfix filtered out)
+    expect(stats.crossRunReuse.total).toBe(1);
+    expect(stats.crossRunReuse.reused).toBe(1);
+  });
+
+  it("crossRunReuse: unparseable response_summary (truncated/null) → zero retrieved", async () => {
+    writeRun(makeRun("run-cr-broken"));
+    writeTrace("run-cr-broken", [
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: '[{"id":"mem-1","memory_typ', duration_ms: 100 }, // truncated
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: "null", duration_ms: 100 }, // valid JSON but not array
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: "", duration_ms: 100 }, // empty
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse.total).toBe(0);
+    expect(stats.crossRunReuse.reused).toBe(0);
+  });
+
+  it("crossRunReuse: partial — 2 retrieved, 1 judged cross-run → 1/2 (50%)", async () => {
+    writeRun(makeRun("run-cr-part-A", { startedAt: "2026-05-11T10:00:00Z" }));
+    writeRun(makeRun("run-cr-part-B", { startedAt: "2026-05-11T11:00:00Z" }));
+    const mem = JSON.stringify([
+      { id: "mem-1", memory_type: "pattern" },
+      { id: "mem-2", memory_type: "pattern" },
+    ]);
+    writeTrace("run-cr-part-A", [
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: mem, duration_ms: 100 },
+    ]);
+    writeTrace("run-cr-part-B", [
+      { ts: "x", method: "memory_judge", params: { memory_id: "mem-1" }, ok: true, response_summary: "", duration_ms: 50 },
+      // mem-2 never judged
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse.total).toBe(2);
+    expect(stats.crossRunReuse.reused).toBe(1);
+    expect(stats.crossRunReuse.percent).toBe(50);
+  });
+
+  // -------------------------------------------------------------------------
+  // perStepHitRate
+  // -------------------------------------------------------------------------
+
+  it("perStepHitRate: per-step counting with JSON.parse non-empty detection", async () => {
+    writeRun(makeRun("run-hr-1"));
+    const nonEmpty = JSON.stringify([{ id: "m1", memory_type: "pattern" }]);
+    const empty = "[]";
+    writeTrace("run-hr-1", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: nonEmpty, duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: empty, duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: nonEmpty, duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["read"]).toEqual({ searches: 3, nonEmpty: 2, percent: 67 });
+  });
+
+  it("perStepHitRate: 'null' (4 chars, unparseable as array) treated as empty", async () => {
+    writeRun(makeRun("run-hr-null"));
+    writeTrace("run-hr-null", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan"] }, ok: true, response_summary: "null", duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan"] }, ok: true, response_summary: '[{"id":"x"}]', duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["plan"]).toEqual({ searches: 2, nonEmpty: 1, percent: 50 });
+  });
+
+  it("perStepHitRate: multi-step distribution — each step independently bucketed", async () => {
+    writeRun(makeRun("run-hr-multi"));
+    const nonEmpty = '[{"id":"m"}]';
+    writeTrace("run-hr-multi", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: nonEmpty, duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan"] }, ok: true, response_summary: "[]", duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan"] }, ok: true, response_summary: nonEmpty, duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:coder"] }, ok: true, response_summary: "[]", duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:coder"] }, ok: true, response_summary: "[]", duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["read"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+    expect(stats.perStepHitRate["plan"]).toEqual({ searches: 2, nonEmpty: 1, percent: 50 });
+    expect(stats.perStepHitRate["coder"]).toEqual({ searches: 2, nonEmpty: 0, percent: 0 });
+  });
+
+  it("perStepHitRate: searches without step tag are skipped, non-search methods ignored", async () => {
+    writeRun(makeRun("run-hr-skip"));
+    writeTrace("run-hr-skip", [
+      { ts: "x", method: "memory_search", params: { tags: [] }, ok: true, response_summary: '[{"id":"x"}]', duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: {}, ok: true, response_summary: '[{"id":"x"}]', duration_ms: 100 },
+      { ts: "x", method: "memory_store", params: { tags: ["step:code"] }, ok: true, response_summary: "{}", duration_ms: 100 },
+      { ts: "x", method: "memory_judge", params: { tags: ["step:code"] }, ok: true, response_summary: "{}", duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate).toEqual({});
+  });
+
+  // -------------------------------------------------------------------------
+  // missingStepComplete
+  // -------------------------------------------------------------------------
+
+  it("missingStepComplete: search > 0 + judge == 0 → affected", async () => {
+    writeRun(makeRun("run-msc-1"));
+    writeTrace("run-msc-1", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: '[{"id":"x"}]', duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: '[{"id":"y"}]', duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.missingStepComplete.count).toBe(1);
+    expect(stats.missingStepComplete.affectedRuns[0]).toEqual({
+      runId: "run-msc-1",
+      step: "read",
+      searches: 2,
+      judges: 0,
+    });
+    expect(stats.missingStepComplete.totalRuns).toBe(1);
+  });
+
+  it("missingStepComplete: search > 0 + judge > 0 → NOT affected", async () => {
+    writeRun(makeRun("run-msc-ok"));
+    writeTrace("run-msc-ok", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: '[{"id":"x"}]', duration_ms: 100 },
+      { ts: "x", method: "memory_judge", params: { tags: ["step:read"], memory_id: "x" }, ok: true, response_summary: "", duration_ms: 50 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.missingStepComplete.count).toBe(0);
+    expect(stats.missingStepComplete.affectedRuns).toEqual([]);
+  });
+
+  it("missingStepComplete: search returned zero results → NOT affected (no feedback expected)", async () => {
+    writeRun(makeRun("run-msc-empty"));
+    writeTrace("run-msc-empty", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: "[]", duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: "null", duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.missingStepComplete.count).toBe(0);
+  });
+
+  it("missingStepComplete: multi-run aggregation + sort by runId desc", async () => {
+    writeRun(makeRun("run-msc-A", { startedAt: "2026-05-11T10:00:00Z" }));
+    writeRun(makeRun("run-msc-B", { startedAt: "2026-05-11T11:00:00Z" }));
+    writeRun(makeRun("run-msc-C", { startedAt: "2026-05-11T12:00:00Z" }));
+    const hit = '[{"id":"m"}]';
+    writeTrace("run-msc-A", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: hit, duration_ms: 100 },
+    ]);
+    writeTrace("run-msc-B", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: hit, duration_ms: 100 },
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan"] }, ok: true, response_summary: hit, duration_ms: 100 },
+    ]);
+    writeTrace("run-msc-C", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: hit, duration_ms: 100 },
+      { ts: "x", method: "memory_judge", params: { tags: ["step:read"], memory_id: "m" }, ok: true, response_summary: "", duration_ms: 50 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    // Affected: (A,read), (B,read), (B,plan). C judged — not affected.
+    expect(stats.missingStepComplete.count).toBe(3);
+    expect(stats.missingStepComplete.totalRuns).toBe(3);
+    // Sort: runId desc → B, B, A. Within same runId: step asc → plan, read.
+    expect(stats.missingStepComplete.affectedRuns.map((e) => `${e.runId}:${e.step}`)).toEqual([
+      "run-msc-B:plan",
+      "run-msc-B:read",
+      "run-msc-A:read",
+    ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Integration: all 3 fields populated in collectEngramStats result
+  // -------------------------------------------------------------------------
+
+  it("collectEngramStats integration: returns 3 new fields with correct shape", async () => {
+    writeRun(makeRun("run-int"));
+    writeTrace("run-int", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:read"] }, ok: true, response_summary: '[{"id":"m1","memory_type":"pattern"}]', duration_ms: 100 },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.crossRunReuse).toEqual({ total: 1, reused: 0, percent: 0 });
+    expect(stats.perStepHitRate["read"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+    expect(stats.missingStepComplete.count).toBe(1);
+    expect(stats.missingStepComplete.totalRuns).toBe(1);
+  });
 });

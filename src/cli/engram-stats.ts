@@ -103,6 +103,33 @@ function renderPretty(stats: EngramStats): void {
     console.log("");
   }
 
+  // Cross-run reuse
+  if (stats.crossRunReuse.total > 0) {
+    const cr = stats.crossRunReuse;
+    console.log("Cross-run memory reuse:");
+    console.log(`  ${cr.reused}/${cr.total} pattern/antipattern memories judged in different run (${cr.percent}%)`);
+    console.log("");
+  }
+
+  // Per-step hit rate
+  const hitRateEntries = Object.entries(stats.perStepHitRate).sort(([a], [b]) => a.localeCompare(b));
+  if (hitRateEntries.length > 0) {
+    console.log("Search hit rate by step:");
+    for (const [step, h] of hitRateEntries) {
+      console.log(`  ${step.padEnd(16)} ${String(h.nonEmpty).padStart(3)}/${String(h.searches).padEnd(3)} non-empty  (${h.percent}%)`);
+    }
+    console.log("");
+  }
+
+  // Missing step-complete (search→no judge)
+  if (stats.missingStepComplete.count > 0) {
+    console.log(`Missing feedback loop (search hits, no judge) — ${stats.missingStepComplete.count} (run, step) tuple${stats.missingStepComplete.count === 1 ? "" : "s"}:`);
+    for (const entry of stats.missingStepComplete.affectedRuns) {
+      console.log(`  ⚠ ${entry.runId}  step=${entry.step.padEnd(12)} ${entry.searches} search hit${entry.searches === 1 ? "" : "s"}, ${entry.judges} judge${entry.judges === 1 ? "" : "s"}`);
+    }
+    console.log("");
+  }
+
   // Warnings
   if (stats.warnings.length > 0) {
     console.log("Warnings:");

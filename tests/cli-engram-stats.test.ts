@@ -171,4 +171,84 @@ describe("engram-stats CLI — E2E", () => {
     expect(json.byMemoryType["pattern"]).toBe(1);
     expect(json.byStep["read"]).toBeDefined();
   });
+
+  it("--json mode: includes crossRunReuse / perStepHitRate / missingStepComplete fields", async () => {
+    writeMinimalRun("run-ext");
+    const traceContent = [
+      JSON.stringify({
+        ts: "x",
+        method: "memory_search",
+        params: { tags: ["step:read"] },
+        ok: true,
+        response_summary: '[{"id":"m1","memory_type":"pattern"}]',
+        duration_ms: 300,
+      }),
+    ].join("\n");
+    writeFileSync(join(vaultPath, "workflow-state", "runs", "run-ext.engram-trace.jsonl"), traceContent, "utf-8");
+
+    await engramStats(["--json"]);
+    const json = JSON.parse(logJoined()) as {
+      crossRunReuse: { total: number; reused: number; percent: number };
+      perStepHitRate: Record<string, { searches: number; nonEmpty: number; percent: number }>;
+      missingStepComplete: { totalRuns: number; affectedRuns: Array<{ runId: string; step: string }>; count: number };
+    };
+    expect(json.crossRunReuse).toEqual({ total: 1, reused: 0, percent: 0 });
+    expect(json.perStepHitRate["read"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+    expect(json.missingStepComplete.count).toBe(1);
+    expect(json.missingStepComplete.affectedRuns[0]?.runId).toBe("run-ext");
+    expect(json.missingStepComplete.affectedRuns[0]?.step).toBe("read");
+  });
+
+  it("pretty mode: renders 3 new sections when non-empty, skips when empty", async () => {
+    writeMinimalRun("run-pretty-A", { search: 0, store: 0, judge: 0, vaultRecord: 0, skipped: 0 });
+    // Build a trace with cross-run reuse + perStepHitRate + missing-step-complete signals.
+    // Two runs so cross-run reuse triggers.
+    const traceA = [
+      JSON.stringify({
+        ts: "x",
+        method: "memory_search",
+        params: { tags: ["step:read"] },
+        ok: true,
+        response_summary: '[{"id":"mem-x","memory_type":"pattern"}]',
+        duration_ms: 200,
+      }),
+    ].join("\n");
+    writeFileSync(join(vaultPath, "workflow-state", "runs", "run-pretty-A.engram-trace.jsonl"), traceA, "utf-8");
+
+    const run2 = {
+      id: "run-pretty-B",
+      workflowName: "dev",
+      taskId: null,
+      taskDescription: "t",
+      currentStep: "code",
+      startedAt: "2026-05-11T12:00:00Z",
+      completedAt: "2026-05-11T13:00:00Z",
+      status: "completed",
+      steps: {
+        code: { status: "completed", output: null, startedAt: null, completedAt: null, durationMs: 100, attempt: 1, engramMemoryId: null, error: null },
+      },
+      telemetry: { search: 0, store: 0, judge: 1, vaultRecord: 0, skipped: 0 },
+    };
+    writeFileSync(join(vaultPath, "workflow-state", "runs", "run-pretty-B.json"), JSON.stringify(run2), "utf-8");
+    const traceB = [
+      JSON.stringify({
+        ts: "x",
+        method: "memory_judge",
+        params: { tags: ["step:code"], memory_id: "mem-x", score: 0.9 },
+        ok: true,
+        response_summary: "",
+        duration_ms: 50,
+      }),
+    ].join("\n");
+    writeFileSync(join(vaultPath, "workflow-state", "runs", "run-pretty-B.engram-trace.jsonl"), traceB, "utf-8");
+
+    await engramStats([]);
+    const out = logJoined();
+    expect(out).toContain("Cross-run memory reuse:");
+    expect(out).toContain("1/1 pattern/antipattern memories");
+    expect(out).toContain("Search hit rate by step:");
+    expect(out).toContain("read");
+    expect(out).toContain("Missing feedback loop");
+    expect(out).toContain("run-pretty-A");
+  });
 });
