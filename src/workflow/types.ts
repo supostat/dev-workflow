@@ -88,6 +88,15 @@ export interface WorkflowRun {
   workflowName: string;
   taskId: string | null;
   taskDescription: string;
+  /**
+   * Snapshot of the active gameplan phase at run-start (task-023, ADR
+   * 2026-05-13). Populated by `workflowStart` via {@link parseGameplanPhase}
+   * over `<vault>/gameplan.md`. Snapshot semantics: a mid-run edit to
+   * `gameplan.md` does NOT propagate — the phase tag emitted by
+   * `buildAutoTags` reflects the value captured at run-start. `null` when
+   * gameplan is absent, missing the phase marker, or fails validation.
+   */
+  phase: string | null;
   currentStep: string;
   startedAt: string;
   completedAt: string | null;

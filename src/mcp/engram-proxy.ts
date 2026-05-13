@@ -6,6 +6,7 @@ export interface PipelineContext {
   step?: string;
   runId?: string;
   taskId?: string;
+  phase?: string;
 }
 
 // Concurrent runs: ENGRAM_RUN_ID env (set by workflow_start) takes priority
@@ -13,8 +14,8 @@ export interface PipelineContext {
 // ADR 2026-05-13 — subagent processes inherit ENV, ensuring each call
 // attributes memories to its own run instead of the most-recent one.
 //
-// Phase tag deferred per ADR 2026-04-30 (WorkflowRun lacks phase field).
-// Add when phase is persisted in WorkflowRun.
+// Phase tag implemented via run.phase field populated at workflowStart
+// (task-023, ADR 2026-05-13).
 export function loadPipelineContext(ctx: ProjectContext): PipelineContext {
   const envRunId = process.env["ENGRAM_RUN_ID"];
   if (envRunId !== undefined && envRunId.length > 0) {
@@ -28,9 +29,10 @@ export function loadPipelineContext(ctx: ProjectContext): PipelineContext {
         step: run.currentStep,
         runId: envRunId,
         taskId: run.taskId ?? undefined,
+        phase: run.phase ?? undefined,
       };
     } catch {
-      // Run not in state (orphan trace) — preserve env runId, no step/taskId
+      // Run not in state (orphan trace) — preserve env runId, no step/taskId/phase
       return { branch: ctx.branch, runId: envRunId };
     }
   }
@@ -43,6 +45,7 @@ export function loadPipelineContext(ctx: ProjectContext): PipelineContext {
       step: run?.currentStep,
       runId: run?.id,
       taskId: run?.taskId ?? undefined,
+      phase: run?.phase ?? undefined,
     };
   } catch {
     return { branch: ctx.branch };
@@ -55,6 +58,11 @@ export function buildAutoTags(c: PipelineContext): string[] {
   if (c.branch) tags.push(`branch:${c.branch}`);
   if (c.taskId) tags.push(`task:${c.taskId}`);
   if (c.runId) tags.push(`run:${c.runId}`);
+  // phase appended at END — supplementary scope metadata, preserves the
+  // existing 4-element order for tests/consumers that depend on stable
+  // prefix positions. Tag order is semantically irrelevant on the engram
+  // ingestion side (set-based filtering).
+  if (c.phase) tags.push(`phase:${c.phase}`);
   return tags;
 }
 

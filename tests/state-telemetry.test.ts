@@ -11,6 +11,7 @@ function makeRun(id: string, overrides: Partial<WorkflowRun> = {}): WorkflowRun 
     workflowName: "dev",
     taskId: null,
     taskDescription: "test",
+    phase: null,
     currentStep: "plan",
     startedAt: new Date().toISOString(),
     completedAt: null,

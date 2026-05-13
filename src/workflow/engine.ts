@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentContextBuilder } from "../agents/context-builder.js";
@@ -14,6 +15,7 @@ import {
 import type { EngramFeedbackResult } from "../lib/engram-feedback.js";
 import { todayDate } from "../lib/fs-helpers.js";
 import { escapeUserInput } from "../lib/escape-user-input.js";
+import { parseGameplanPhase } from "../lib/gameplan-parser.js";
 import { extractVerdict, extractNextTarget, isAllowedNextTarget } from "./output-parser.js";
 
 export interface WorkflowResolver {
@@ -91,11 +93,25 @@ export class WorkflowEngine {
       };
     }
 
+    // Snapshot active gameplan phase at run-start — symmetric with the MCP
+    // workflowStart path (task-023, ADR 2026-05-13). Direct fs read; graceful
+    // null on any failure.
+    let phase: string | null = null;
+    try {
+      const gameplanPath = join(this.state.vaultPath, "gameplan.md");
+      if (existsSync(gameplanPath)) {
+        phase = parseGameplanPhase(readFileSync(gameplanPath, "utf-8"));
+      }
+    } catch {
+      // graceful: phase stays null
+    }
+
     const run: WorkflowRun = {
       id: runId,
       workflowName: workflow.name,
       taskId: taskId ?? null,
       taskDescription,
+      phase,
       currentStep: workflow.steps[0]!.name,
       startedAt: nowISO(),
       completedAt: null,

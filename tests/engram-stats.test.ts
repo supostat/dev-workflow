@@ -31,6 +31,7 @@ describe("collectEngramStats", () => {
       workflowName: "dev",
       taskId: null,
       taskDescription: "test",
+      phase: null,
       currentStep: "code",
       startedAt: "2026-05-11T10:00:00Z",
       completedAt: "2026-05-11T11:00:00Z",

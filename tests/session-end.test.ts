@@ -18,6 +18,7 @@ function baseRun(overrides: Partial<WorkflowRun> = {}): WorkflowRun {
     workflowName: "dev",
     taskId: null,
     taskDescription: "test",
+    phase: null,
     currentStep: "verify",
     startedAt: new Date().toISOString(),
     completedAt: null,

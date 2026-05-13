@@ -66,6 +66,7 @@ function writeActiveRun(vaultPath: string, fields: {
   currentStep?: string;
   taskId?: string | null;
   status?: string;
+  phase?: string | null;
 }): void {
   const workflowsDir = join(vaultPath, "workflow-state", "runs");
   mkdirSync(workflowsDir, { recursive: true });
@@ -74,6 +75,7 @@ function writeActiveRun(vaultPath: string, fields: {
     workflowName: "dev",
     taskId: fields.taskId ?? null,
     taskDescription: "test",
+    phase: fields.phase ?? null,
     currentStep: fields.currentStep ?? "plan",
     startedAt: new Date().toISOString(),
     completedAt: null,
@@ -88,7 +90,24 @@ function writeActiveRun(vaultPath: string, fields: {
 }
 
 describe("buildAutoTags", () => {
-  it("emits all four tags when context is fully populated", () => {
+  it("emits all five tags when context is fully populated (phase appended at end)", () => {
+    const tags = buildAutoTags({
+      branch: "main",
+      step: "plan",
+      runId: "run-42",
+      taskId: "task-007",
+      phase: "test-phase",
+    });
+    expect(tags).toEqual([
+      "step:plan",
+      "branch:main",
+      "task:task-007",
+      "run:run-42",
+      "phase:test-phase",
+    ]);
+  });
+
+  it("omits phase tag when phase is absent (4-element shape preserved)", () => {
     const tags = buildAutoTags({
       branch: "main",
       step: "plan",
@@ -100,6 +119,12 @@ describe("buildAutoTags", () => {
       "branch:main",
       "task:task-007",
       "run:run-42",
+    ]);
+  });
+
+  it("emits phase tag alone when only phase is present", () => {
+    expect(buildAutoTags({ phase: "engram-hardening" })).toEqual([
+      "phase:engram-hardening",
     ]);
   });
 
@@ -149,6 +174,7 @@ describe("loadPipelineContext", () => {
       step: undefined,
       runId: undefined,
       taskId: undefined,
+      phase: undefined,
     });
   });
 
@@ -166,6 +192,45 @@ describe("loadPipelineContext", () => {
       step: "review",
       runId: "run-99",
       taskId: "task-005",
+      phase: undefined,
+    });
+  });
+
+  it("populates phase from active run when run.phase is set", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-phase-1",
+      currentStep: "plan",
+      taskId: "task-101",
+      status: "running",
+      phase: "test-phase",
+    });
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "plan",
+      runId: "run-phase-1",
+      taskId: "task-101",
+      phase: "test-phase",
+    });
+  });
+
+  it("returns phase undefined when run.phase is null", () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    writeActiveRun(env.context.vaultPath, {
+      id: "run-phase-null",
+      currentStep: "plan",
+      taskId: "task-102",
+      status: "running",
+      phase: null,
+    });
+    expect(loadPipelineContext(env.context)).toEqual({
+      branch: "feature-x",
+      step: "plan",
+      runId: "run-phase-null",
+      taskId: "task-102",
+      phase: undefined,
     });
   });
 
@@ -181,6 +246,7 @@ describe("loadPipelineContext", () => {
       step: undefined,
       runId: undefined,
       taskId: undefined,
+      phase: undefined,
     });
   });
 
@@ -193,6 +259,7 @@ describe("loadPipelineContext", () => {
       currentStep: "plan",
       taskId: "task-042",
       status: "running",
+      phase: "env-phase",
     });
     process.env["ENGRAM_RUN_ID"] = "run-abc123def456";
     expect(loadPipelineContext(env.context)).toEqual({
@@ -200,6 +267,7 @@ describe("loadPipelineContext", () => {
       step: "plan",
       runId: "run-abc123def456",
       taskId: "task-042",
+      phase: "env-phase",
     });
   });
 
@@ -220,6 +288,7 @@ describe("loadPipelineContext", () => {
       workflowName: "dev",
       taskId: "task-recent",
       taskDescription: "newer",
+      phase: null,
       currentStep: "review",
       startedAt: new Date(Date.now() + 60_000).toISOString(),
       completedAt: null,
@@ -237,6 +306,7 @@ describe("loadPipelineContext", () => {
       step: "code",
       runId: "run-target",
       taskId: "task-target",
+      phase: undefined,
     });
   });
 
@@ -265,6 +335,7 @@ describe("loadPipelineContext", () => {
       step: "plan",
       runId: "run-fallback",
       taskId: "task-fb",
+      phase: undefined,
     });
   });
 
@@ -276,6 +347,7 @@ describe("loadPipelineContext", () => {
       currentStep: "verify",
       taskId: "task-curr",
       status: "running",
+      phase: "current-phase",
     });
     expect(process.env["ENGRAM_RUN_ID"]).toBeUndefined();
     expect(loadPipelineContext(env.context)).toEqual({
@@ -283,6 +355,7 @@ describe("loadPipelineContext", () => {
       step: "verify",
       runId: "run-current",
       taskId: "task-curr",
+      phase: "current-phase",
     });
   });
 });
@@ -610,6 +683,7 @@ describe("loadPipelineContext — additional cases", () => {
       step: undefined,
       runId: undefined,
       taskId: undefined,
+      phase: undefined,
     });
   });
 });

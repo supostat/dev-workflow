@@ -88,7 +88,7 @@ describe("workflow_start MCP handler", () => {
     );
   });
 
-  it("persists state file at <vault>/workflow-state/runs/run-<12hex>.json with all 9 WorkflowRun fields", async () => {
+  it("persists state file at <vault>/workflow-state/runs/run-<12hex>.json with all 10 WorkflowRun fields", async () => {
     const result = await handlers.handle("workflow_start", {
       workflowName: "dev",
       taskDescription: "test task",
@@ -111,16 +111,18 @@ describe("workflow_start MCP handler", () => {
     expect(loaded.taskId).toBeNull();
     // 4. taskDescription mirrors input
     expect(loaded.taskDescription).toBe("test task");
-    // 5. currentStep is the first step of the resolved workflow ('preflight' for dev)
+    // 5. phase is null — test fixture has no gameplan.md
+    expect(loaded.phase).toBeNull();
+    // 6. currentStep is the first step of the resolved workflow ('preflight' for dev)
     expect(loaded.currentStep).toBe("preflight");
-    // 6. startedAt is an ISO 8601 string
+    // 7. startedAt is an ISO 8601 string
     expect(loaded.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(Number.isFinite(Date.parse(loaded.startedAt))).toBe(true);
-    // 7. completedAt is null on a fresh run
+    // 8. completedAt is null on a fresh run
     expect(loaded.completedAt).toBeNull();
-    // 8. status is "running"
+    // 9. status is "running"
     expect(loaded.status).toBe("running");
-    // 9. steps is an object with one entry per workflow step
+    // 10. steps is an object with one entry per workflow step
     const stepCount = Object.keys(workflow.steps).length;
     expect(stepCount).toBeGreaterThan(0);
     expect(Object.keys(loaded.steps)).toHaveLength(stepCount);
@@ -333,6 +335,84 @@ steps:
     const run = state.load(result.runId);
     expect(run.workflowName).toBe("hotfix");
     expect(run.currentStep).toBe(resolved.steps[0]!.name);
+  });
+
+  // task-023 (ADR 2026-05-13): WorkflowRun.phase snapshot
+  it("populates run.phase from gameplan.md frontmatter (current-phase field)", async () => {
+    // Overwrite the scaffold gameplan with frontmatter declaring the phase.
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+current-phase: engram-hardening
+tags: [gameplan]
+---
+# Gameplan
+`, "utf-8");
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "phase snapshot test",
+    }) as WorkflowStartResult;
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBe("engram-hardening");
+  });
+
+  it("populates run.phase from gameplan.md body marker when frontmatter absent", async () => {
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+tags: [gameplan]
+---
+# Gameplan
+
+## Current Phase
+
+**Active: \`fallback-phase\`** — body marker only
+`, "utf-8");
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "phase body fallback",
+    }) as WorkflowStartResult;
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBe("fallback-phase");
+  });
+
+  it("run.phase is null when gameplan.md is absent", async () => {
+    // Remove the scaffold-created gameplan to simulate the "no gameplan" case.
+    rmSync(join(context.vaultPath, "gameplan.md"));
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "no gameplan",
+    }) as WorkflowStartResult;
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBeNull();
+  });
+
+  it("snapshot semantics: mid-run gameplan edit does NOT update run.phase", async () => {
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+current-phase: initial-phase
+---
+`, "utf-8");
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "snapshot test",
+    }) as WorkflowStartResult;
+
+    // Edit gameplan AFTER workflow_start — the persisted run.phase must
+    // remain the snapshot value, not pick up the new value.
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+current-phase: edited-after-start
+---
+`, "utf-8");
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBe("initial-phase");
   });
 
   it("rejects workflow YAML with prototype-pollution step name (E005)", async () => {

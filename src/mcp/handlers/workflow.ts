@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveWorkflow } from "../../cli/run.js";
+import { parseGameplanPhase } from "../../lib/gameplan-parser.js";
 import { WorkflowState } from "../../workflow/state.js";
 import type { StepState, WorkflowRun } from "../../workflow/types.js";
 import { createWorkflow, type WorkflowCreateInput } from "../workflow-create.js";
@@ -143,11 +145,31 @@ export function workflowStart(
     };
   }
 
+  // Snapshot the active gameplan phase at run-start (task-023, ADR
+  // 2026-05-13). Direct `node:fs` read keeps the handler symmetric with
+  // `WorkflowState(vaultPath)` — avoids constructing a full `ProjectContext`
+  // just to instantiate `VaultReader` for a single-file read. Snapshot
+  // semantics: subsequent edits to `gameplan.md` mid-run do NOT propagate;
+  // the tag emitted by `buildAutoTags` reflects the value captured here.
+  let phase: string | null = null;
+  try {
+    const gameplanPath = join(vaultPath, "gameplan.md");
+    if (existsSync(gameplanPath)) {
+      const content = readFileSync(gameplanPath, "utf-8");
+      phase = parseGameplanPhase(content);
+    }
+  } catch {
+    // Graceful fallback — gameplan unreadable (permissions, race) →
+    // phase stays null; absence of a phase tag is acceptable, throwing
+    // would abort an otherwise valid workflow_start call.
+  }
+
   const run: WorkflowRun = {
     id: runId,
     workflowName: workflow.name,
     taskId: input.taskId,
     taskDescription: input.taskDescription,
+    phase,
     currentStep: workflow.steps[0]!.name,
     startedAt: new Date().toISOString(),
     completedAt: null,
