@@ -378,6 +378,47 @@ tags: [gameplan]
     expect(run.phase).toBe("fallback-phase");
   });
 
+  it("run.phase is null when frontmatter has current-phase: null sentinel (no body fallback)", async () => {
+    // Integration coverage for parseGameplanPhase null-literal handling at the
+    // workflow_start handler boundary. Body marker is present but MUST be
+    // ignored — the sentinel signals authoritative intent to clear phase.
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+current-phase: null
+tags: [gameplan]
+---
+## Current Phase
+
+**Active: \`body-should-not-leak\`** — must not be used
+`, "utf-8");
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "null sentinel integration test",
+    }) as WorkflowStartResult;
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBeNull();
+  });
+
+  it("run.phase is null when frontmatter has current-phase: ~ (YAML tilde sentinel, no body fallback)", async () => {
+    writeFileSync(join(context.vaultPath, "gameplan.md"), `---
+current-phase: ~
+tags: [gameplan]
+---
+**Active: \`body-should-not-leak\`** — must not be used
+`, "utf-8");
+
+    const result = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "tilde sentinel integration test",
+    }) as WorkflowStartResult;
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(result.runId);
+    expect(run.phase).toBeNull();
+  });
+
   it("run.phase is null when gameplan.md is absent", async () => {
     // Remove the scaffold-created gameplan to simulate the "no gameplan" case.
     rmSync(join(context.vaultPath, "gameplan.md"));

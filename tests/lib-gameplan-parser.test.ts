@@ -145,4 +145,67 @@ current-phase: ${phase}
     const match = "**Active: `engram-hardening`** — note".match(GAMEPLAN_PHASE_PATTERN);
     expect(match?.[1]).toBe("engram-hardening");
   });
+
+  it("returns null for current-phase: null literal (hand-coded YAML parser scalar)", () => {
+    // The hand-coded parseFrontmatter treats YAML null as the literal string
+    // "null"; without the sentinel guard it would match VALID_PHASE_NAME_PATTERN
+    // and be returned as a literal phase name, polluting downstream engram tags.
+    const content = `---
+current-phase: null
+---
+body
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
+
+  it("returns null for current-phase: ~ (YAML null alias)", () => {
+    const content = `---
+current-phase: ~
+---
+body
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
+
+  it("rejects uppercase NULL via VALID_PHASE_NAME_PATTERN (scope boundary)", () => {
+    // Scope decision: NULL_LITERAL_SENTINELS is strictly lowercase ("null"/"~").
+    // Uppercase NULL is NOT special-cased here — it falls through to the regex,
+    // which rejects it because VALID_PHASE_NAME_PATTERN requires lowercase.
+    // This test pins the case-sensitivity decision against future scope creep.
+    const content = `---
+current-phase: NULL
+---
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
+
+  it("rejects mixed-case Null via VALID_PHASE_NAME_PATTERN (not special-cased)", () => {
+    const content = `---
+current-phase: Null
+---
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
+
+  it("null sentinel in frontmatter takes priority over body Active marker", () => {
+    // An explicitly cleared current-phase must NOT fall through to body
+    // regex — the sentinel signals authoritative intent.
+    const content = `---
+current-phase: null
+---
+## Current Phase
+
+**Active: \`body-phase\`** — must not be used
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
+
+  it("tilde sentinel in frontmatter takes priority over body Active marker", () => {
+    const content = `---
+current-phase: ~
+---
+**Active: \`body-phase\`** — must not be used
+`;
+    expect(parseGameplanPhase(content)).toBeNull();
+  });
 });

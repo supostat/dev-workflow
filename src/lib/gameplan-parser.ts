@@ -9,6 +9,19 @@ import { parseFrontmatter } from "./frontmatter.js";
 export const VALID_PHASE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 /**
+ * YAML null-literal sentinels recognized by the hand-coded frontmatter
+ * parser. Because `parseFrontmatter` treats all scalars as literal strings
+ * (no YAML primitive coercion — 0-deps invariant), `current-phase: null` and
+ * `current-phase: ~` arrive here as the strings `"null"` and `"~"`. The
+ * lowercase `"null"` matches {@link VALID_PHASE_NAME_PATTERN} (5 lowercase
+ * letters) and would otherwise be returned as a literal phase name,
+ * polluting downstream engram tags as `phase:null`. Special-case both as
+ * "no phase" before regex validation. Strict lowercase only — uppercase
+ * `NULL` and mixed-case `Null` are rejected by the regex.
+ */
+export const NULL_LITERAL_SENTINELS: ReadonlySet<string> = new Set(["null", "~"]);
+
+/**
  * Body fallback: matches the gameplan `## Current Phase` marker line
  *   `**Active: \`<phase-name>\`**`
  * Capture group is pre-validated by the regex itself (same character set as
@@ -26,7 +39,10 @@ export const GAMEPLAN_PHASE_PATTERN =
  * Hybrid priority (A + B):
  *   1. Frontmatter field `current-phase` (string scalar only). YAML arrays
  *      and non-string types are rejected by the `typeof === "string"` guard.
- *      Empty string maps to `null`.
+ *      Empty string maps to `null`. Literal `"null"` and `"~"` (YAML null
+ *      forms surfacing as strings through the hand-coded parser — see
+ *      {@link NULL_LITERAL_SENTINELS}) also map to `null` so an explicitly
+ *      cleared `current-phase: null` does not become a literal phase name.
  *   2. Body regex {@link GAMEPLAN_PHASE_PATTERN} as fallback.
  *
  * Either source is validated against {@link VALID_PHASE_NAME_PATTERN};
@@ -38,6 +54,7 @@ export function parseGameplanPhase(content: string): string | null {
 
   const frontmatterPhase = fields["current-phase"];
   if (typeof frontmatterPhase === "string") {
+    if (NULL_LITERAL_SENTINELS.has(frontmatterPhase)) return null;
     if (frontmatterPhase.length === 0) return null;
     return VALID_PHASE_NAME_PATTERN.test(frontmatterPhase) ? frontmatterPhase : null;
   }
