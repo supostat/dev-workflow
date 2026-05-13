@@ -192,6 +192,22 @@ export class ToolHandlers {
       case "parse_engram_feedback":
         return memory.parseEngramFeedback(requireString(params, "output"), params["expectedMemoryIds"]);
 
+      case "step_complete": {
+        const stepName = requireString(params, "stepName");
+        if (typeof params["output"] !== "string") {
+          throw new Error("step_complete: output must be a string");
+        }
+        const beforeSearchMemoryIds = memory.validateBeforeSearchMemoryIds(
+          params["beforeSearchMemoryIds"],
+        );
+        return memory.stepComplete(
+          this.context,
+          stepName,
+          beforeSearchMemoryIds,
+          params["output"] as string,
+        );
+      }
+
       // ── profile ──
       case "profile_get":
         return profile.profileGet(this.context.vaultPath);

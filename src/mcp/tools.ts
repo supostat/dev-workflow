@@ -294,6 +294,47 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
+      name: "step_complete",
+      description: "Finalize a pipeline step: parse the agent's `## Engram Feedback` block, apply each judgment to engram (silent fail-safe, capped at 20/call), and emit antipattern observability (ids retrieved + score distribution buckets). NO blanket fallback — memories without explicit feedback land in `fallbackIds` for orchestrator-level handling.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          stepName: {
+            type: "string",
+            description: "Pipeline step identifier (e.g. 'plan', 'code', 'review')",
+          },
+          runId: {
+            type: "string",
+            description: "Optional workflow run id for telemetry correlation",
+          },
+          beforeSearchMemoryIds: {
+            type: "array",
+            description: "Memories retrieved before the step (from memory_search). Each item carries its engram memory_type for antipattern observability.",
+            items: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",
+                  description: "Engram memory UUID",
+                },
+                memoryType: {
+                  type: "string",
+                  description: "Engram memory_type (pattern, antipattern, decision, bugfix, context)",
+                },
+              },
+              required: ["id", "memoryType"],
+            },
+          },
+          output: {
+            type: "string",
+            description: "Full subagent output, parsed server-side via extractEngramFeedbackSection — do not pre-process",
+          },
+        },
+        required: ["stepName", "beforeSearchMemoryIds", "output"],
+      },
+    },
+    {
       name: "profile_get",
       description: "Read communication profile state: active (from .profile-state), default (from communication.yaml), available list, and effective profile config",
       inputSchema: {
