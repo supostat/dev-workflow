@@ -158,6 +158,13 @@ export class ToolHandlers {
           params["taskId"],
         );
 
+      case "step_start":
+        return workflow.stepStart(
+          this.context.vaultPath,
+          params["stepName"],
+          params["runId"],
+        );
+
       // ── memory (engram) ──
       case "memory_search":
         return memory.memorySearch(

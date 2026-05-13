@@ -26,7 +26,7 @@ dev-workflow gives it a **strict protocol**: every task goes through an 11-step 
 - **Intelligence** — pattern graph with scoring (recency, frequency, context match)
 - **Phase mode** — break large specs into phases, code each subtask separately
 - **Interactive & autonomous** — ask before commit (default) or auto-commit for swarm use
-- **25 MCP tools** — programmatic access to vault, tasks, intelligence, memory, workflows, agents, communication profiles (via `.mcp.json`)
+- **26 MCP tools** — programmatic access to vault, tasks, intelligence, memory, workflows, agents, communication profiles (via `.mcp.json`)
 - **Engram memory** — persistent long-term store with semantic search via Voyage AI embeddings; auto-decorated with pipeline tags (step/branch/run/task)
 - **3 hooks** — SessionStart, SessionEnd, TaskCompleted
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
@@ -162,7 +162,7 @@ dev-workflow serve                       # Start MCP server
 
 ## MCP Tools
 
-25 tools available via MCP server:
+26 tools available via MCP server:
 
 | Tool | Description |
 |------|------------|
@@ -181,6 +181,7 @@ dev-workflow serve                       # Start MCP server
 | `workflow_status` | Current workflow status |
 | `workflow_create` | Save a custom workflow YAML |
 | `workflow_start` | Initiate a workflow run (slash-orchestrator path): create state file, set engram trace env vars, return runId |
+| `step_start` | Update run.currentStep at the start of a workflow step (symmetric pair with `step_complete`). Tags engram traces with the current step:<name> |
 | `agent_list` | List agents with permissions |
 | `agent_run` | Generate agent prompt with vault context |
 | `parse_engram_feedback` | Parse `## Engram Feedback` block from agent output |

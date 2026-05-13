@@ -4,11 +4,12 @@
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__dev-workflow__memory_search({ query: "read " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save the returned array of memory objects. Extract `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 1.2.
-3. Build a human-readable `engramContextBlock`: for each memory, a bullet `- [<type>] <context> — <action>`. If no results, set `engramContextBlock = "(none)"`.
-4. Note any `antipattern` records — they MUST be addressed explicitly by the subagent.
-5. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable (engram daemon down, dev-workflow MCP not connected), log `[engram] search skipped for Step 1` to stderr, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
+1. Call `mcp__dev-workflow__step_start({ stepName: "read", runId })` — updates run state to current step (accurate engram step tags).
+2. Call `mcp__dev-workflow__memory_search({ query: "read " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+3. Save the returned array of memory objects. Extract `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 1.2.
+4. Build a human-readable `engramContextBlock`: for each memory, a bullet `- [<type>] <context> — <action>`. If no results, set `engramContextBlock = "(none)"`.
+5. Note any `antipattern` records — they MUST be addressed explicitly by the subagent.
+6. **Fail-safe:** if `mcp__dev-workflow__memory_search` unavailable (engram daemon down, dev-workflow MCP not connected), log `[engram] search skipped for Step 1` to stderr, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`. Continue.
 
 ## Step 1.1: Launch subagent
 

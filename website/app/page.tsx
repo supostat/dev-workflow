@@ -39,7 +39,7 @@ const STATS = [
   { value: "11", label: "шагов pipeline" },
   { value: "3", label: "reviewer-а параллельно" },
   { value: "9", label: "критериев плана" },
-  { value: "25", label: "MCP tools" },
+  { value: "26", label: "MCP tools" },
   { value: "3", label: "хука автоматики" },
 ] as const;
 

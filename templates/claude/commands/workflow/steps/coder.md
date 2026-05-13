@@ -4,10 +4,11 @@
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__dev-workflow__memory_search({ query: "code " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 4.2. Build `engramContextBlock` (bullet list or `"(none)"`).
-3. Address any `antipattern` records — the coder MUST note why the approach differs or change approach.
-4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 4` to stderr, set `engramMemories = []`, `engramContextBlock = "(engram unavailable)"`. Continue.
+1. Call `mcp__dev-workflow__step_start({ stepName: "code", runId })` — updates run state to current step (accurate engram step tags).
+2. Call `mcp__dev-workflow__memory_search({ query: "code " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+3. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 4.2. Build `engramContextBlock` (bullet list or `"(none)"`).
+4. Address any `antipattern` records — the coder MUST note why the approach differs or change approach.
+5. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 4` to stderr, set `engramMemories = []`, `engramContextBlock = "(engram unavailable)"`. Continue.
 
 ## Step 4.1: Launch subagent
 

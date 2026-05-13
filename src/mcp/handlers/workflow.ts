@@ -9,6 +9,7 @@ import { createWorkflow, type WorkflowCreateInput } from "../workflow-create.js"
 
 const WORKFLOW_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const TASK_ID_PATTERN = /^task-\d{3,}$/;
+const RUN_ID_PATTERN = /^run-[a-f0-9]{12}$/;
 /**
  * Step names from custom workflow YAML become object keys in
  * `steps: Record<string, StepState>`. Rejecting `__proto__`, `constructor`,
@@ -188,4 +189,82 @@ export function workflowStart(
   }
 
   return { runId, traceFilePath };
+}
+
+/**
+ * Validate `step_start` input at the MCP boundary. Throws on first failure
+ * with a stable error code (E001..E003) — callers map these to JSON-RPC
+ * error responses.
+ *
+ * - `stepName` uses STEP_NAME_PATTERN (same kebab-case constraint that
+ *   guards prototype pollution in `workflow_start` step keys).
+ * - `runId`, when provided, must match the prefixed-hex format minted by
+ *   `workflow_start` (`run-<12hex>`). The engine-path date-seq generator
+ *   (`run-<YYYY-MM-DD>-<seq>`) is NOT accepted here — `step_start` is the
+ *   slash-orchestrator's symmetric counterpart to `step_complete` and
+ *   only the slash path produces prefixed-hex runIds.
+ */
+function validateStepStartInput(
+  stepName: unknown,
+  runId: unknown,
+): { stepName: string; runId: string | null } {
+  if (typeof stepName !== "string" || !STEP_NAME_PATTERN.test(stepName)) {
+    throw new Error(
+      "E001: stepName must match /^[a-z0-9][a-z0-9_-]{0,63}$/ " +
+      "(lowercase kebab-case, 1-64 chars, starts with [a-z0-9])",
+    );
+  }
+  let normalizedRunId: string | null = null;
+  if (runId !== undefined && runId !== null) {
+    if (typeof runId !== "string" || !RUN_ID_PATTERN.test(runId)) {
+      throw new Error("E002: runId, when provided, must match /^run-[a-f0-9]{12}$/");
+    }
+    normalizedRunId = runId;
+  }
+  return { stepName, runId: normalizedRunId };
+}
+
+/**
+ * Update `run.currentStep` at the start of a workflow step. Symmetric pair
+ * with `step_complete` — together they bracket every pipeline step so
+ * engram traces carry an accurate `step:<name>` auto-tag for memories
+ * stored/searched mid-step.
+ *
+ * Run resolution priority:
+ * 1. explicit `runId` parameter (orchestrator already knows the run)
+ * 2. `process.env.ENGRAM_RUN_ID` (set by `workflow_start`)
+ * 3. throw E003 — no active run, orchestrator must call `workflow_start` first
+ *
+ * Fail-loud on missing run (E004): `state.load` throws "Workflow run not
+ * found" when the file is absent. We surface this as E004 with the runId
+ * in the message instead of silent fail-safe — an orchestrator calling
+ * `step_start` against a stale/wrong runId would otherwise emit memories
+ * tagged with a step name that no run record will ever know about.
+ */
+export function stepStart(
+  vaultPath: string,
+  stepName: unknown,
+  runId: unknown,
+): { ok: true } {
+  const input = validateStepStartInput(stepName, runId);
+
+  const resolvedRunId = input.runId ?? process.env["ENGRAM_RUN_ID"];
+  if (!resolvedRunId) {
+    throw new Error(
+      "E003: no active run — call workflow_start first or pass runId explicitly",
+    );
+  }
+
+  const state = new WorkflowState(vaultPath);
+  let run: WorkflowRun;
+  try {
+    run = state.load(resolvedRunId);
+  } catch {
+    throw new Error(`E004: run not in state: ${resolvedRunId}`);
+  }
+
+  run.currentStep = input.stepName;
+  state.save(run);
+
+  return { ok: true };
 }

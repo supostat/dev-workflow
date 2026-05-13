@@ -4,10 +4,11 @@
 
 Before launching reviewers, orchestrator MUST:
 
-1. Call `mcp__dev-workflow__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 5.2. Build `engramContextBlock`.
-3. The SAME memory set is shared across all 3 reviewers — each reviewer provides their own judgments in their own output.
-4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemories = []`, continue.
+1. Call `mcp__dev-workflow__step_start({ stepName: "review", runId })` — updates run state to current step (accurate engram step tags). Called ONCE before all 3 reviewers — they share the same `step:review` auto-tag.
+2. Call `mcp__dev-workflow__memory_search({ query: "review " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+3. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 5.2. Build `engramContextBlock`.
+4. The SAME memory set is shared across all 3 reviewers — each reviewer provides their own judgments in their own output.
+5. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 5`, set `engramMemories = []`, continue.
 
 Then run `git diff` to capture actual changes.
 Pass CODE_DONE summary + diff + `engramContextBlock` + memory id bullet list (derived from `engramMemories.map(m => m.id)` for template substitution) to each reviewer.

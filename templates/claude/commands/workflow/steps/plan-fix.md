@@ -6,9 +6,10 @@ Apply surgical edits to the saved plan based on review remarks.
 
 Before launching the subagent, orchestrator MUST:
 
-1. Call `mcp__dev-workflow__memory_search({ query: "plan-fix " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
-2. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 3.5.3. Build `engramContextBlock`.
-3. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 3.5`, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`, continue.
+1. Call `mcp__dev-workflow__step_start({ stepName: "plan-fix", runId })` — updates run state to current step (accurate engram step tags).
+2. Call `mcp__dev-workflow__memory_search({ query: "plan-fix " + taskDescription + " " + branch, project: projectName, limit: 5 })`.
+3. Save `engramMemories = results.map(m => ({ id: m.id, memoryType: m.memory_type }))` — enriched objects (id + memoryType) required by `step_complete` in Step 3.5.3. Build `engramContextBlock`.
+4. **Fail-safe:** if search unavailable, log `[engram] search skipped for Step 3.5`, set `engramMemories = []` and `engramContextBlock = "(engram unavailable)"`, continue.
 
 ## Step 3.5.1: Skip-if-no-remarks check (orchestrator, BEFORE subagent)
 

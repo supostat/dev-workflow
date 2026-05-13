@@ -266,6 +266,26 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
+      name: "step_start",
+      description: "Update run.currentStep at the start of a workflow step. Pairs with step_complete to give engram traces accurate step:<name> tags. Call before memory_search calls in Step X.0 of each step file. Run resolution priority: explicit runId → ENGRAM_RUN_ID env → throw E003. Validation: stepName must match /^[a-z0-9][a-z0-9_-]{0,63}$/ (E001); runId, if provided, must match /^run-[a-f0-9]{12}$/ (E002); missing active run throws E003; runId not found in state throws E004.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          stepName: {
+            type: "string",
+            pattern: "^[a-z0-9][a-z0-9_-]{0,63}$",
+            description: "Pipeline step identifier (lowercase kebab-case, 1-64 chars, e.g. 'read', 'plan', 'code', 'review')",
+          },
+          runId: {
+            type: "string",
+            pattern: "^run-[a-f0-9]{12}$",
+            description: "Optional workflow run id (prefixed-hex format). Falls back to ENGRAM_RUN_ID env when omitted.",
+          },
+        },
+        required: ["stepName"],
+      },
+    },
+    {
       name: "memory_search",
       description: "Search Engram memories with auto-decoration (step/branch/run/task tags from active pipeline). Direct mcp__engram__memory_search remains available as escape hatch for explicit project/tag control.",
       inputSchema: {
