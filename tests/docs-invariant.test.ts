@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getToolDefinitions } from "../src/mcp/tools.js";
 import { PACKAGE_ROOT } from "../src/lib/package-root.js";
@@ -106,6 +106,19 @@ describe("docs-invariant: hook count", () => {
     const mdx = readSrc("website/content/docs/concepts/hooks.mdx");
     for (const event of declared) {
       expect(mdx, `hooks.mdx is missing hook ${event}`).toContain(event);
+    }
+  });
+
+  // Negative invariant — catches stale references to hook events that were
+  // removed from settings-template.ts but lingered in mdx tables, JSON examples,
+  // or section headings. Today's commit b7b9a6f cleared PostToolUse + PreCompact
+  // from concepts/hooks.mdx; this test guards against reintroduction.
+  const removedHooks = hookEvents.filter((event) => !declared.includes(event));
+
+  it("hooks.mdx does NOT mention any non-declared hook event", () => {
+    const mdx = readSrc("website/content/docs/concepts/hooks.mdx");
+    for (const event of removedHooks) {
+      expect(mdx, `hooks.mdx must not mention non-declared hook ${event}`).not.toContain(event);
     }
   });
 });
@@ -259,4 +272,46 @@ describe("docs-invariant: Engram Feedback empty-case guidance (run-432abc570e51)
     const matches = content.match(/no memories retrieved[\s\S]*?placeholder/gims);
     expect(matches?.length).toBe(3);
   });
+});
+
+describe("docs-invariant: skill directory frontmatter (commands-to-skills migration spec)", () => {
+  // Every bundled skill MUST have a SKILL.md with `name:` and `description:`
+  // fields. Namespaced skill dirs (`<ns>__<verb>`) MUST set `name: <ns>:<verb>`
+  // — that frontmatter field is the slash-registration source, not the
+  // directory layout. See knowledge.md 2026-05-14 addendum.
+  const skillsRoot = join(PACKAGE_ROOT, "templates/claude/skills");
+  const skillDirs = readdirSync(skillsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  it("templates/claude/skills/ has > 5 skills (sanity)", () => {
+    expect(skillDirs.length).toBeGreaterThan(5);
+  });
+
+  for (const dir of skillDirs) {
+    it(`${dir}/SKILL.md exists with well-formed frontmatter`, () => {
+      const skillPath = join(skillsRoot, dir, "SKILL.md");
+      const content = readFileSync(skillPath, "utf-8");
+
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      expect(fmMatch, `${dir}/SKILL.md missing frontmatter delimiter`).not.toBeNull();
+      const frontmatter = fmMatch![1];
+
+      const nameMatch = frontmatter.match(/^name:\s*(.+?)\s*$/m);
+      const descMatch = frontmatter.match(/^description:\s*(.+?)\s*$/m);
+      expect(nameMatch, `${dir}/SKILL.md missing 'name:' field`).not.toBeNull();
+      expect(descMatch, `${dir}/SKILL.md missing 'description:' field`).not.toBeNull();
+      expect(nameMatch![1].trim().length, `${dir}/SKILL.md 'name:' is empty`).toBeGreaterThan(0);
+      expect(descMatch![1].trim().length, `${dir}/SKILL.md 'description:' is empty`).toBeGreaterThan(0);
+
+      if (dir.includes("__")) {
+        const expectedSlug = dir.replace("__", ":");
+        expect(
+          nameMatch![1].trim(),
+          `${dir}/SKILL.md 'name:' must equal '${expectedSlug}' (commands-to-skills migration invariant)`,
+        ).toBe(expectedSlug);
+      }
+    });
+  }
 });
