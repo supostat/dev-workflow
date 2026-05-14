@@ -7,16 +7,18 @@ import {
 } from "../lib/workflow-render.js";
 import type { WorkflowDefinition } from "../workflow/types.js";
 import { listAvailableWorkflows, resolveWorkflow } from "./run.js";
+import { runWorkflowCleanup } from "./workflow-cleanup.js";
 
-const SUBCOMMANDS: ReadonlySet<string> = new Set(["show", "graph", "effective"]);
+const SUBCOMMANDS: ReadonlySet<string> = new Set(["show", "graph", "effective", "cleanup"]);
 
 function printUsage(): void {
-  console.error("Usage: dev-workflow workflow <subcommand> <name> [options]");
+  console.error("Usage: dev-workflow workflow <subcommand> [args]");
   console.error("");
   console.error("Subcommands:");
   console.error("  show <name> [--bodies]      List steps and metadata");
   console.error("  graph <name> [--ascii]      Render DAG (Mermaid by default)");
   console.error("  effective <name>            Show resolved step-files and subagents");
+  console.error("  cleanup [options]           Mark/delete stale paused/running runs");
 }
 
 function failWithUsage(message: string): void {
@@ -39,6 +41,20 @@ export function runWorkflowCommand(args: string[]): void {
     return;
   }
 
+  const context = detectContext();
+  if (!context) {
+    console.error("Not a git repository.");
+    process.exitCode = 1;
+    return;
+  }
+
+  // cleanup operates on the runs directory, not a specific workflow definition —
+  // it does not take a workflow-name argument.
+  if (subcommand === "cleanup") {
+    runWorkflowCleanup(args.slice(1), context.vaultPath);
+    return;
+  }
+
   const workflowName = args[1];
   if (!workflowName) {
     failWithUsage(`workflow name required for "${subcommand}"`);
@@ -46,13 +62,6 @@ export function runWorkflowCommand(args: string[]): void {
   }
 
   const flags = args.slice(2);
-
-  const context = detectContext();
-  if (!context) {
-    console.error("Not a git repository.");
-    process.exitCode = 1;
-    return;
-  }
 
   let workflow: WorkflowDefinition;
   try {

@@ -56,6 +56,7 @@ Usage:
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow engram-trace <runId>      Show engram socket trace summary [--raw]
   dev-workflow workflow show|graph|effective <name>   Inspect workflow structure
+  dev-workflow workflow cleanup [options] Mark/delete stale paused or running runs
   dev-workflow vault diff [SPEC.md]    Compare SPEC.md against vault sections
   dev-workflow serve                     Start MCP server
   dev-workflow help                      Show this help

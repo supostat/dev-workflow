@@ -51,7 +51,7 @@ export interface WorkflowDefinition {
 }
 
 export type StepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
-export type WorkflowStatus = "running" | "completed" | "failed" | "paused";
+export type WorkflowStatus = "running" | "completed" | "failed" | "paused" | "aborted";
 
 export interface StepState {
   status: StepStatus;
@@ -103,4 +103,11 @@ export interface WorkflowRun {
   status: WorkflowStatus;
   steps: Record<string, StepState>;
   telemetry?: TelemetryCounters;
+  /**
+   * Free-form reason set when status transitions to `"aborted"`. Currently
+   * only written by `dev-workflow workflow cleanup` (which marks
+   * orchestrator-stranded runs that never reached a terminal state).
+   * Optional — absent for runs that completed/failed normally.
+   */
+  abortReason?: string;
 }
