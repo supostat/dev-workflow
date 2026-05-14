@@ -145,6 +145,72 @@ describe("appendEngramTrace", () => {
     expect(second.ok).toBe(false);
     expect(second.error).toBe("oops");
   });
+
+  describe("ENGRAM_STEP top-level field (Option B from 2026-05-14 debt)", () => {
+    let originalStep: string | undefined;
+
+    beforeEach(() => {
+      originalStep = process.env["ENGRAM_STEP"];
+    });
+
+    afterEach(() => {
+      if (originalStep === undefined) {
+        delete process.env["ENGRAM_STEP"];
+      } else {
+        process.env["ENGRAM_STEP"] = originalStep;
+      }
+    });
+
+    it("populates event.step from ENGRAM_STEP env when set", () => {
+      const tracePath = join(tempDir, "step.jsonl");
+      process.env["ENGRAM_TRACE_FILE"] = tracePath;
+      process.env["ENGRAM_STEP"] = "read";
+
+      appendEngramTrace(makeEvent({ method: "memory_search" }));
+
+      const parsed = JSON.parse(
+        readFileSync(tracePath, "utf-8").split("\n")[0]!,
+      ) as EngramTraceEvent;
+      expect(parsed.step).toBe("read");
+    });
+
+    it("omits step field when ENGRAM_STEP is unset", () => {
+      const tracePath = join(tempDir, "no-step.jsonl");
+      process.env["ENGRAM_TRACE_FILE"] = tracePath;
+      delete process.env["ENGRAM_STEP"];
+
+      appendEngramTrace(makeEvent({ method: "memory_search" }));
+
+      const parsed = JSON.parse(
+        readFileSync(tracePath, "utf-8").split("\n")[0]!,
+      ) as Record<string, unknown>;
+      expect("step" in parsed).toBe(false);
+    });
+
+    it("omits step field when ENGRAM_STEP is empty string", () => {
+      const tracePath = join(tempDir, "empty-step.jsonl");
+      process.env["ENGRAM_TRACE_FILE"] = tracePath;
+      process.env["ENGRAM_STEP"] = "";
+
+      appendEngramTrace(makeEvent({ method: "memory_search" }));
+
+      const parsed = JSON.parse(
+        readFileSync(tracePath, "utf-8").split("\n")[0]!,
+      ) as Record<string, unknown>;
+      expect("step" in parsed).toBe(false);
+    });
+
+    it("does not mutate the caller's event object", () => {
+      const tracePath = join(tempDir, "no-mutate.jsonl");
+      process.env["ENGRAM_TRACE_FILE"] = tracePath;
+      process.env["ENGRAM_STEP"] = "plan";
+
+      const original = makeEvent({ method: "memory_search" });
+      appendEngramTrace(original);
+
+      expect((original as { step?: string }).step).toBeUndefined();
+    });
+  });
 });
 
 describe("engramTrace CLI", () => {

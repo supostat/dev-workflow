@@ -171,7 +171,12 @@ function aggregateMemoryTypes(events: EngramTraceEvent[]): Record<string, number
 function aggregateByStep(events: EngramTraceEvent[]): EngramStats["byStep"] {
   const acc: Record<string, { search: number; store: number; judge: number }> = {};
   for (const event of events) {
-    const step = tagValue(event.params["tags"], "step:");
+    // Prefer top-level `step` field (Option B fix 2026-05-14); fall back to
+    // legacy `step:<name>` tag in params for pre-fix trace files.
+    const stepFromField = typeof event.step === "string" && event.step.length > 0
+      ? event.step
+      : null;
+    const step = stepFromField ?? tagValue(event.params["tags"], "step:");
     if (!step) continue;
     const slot = acc[step] ?? { search: 0, store: 0, judge: 0 };
     if (event.method === "memory_search") slot.search++;

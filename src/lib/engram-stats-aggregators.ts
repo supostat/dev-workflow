@@ -43,6 +43,18 @@ function tagValue(tags: unknown, prefix: string): string | null {
 }
 
 /**
+ * Step name for a trace event. Prefers the top-level `step` field (set by
+ * `appendEngramTrace` from `process.env.ENGRAM_STEP`, written since
+ * `2026-05-14` Option B fix). Falls back to the legacy `step:<name>` tag in
+ * `params.tags` for traces written before that fix (still in the
+ * `<vault>/workflow-state/runs/` directory).
+ */
+function stepOfEvent(event: AnnotatedEvent): string | null {
+  if (typeof event.step === "string" && event.step.length > 0) return event.step;
+  return tagValue(event.params["tags"], "step:");
+}
+
+/**
  * Extract ids of pattern/antipattern memories from a memory_search
  * response_summary blob. `memory_type` lives per-memory inside the JSON array
  * (NOT on event.params — search params shape is `{ query, project, limit, tags }`).
@@ -180,7 +192,7 @@ export function aggregatePerStepHitRate(events: AnnotatedEvent[]): PerStepHitRat
   const perStep: Record<string, { searches: number; nonEmpty: number }> = {};
   for (const event of events) {
     if (event.method !== "memory_search") continue;
-    const step = tagValue(event.params["tags"], "step:");
+    const step = stepOfEvent(event);
     if (!step) continue;
     const slot = perStep[step] ?? { searches: 0, nonEmpty: 0 };
     slot.searches++;
@@ -219,7 +231,7 @@ export function detectMissingStepComplete(
   // key: `${runId} ${step}`
   const byKey = new Map<string, MissingStepCompleteEntry>();
   for (const event of events) {
-    const step = tagValue(event.params["tags"], "step:");
+    const step = stepOfEvent(event);
     if (!step) continue;
     const key = `${event.run_id} ${step}`;
     let slot = byKey.get(key);

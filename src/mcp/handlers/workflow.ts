@@ -266,5 +266,11 @@ export function stepStart(
   run.currentStep = input.stepName;
   state.save(run);
 
+  // Propagate step name to engram trace events via env. Subagent
+  // subprocesses inherit ENGRAM_STEP and so emit trace events
+  // self-tagged with the current step, even though search-path tags
+  // no longer carry step: (asymmetric tag injection, ADR 2026-05-14).
+  process.env["ENGRAM_STEP"] = input.stepName;
+
   return { ok: true };
 }

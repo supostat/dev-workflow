@@ -374,6 +374,42 @@ describe("collectEngramStats", () => {
     expect(stats.perStepHitRate["coder"]).toEqual({ searches: 2, nonEmpty: 0, percent: 0 });
   });
 
+  it("perStepHitRate: reads top-level event.step (Option B fix 2026-05-14)", async () => {
+    writeRun(makeRun("run-step-field"));
+    const nonEmpty = '[{"id":"m"}]';
+    writeTrace("run-step-field", [
+      { ts: "x", method: "memory_search", params: { tags: ["branch:main"] }, ok: true, response_summary: nonEmpty, duration_ms: 100, step: "read" },
+      { ts: "x", method: "memory_search", params: { tags: ["branch:main"] }, ok: true, response_summary: "[]", duration_ms: 100, step: "read" },
+      { ts: "x", method: "memory_search", params: { tags: ["branch:main"] }, ok: true, response_summary: nonEmpty, duration_ms: 100, step: "plan" },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["read"]).toEqual({ searches: 2, nonEmpty: 1, percent: 50 });
+    expect(stats.perStepHitRate["plan"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+  });
+
+  it("perStepHitRate: top-level step wins over legacy step:<name> tag", async () => {
+    writeRun(makeRun("run-step-precedence"));
+    writeTrace("run-step-precedence", [
+      // event.step=read but tag says step:plan — top-level field wins
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan", "branch:main"] }, ok: true, response_summary: '[{"id":"m"}]', duration_ms: 100, step: "read" },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["read"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+    expect(stats.perStepHitRate["plan"]).toBeUndefined();
+  });
+
+  it("perStepHitRate: empty-string event.step falls back to legacy tag", async () => {
+    writeRun(makeRun("run-step-empty"));
+    writeTrace("run-step-empty", [
+      { ts: "x", method: "memory_search", params: { tags: ["step:plan", "branch:main"] }, ok: true, response_summary: '[{"id":"m"}]', duration_ms: 100, step: "" },
+    ]);
+
+    const stats = await collectEngramStats(vaultPath, { skipLive: true });
+    expect(stats.perStepHitRate["plan"]).toEqual({ searches: 1, nonEmpty: 1, percent: 100 });
+  });
+
   it("perStepHitRate: searches without step tag are skipped, non-search methods ignored", async () => {
     writeRun(makeRun("run-hr-skip"));
     writeTrace("run-hr-skip", [

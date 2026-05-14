@@ -9,6 +9,15 @@ export interface EngramTraceEvent {
   response_summary: string;
   duration_ms: number;
   error?: string;
+  /**
+   * Pipeline step at the moment the event was emitted, sourced from
+   * `process.env.ENGRAM_STEP` (set by `step_start` handler). Optional —
+   * legacy traces and out-of-pipeline calls omit it. Aggregators prefer
+   * this field over the legacy `step:<name>` tag in `params.tags`,
+   * which the asymmetric tag injection fix (ADR 2026-05-14) stripped
+   * from the search wire.
+   */
+  step?: string;
 }
 
 const ensuredDirs = new Set<string>();
@@ -16,13 +25,15 @@ const ensuredDirs = new Set<string>();
 export function appendEngramTrace(event: EngramTraceEvent): void {
   const filePath = process.env["ENGRAM_TRACE_FILE"];
   if (!filePath) return;
+  const step = process.env["ENGRAM_STEP"];
+  const enriched: EngramTraceEvent = step ? { ...event, step } : event;
   try {
     const dir = dirname(filePath);
     if (!ensuredDirs.has(dir)) {
       mkdirSync(dir, { recursive: true });
       ensuredDirs.add(dir);
     }
-    appendFileSync(filePath, JSON.stringify(event) + "\n");
+    appendFileSync(filePath, JSON.stringify(enriched) + "\n");
   } catch {
     // Trace failures must never bubble — observability is best-effort,
     // matching engram socket fail-safe semantics.
