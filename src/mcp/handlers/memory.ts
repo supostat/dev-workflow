@@ -1,6 +1,6 @@
 import type { ProjectContext } from "../../lib/types.js";
 import { engramSearch, engramStoreStrict, engramJudge } from "../../lib/engram.js";
-import { loadPipelineContext, buildAutoTags, mergeTags } from "../engram-proxy.js";
+import { loadPipelineContext, buildAutoTags, buildSearchTags, mergeTags } from "../engram-proxy.js";
 import {
   parseEngramFeedback as parseEngramFeedbackFn,
   type EngramFeedbackResult,
@@ -27,7 +27,7 @@ export async function memorySearch(
 ): Promise<unknown> {
   if (opts.tags) validateTags(opts.tags, "memory_search");
   const pipelineCtx = loadPipelineContext(context);
-  const tags = mergeTags(buildAutoTags(pipelineCtx), opts.tags);
+  const tags = mergeTags(buildSearchTags(pipelineCtx), opts.tags);
   const result = await engramSearch(
     query,
     context.projectName,

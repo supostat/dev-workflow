@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   loadPipelineContext,
   buildAutoTags,
+  buildSearchTags,
   mergeTags,
 } from "../src/mcp/engram-proxy.js";
 import type { ProjectContext } from "../src/lib/types.js";
@@ -135,6 +136,45 @@ describe("buildAutoTags", () => {
       "branch:feat-1",
     ]);
     expect(buildAutoTags({})).toEqual([]);
+  });
+});
+
+describe("buildSearchTags", () => {
+  it("returns empty array for empty context", () => {
+    expect(buildSearchTags({})).toEqual([]);
+  });
+
+  it("returns branch tag alone when only branch is present", () => {
+    expect(buildSearchTags({ branch: "main" })).toEqual(["branch:main"]);
+  });
+
+  it("returns branch + task in order when both present", () => {
+    expect(buildSearchTags({ branch: "main", taskId: "task-021" })).toEqual([
+      "branch:main",
+      "task:task-021",
+    ]);
+  });
+
+  it("drops volatile run/step/phase tags from full context (cross-run reuse)", () => {
+    const tags = buildSearchTags({
+      branch: "main",
+      step: "read",
+      runId: "run-abc123def456",
+      taskId: "task-021",
+      phase: "engram-hardening",
+    });
+    expect(tags).toEqual(["branch:main", "task:task-021"]);
+    expect(tags).not.toContain("step:read");
+    expect(tags).not.toContain("run:run-abc123def456");
+    expect(tags).not.toContain("phase:engram-hardening");
+  });
+
+  it("returns empty when only volatile tags are present (no stable scope)", () => {
+    expect(buildSearchTags({
+      step: "code",
+      runId: "run-deadbeef0000",
+      phase: "x",
+    })).toEqual([]);
   });
 });
 
@@ -371,7 +411,7 @@ describe("memory_search MCP handler", () => {
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it("forwards query, project, limit, and merged auto-tags to engramSearch", async () => {
+  it("forwards query, project, limit, and merged search-tags to engramSearch (drops volatile run/step/phase)", async () => {
     const env = createTestContext();
     projectRoot = env.projectRoot;
     writeActiveRun(env.context.vaultPath, {
@@ -389,13 +429,12 @@ describe("memory_search MCP handler", () => {
       "auth flow",
       "test-project",
       3,
-      expect.arrayContaining([
-        "step:plan",
-        "branch:feature-x",
-        "task:task-001",
-        "custom",
-      ]),
+      ["branch:feature-x", "task:task-001", "custom"],
     );
+    const tagsArg = vi.mocked(engramSearch).mock.calls[0]![3]!;
+    expect(tagsArg).not.toContain("step:plan");
+    expect(tagsArg.some((t) => t.startsWith("run:"))).toBe(false);
+    expect(tagsArg.some((t) => t.startsWith("phase:"))).toBe(false);
   });
 
   it("uses default limit 5 when omitted", async () => {

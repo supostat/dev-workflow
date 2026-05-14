@@ -66,6 +66,26 @@ export function buildAutoTags(c: PipelineContext): string[] {
   return tags;
 }
 
+/**
+ * Build tags filter for memory_search (retrieval path).
+ *
+ * Asymmetric to buildAutoTags: drops volatile per-run scope tags
+ * (run/step/phase) which would AND-exclude all prior memories — engram
+ * applies tags filter with AND semantics, so a unique-per-run `run:<id>`
+ * tag guarantees zero cross-run matches. Keeps stable scope tags
+ * (branch/task) so retrieval is scoped to the project context without
+ * narrowing to a single pipeline invocation.
+ *
+ * Store path uses full buildAutoTags for attribution accuracy. See ADR
+ * `2026-05-14-asymmetric-engram-tag-injection...` for the design split.
+ */
+export function buildSearchTags(c: PipelineContext): string[] {
+  const tags: string[] = [];
+  if (c.branch) tags.push(`branch:${c.branch}`);
+  if (c.taskId) tags.push(`task:${c.taskId}`);
+  return tags;
+}
+
 export function mergeTags(autoTags: string[], userTags?: string[]): string[] {
   if (!userTags?.length) return autoTags;
   return Array.from(new Set([...autoTags, ...userTags]));
