@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { icon, keyValue } from "../lib/output.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
+import { updateSkillsAdditively } from "../lib/skills-update.js";
 
 export function update(): void {
   const context = detectContext();
@@ -43,8 +44,8 @@ export function update(): void {
   const skillsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "skills");
   const skillsTargetDir = join(projectRoot, ".claude", "skills");
   if (existsSync(skillsTemplateDir)) {
-    cpSync(skillsTemplateDir, skillsTargetDir, { recursive: true, force: true });
-    console.log(keyValue("\u2713 skills/", "updated from package"));
+    const { added, skipped } = updateSkillsAdditively(skillsTemplateDir, skillsTargetDir);
+    console.log(keyValue("\u2713 skills/", `${added} added, ${skipped} skipped (user-modified)`));
     updated++;
   }
 
