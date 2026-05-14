@@ -10,6 +10,7 @@ import { isEngramAvailable } from "../lib/engram.js";
 import { buildSettingsJson } from "../lib/settings-template.js";
 import { getPackageVersion, writeLock } from "../lib/migration-lock.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
+import { requireClaudeCodeVersion } from "../lib/claude-code-version.js";
 
 interface InitOptions {
   force: boolean;
@@ -74,6 +75,20 @@ function mergeSettingsJson(filepath: string, newSettings: Record<string, unknown
 }
 
 export function init(options: InitOptions): void {
+  const versionCheck = requireClaudeCodeVersion();
+  if (!versionCheck.ok) {
+    console.error(
+      `Error: Claude Code v${versionCheck.detected} detected, but dev-workflow skills format requires v${versionCheck.minimum} or later. Please upgrade Claude Code.`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (versionCheck.detected === null) {
+    console.error(
+      `Note: Claude Code CLI not detected on PATH. dev-workflow init will proceed, but you'll need Claude Code v${versionCheck.minimum}+ to use the scaffolded skills.`,
+    );
+  }
+
   const context = detectContext();
   if (!context) {
     console.error("Error: not a git repository. Run 'git init' first.");

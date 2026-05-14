@@ -8,6 +8,7 @@ import { getBuiltinWorkflows } from "../workflow/builtin.js";
 import { icon } from "../lib/output.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
 import { parseFrontmatter } from "../lib/frontmatter.js";
+import { requireClaudeCodeVersion } from "../lib/claude-code-version.js";
 
 export interface SkillProblem {
   filepath: string;
@@ -165,6 +166,18 @@ export async function doctor(fix: boolean = false): Promise<void> {
       console.log(`    ${icon.error} ${problem.filepath}: ${problem.reason}`);
       issues.push(`skill ${problem.filepath}: ${problem.reason}`);
     }
+  }
+
+  // Claude Code version
+  const versionCheck = requireClaudeCodeVersion();
+  if (versionCheck.detected === null) {
+    console.log(`  ${icon.warning} Claude Code     not detected on PATH`);
+    issues.push(`Claude Code CLI not on PATH — skills format requires v${versionCheck.minimum}+`);
+  } else if (!versionCheck.ok) {
+    console.log(`  ${icon.error} Claude Code     v${versionCheck.detected} (need v${versionCheck.minimum}+)`);
+    issues.push(`Claude Code v${versionCheck.detected} is older than required v${versionCheck.minimum} for skills format`);
+  } else {
+    console.log(`  ${icon.success} Claude Code     v${versionCheck.detected}`);
   }
 
   // CLAUDE.md
