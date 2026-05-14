@@ -200,7 +200,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     },
     {
       name: "workflow_create",
-      description: "Create a custom workflow YAML in .dev-vault/workflows/<name>.yaml. Vault-only — does NOT write to .claude/commands/ (session-start hook auto-generates shims on next session restart).",
+      description: "Create a custom workflow YAML in .dev-vault/workflows/<name>.yaml. Vault-only — does NOT register a slash directly (session-start hook auto-generates a `.claude/commands/workflow/<name>.md` shim that delegates to the /workflow:dev skill on next session restart).",
       inputSchema: {
         type: "object",
         properties: {

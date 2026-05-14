@@ -4,19 +4,19 @@ import type { StepDefinition, WorkflowDefinition } from "../workflow/types.js";
 import { PACKAGE_ROOT } from "./package-root.js";
 
 const BUILTIN_STEP_FILES: Record<string, string> = {
-  reader: "templates/claude/commands/workflow/steps/read.md",
-  planner: "templates/claude/commands/workflow/steps/plan.md",
-  "plan-reviewer": "templates/claude/commands/workflow/steps/plan-review.md",
-  coder: "templates/claude/commands/workflow/steps/coder.md",
-  reviewer: "templates/claude/commands/workflow/steps/review.md",
-  tester: "templates/claude/commands/workflow/steps/test.md",
-  verifier: "templates/claude/commands/workflow/steps/verify.md",
-  committer: "templates/claude/commands/workflow/steps/commit.md",
-  preflight: "templates/claude/commands/workflow/steps/preflight.md",
-  "vault-updates": "templates/claude/commands/workflow/steps/vault-updates.md",
+  reader: "templates/claude/skills/workflow__dev/steps/read.md",
+  planner: "templates/claude/skills/workflow__dev/steps/plan.md",
+  "plan-reviewer": "templates/claude/skills/workflow__dev/steps/plan-review.md",
+  coder: "templates/claude/skills/workflow__dev/steps/coder.md",
+  reviewer: "templates/claude/skills/workflow__dev/steps/review.md",
+  tester: "templates/claude/skills/workflow__dev/steps/test.md",
+  verifier: "templates/claude/skills/workflow__dev/steps/verify.md",
+  committer: "templates/claude/skills/workflow__dev/steps/commit.md",
+  preflight: "templates/claude/skills/workflow__dev/steps/preflight.md",
+  "vault-updates": "templates/claude/skills/workflow__dev/steps/vault-updates.md",
 };
 
-const PLAN_FIX_STEP_FILE = "templates/claude/commands/workflow/steps/plan-fix.md";
+const PLAN_FIX_STEP_FILE = "templates/claude/skills/workflow__dev/steps/plan-fix.md";
 
 const ORCHESTRATOR_AGENTS: ReadonlySet<string> = new Set(["preflight", "vault-updates"]);
 
@@ -36,7 +36,7 @@ const SUBSEPARATOR = "───────────────────�
 const SAFE_MERMAID_ID = /^[A-Za-z0-9_-]+$/;
 const ALLOWED_STEP_FILE_PREFIXES = [
   ".dev-vault/workflow-steps/",
-  "templates/claude/commands/workflow/steps/",
+  "templates/claude/skills/workflow__dev/steps/",
 ];
 
 function escapeMermaidId(value: string): string {
@@ -116,7 +116,7 @@ function resolveStepFile(step: StepDefinition): ResolvedStepFile {
 function resolveStepFileForRead(step: StepDefinition): string | null {
   if (step.stepFile !== undefined) {
     validateStepFilePath(step.stepFile);
-    if (step.stepFile.startsWith("templates/claude/commands/workflow/steps/")) {
+    if (step.stepFile.startsWith("templates/claude/skills/workflow__dev/steps/")) {
       return join(PACKAGE_ROOT, step.stepFile);
     }
     return join(process.cwd(), step.stepFile);

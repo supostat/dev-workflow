@@ -152,13 +152,13 @@ describe("docs-invariant: Path D subagent dispatch wording (commit dcda8bb..., A
   // don't regress: built-in Explore subagent is FULLY ISOLATED from MCP, the
   // only way subagents can call `mcp__dev-workflow__memory_*` is via
   // general-purpose dispatch.
-  const dispatchMd = readSrc("templates/claude/commands/workflow/_dispatch.md");
+  const dispatchMd = readSrc("templates/claude/skills/workflow__dev/SKILL.md");
 
-  it("_dispatch.md references subagent_type: general-purpose at least once", () => {
+  it("SKILL.md references subagent_type: general-purpose at least once", () => {
     expect(dispatchMd).toMatch(/subagent_type:\s*general-purpose/);
   });
 
-  it("_dispatch.md does NOT instruct passing subagent_type: Explore or Full", () => {
+  it("SKILL.md does NOT instruct passing subagent_type: Explore or Full", () => {
     expect(dispatchMd).not.toMatch(/subagent_type:\s*(Explore|Full)\b/);
   });
 
@@ -178,7 +178,7 @@ describe("docs-invariant: Path D subagent dispatch wording (commit dcda8bb..., A
 
   for (const stepFile of stepFiles) {
     it(`steps/${stepFile} uses "Dispatch" not "Launch Explore/Full"`, () => {
-      const content = readSrc(`templates/claude/commands/workflow/steps/${stepFile}`);
+      const content = readSrc(`templates/claude/skills/workflow__dev/steps/${stepFile}`);
       expect(content).not.toMatch(/Launch\s+\*\*(?:Explore|Full)\*\*/);
     });
   }
@@ -246,12 +246,12 @@ describe("docs-invariant: Engram Feedback empty-case guidance (run-432abc570e51)
     "templates/agents/reviewer.md",
     "templates/agents/architect.md",
     "templates/agents/debugger.md",
-    "templates/claude/commands/workflow/steps/read.md",
-    "templates/claude/commands/workflow/steps/plan.md",
-    "templates/claude/commands/workflow/steps/plan-fix.md",
-    "templates/claude/commands/workflow/steps/coder.md",
-    "templates/claude/commands/workflow/steps/review.md",
-    "templates/claude/commands/workflow/steps/verify.md",
+    "templates/claude/skills/workflow__dev/steps/read.md",
+    "templates/claude/skills/workflow__dev/steps/plan.md",
+    "templates/claude/skills/workflow__dev/steps/plan-fix.md",
+    "templates/claude/skills/workflow__dev/steps/coder.md",
+    "templates/claude/skills/workflow__dev/steps/review.md",
+    "templates/claude/skills/workflow__dev/steps/verify.md",
   ];
 
   it("EMPTY_CASE_FILES has exactly 12 entries (sanity)", () => {
@@ -268,7 +268,7 @@ describe("docs-invariant: Engram Feedback empty-case guidance (run-432abc570e51)
     // The three reviewer prompt blocks (security/quality/coverage) are
     // intentionally parallel — losing the guidance from just one is the
     // exact regression the docs-invariant guards against.
-    const content = readSrc("templates/claude/commands/workflow/steps/review.md");
+    const content = readSrc("templates/claude/skills/workflow__dev/steps/review.md");
     const matches = content.match(/no memories retrieved[\s\S]*?placeholder/gims);
     expect(matches?.length).toBe(3);
   });

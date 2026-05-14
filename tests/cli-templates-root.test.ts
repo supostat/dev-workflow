@@ -30,10 +30,10 @@ describe("templates-root CLI command", () => {
     expect(statSync(out).isDirectory()).toBe(true);
   });
 
-  it("resolves to the actual bundled templates directory (sanity: vault/upgrade.md present)", () => {
+  it("resolves to the actual bundled templates directory (sanity: vault__upgrade skill present)", () => {
     templatesRoot();
     const out = captured();
-    expect(existsSync(join(out, "claude/commands/vault/upgrade.md"))).toBe(true);
+    expect(existsSync(join(out, "claude/skills/vault__upgrade/SKILL.md"))).toBe(true);
   });
 
   it("returns a canonical path (no .. segments left after resolve)", () => {

@@ -149,13 +149,13 @@ describe("renderEffective", () => {
     const out = renderEffective(SIMPLE_WORKFLOW);
     expect(out).toContain("Resolved step file:");
     expect(out).toContain("(builtin-table)");
-    expect(out).toContain("templates/claude/commands/workflow/steps/read.md");
+    expect(out).toContain("templates/claude/skills/workflow__dev/steps/read.md");
   });
 
   it("renders builtin-table (plan-fix special) source for plan-fix step", () => {
     const out = renderEffective(DEV_WORKFLOW);
     expect(out).toContain("(builtin-table (plan-fix special))");
-    expect(out).toContain("templates/claude/commands/workflow/steps/plan-fix.md");
+    expect(out).toContain("templates/claude/skills/workflow__dev/steps/plan-fix.md");
   });
 
   it("renders explicit (stepFile) source when step has custom stepFile", () => {
@@ -231,7 +231,7 @@ describe("renderShow with bodies", () => {
     const out = renderShow(SIMPLE_WORKFLOW, { bodies: true });
     expect(out).toContain("Step file bodies:");
     expect(out).toContain("▼ [0] read");
-    expect(out).toContain("templates/claude/commands/workflow/steps/read.md");
+    expect(out).toContain("templates/claude/skills/workflow__dev/steps/read.md");
     // Line numbers begin at 1 padded with at least one space
     expect(out).toMatch(/\n\s*1 /);
   });

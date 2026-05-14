@@ -3,13 +3,13 @@ import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Drift-detection tests for templates/claude/commands/vault/upgrade.md.
-// The slash markdown is template-static (not unit-runnable), so these tests
+// Drift-detection tests for templates/claude/skills/vault__upgrade/SKILL.md.
+// The skill body is template-static (not unit-runnable), so these tests
 // are essentially grep-against-canonical: assert that key invariant phrases
 // exist. Catches accidental deletion / refactor breakage in CI.
 
 const PACKAGE_ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
-const UPGRADE_MD = join(PACKAGE_ROOT, "templates/claude/commands/vault/upgrade.md");
+const UPGRADE_MD = join(PACKAGE_ROOT, "templates/claude/skills/vault__upgrade/SKILL.md");
 
 function readUpgrade(): string {
   return readFileSync(UPGRADE_MD, "utf-8");

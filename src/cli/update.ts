@@ -29,15 +29,6 @@ export function update(): void {
   const lockBumps: Partial<Omit<LockState, "version" | "updated_at">> = {};
   const packageVersion = getPackageVersion();
 
-  const commandsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "commands");
-  const commandsTargetDir = join(projectRoot, ".claude", "commands");
-  if (existsSync(commandsTemplateDir)) {
-    cpSync(commandsTemplateDir, commandsTargetDir, { recursive: true, force: true });
-    console.log(keyValue("\u2713 commands/", "updated from package"));
-    lockBumps.commands_version = packageVersion;
-    updated++;
-  }
-
   const agentsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "agents");
   const agentsTargetDir = join(projectRoot, ".claude", "agents");
   if (existsSync(agentsTemplateDir)) {

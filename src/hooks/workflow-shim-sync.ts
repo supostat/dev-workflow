@@ -135,12 +135,12 @@ function renderWorkflowShim(workflow: WorkflowDefinition): string {
     "",
     description,
     "",
-    `**Dispatch:** apply the generic dispatcher at \`templates/claude/commands/workflow/_dispatch.md\` with:`,
+    `**Dispatch:** apply the \`/workflow:dev\` skill's dispatcher logic with:`,
     "",
     `- \`workflow = "${workflow.name}"\``,
     "- `args = ` the ARGUMENTS value supplied by the harness",
     "",
-    `The dispatcher resolves \`${workflow.name}\` from \`.dev-vault/workflows/${workflow.name}.yaml\`, runs each step via the step-file resolution order, enforces gates and permissions, and records findings to the vault.`,
+    `The skill (\`templates/claude/skills/workflow__dev/SKILL.md\`) resolves \`${workflow.name}\` from \`.dev-vault/workflows/${workflow.name}.yaml\`, runs each step via the step-file resolution order, enforces gates and permissions, and records findings to the vault.`,
   ].join("\n");
 
   return serializeFrontmatter(

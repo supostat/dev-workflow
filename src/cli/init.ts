@@ -143,14 +143,7 @@ export function init(options: InitOptions): void {
     options.force,
   );
 
-  // 2. Copy commands from templates
-  const commandsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "commands");
-  const commandsTargetDir = join(projectRoot, ".claude", "commands");
-
-  if (existsSync(commandsTemplateDir)) {
-    cpSync(commandsTemplateDir, commandsTargetDir, { recursive: true, force: options.force });
-  }
-
+  // 2. Copy agents from templates (commands removed in v2.0.0; skills supersede)
   const agentsTemplateDir = join(PACKAGE_ROOT, "templates", "claude", "agents");
   const agentsTargetDir = join(projectRoot, ".claude", "agents");
   if (existsSync(agentsTemplateDir)) {
@@ -165,13 +158,11 @@ export function init(options: InitOptions): void {
 
   console.log(section(icon.vault, "Claude Code"));
   console.log(keyValue("\u2713 settings.json", "hooks + MCP configured"));
-  console.log(keyValue("\u2713 commands/", "17 commands installed"));
   console.log(keyValue("\u2713 agents/", "2 agents installed"));
   const skillCount = existsSync(skillsTargetDir) ? readdirSync(skillsTargetDir).length : 0;
   console.log(keyValue("\u2713 skills/", `${skillCount} skill(s) installed`));
   const packageVersion = getPackageVersion();
   writeLock(projectRoot, {
-    commands_version: packageVersion,
     agents_version: packageVersion,
     skills_version: packageVersion,
   });

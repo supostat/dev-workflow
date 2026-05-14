@@ -61,7 +61,7 @@ const VALID_GATES: ReadonlySet<string> = new Set([
 const DEV_CLASS_AGENTS: ReadonlySet<string> = new Set(["coder", "committer"]);
 const STEP_FILE_ALLOWED_PREFIXES = [
   ".dev-vault/workflow-steps",
-  "templates/claude/commands/workflow/steps",
+  "templates/claude/skills/workflow__dev/steps",
 ];
 
 class CliStepExecutor implements StepExecutor {

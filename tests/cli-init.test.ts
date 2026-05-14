@@ -86,13 +86,10 @@ describe("init CLI command — E2E", () => {
     expect(devWorkflow.args).toContain("serve");
   });
 
-  it("copies .claude/commands/ from templates (non-empty dir)", () => {
+  it("does NOT write .claude/commands/ (removed in v2.0.0 — skills supersede)", () => {
     init({ force: true });
     const commandsDir = join(projectRoot, ".claude", "commands");
-    expect(existsSync(commandsDir)).toBe(true);
-    expect(statSync(commandsDir).isDirectory()).toBe(true);
-    // Spot-check: workflow/dev.md should be present
-    expect(existsSync(join(commandsDir, "workflow", "dev.md"))).toBe(true);
+    expect(existsSync(commandsDir)).toBe(false);
   });
 
   it("copies .claude/agents/ from templates", () => {
@@ -117,7 +114,7 @@ describe("init CLI command — E2E", () => {
     expect(statSync(skillsDir).isDirectory()).toBe(true);
     // Spot-check: bundled obsidian-markdown skill from project genesis
     expect(existsSync(join(skillsDir, "obsidian-markdown", "SKILL.md"))).toBe(true);
-    // Console output emits skills count alongside commands/agents
+    // Console output emits skills count alongside agents (commands removed in v2.0.0)
     expect(logOutput.some((line) => line.includes("skills/") && /\d+ skill\(s\) installed/.test(line))).toBe(true);
   });
 
