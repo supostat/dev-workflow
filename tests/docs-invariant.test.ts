@@ -315,3 +315,60 @@ describe("docs-invariant: skill directory frontmatter (commands-to-skills migrat
     });
   }
 });
+
+describe("docs-invariant: workflow yaml name matches filename", () => {
+  // Each templates/workflows/<name>.yaml MUST declare `name: <name>` matching
+  // its filename basename. Accidental file rename without yaml-field update
+  // breaks workflow resolution silently (resolveWorkflow looks up by yaml.name,
+  // not by filename) — this invariant catches the drift at test time.
+  const yamlRoot = join(PACKAGE_ROOT, "templates/workflows");
+  const yamlFiles = readdirSync(yamlRoot)
+    .filter((entry) => entry.endsWith(".yaml"))
+    .sort();
+
+  it("templates/workflows/ has > 3 yaml files (sanity)", () => {
+    expect(yamlFiles.length).toBeGreaterThan(3);
+  });
+
+  for (const file of yamlFiles) {
+    it(`${file} declares 'name:' matching filename basename`, () => {
+      const content = readFileSync(join(yamlRoot, file), "utf-8");
+      const nameMatch = content.match(/^name:\s*(.+?)\s*$/m);
+      const basename = file.replace(/\.yaml$/, "");
+      expect(nameMatch, `${file} missing 'name:' field`).not.toBeNull();
+      expect(
+        nameMatch![1].trim(),
+        `${file} 'name:' must equal '${basename}' (filename basename — resolveWorkflow uses yaml.name as registry key)`,
+      ).toBe(basename);
+    });
+  }
+});
+
+describe("docs-invariant: skill description min length", () => {
+  // Floor on description length catches truncated / placeholder frontmatter
+  // (e.g. `description: TODO`, `description: WIP`) that the existing skill
+  // frontmatter test would accept because it only checks length > 0. The
+  // shortest legitimate description today is well above 20 chars; 20 is a
+  // conservative threshold that catches stub values without false positives.
+  const skillsRoot = join(PACKAGE_ROOT, "templates/claude/skills");
+  const skillDirsForDescCheck = readdirSync(skillsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const MIN_DESCRIPTION_LENGTH = 20;
+
+  for (const dir of skillDirsForDescCheck) {
+    it(`${dir}/SKILL.md description has > ${MIN_DESCRIPTION_LENGTH} chars`, () => {
+      const content = readFileSync(join(skillsRoot, dir, "SKILL.md"), "utf-8");
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = fmMatch![1];
+      const descMatch = frontmatter.match(/^description:\s*(.+?)\s*$/m);
+      const description = descMatch![1].trim();
+      const preview = description.length > 50 ? description.slice(0, 50) + "..." : description;
+      expect(
+        description.length,
+        `${dir}/SKILL.md description must be > ${MIN_DESCRIPTION_LENGTH} chars (got '${preview}', length=${description.length})`,
+      ).toBeGreaterThan(MIN_DESCRIPTION_LENGTH);
+    });
+  }
+});
