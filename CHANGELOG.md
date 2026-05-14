@@ -5,6 +5,239 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-14
+
+One-day minor release accumulating 27 commits since v1.1.0. Headline:
+the **commands-to-skills migration** ships as dual-deploy — every
+user-facing slash command (`/workflow:dev`, `/vault:*`, `/git:*`,
+`/session:*`) now bundles BOTH a legacy `.claude/commands/<ns>/<verb>.md`
+and a new `.claude/skills/<ns>__<verb>/SKILL.md`. Skill format takes
+precedence on name collision (rollback safety net). Init enforces
+Claude Code v2.1.101+ at runtime so users on too-old clients fail loud
+instead of silently losing skill registration. A run of post-Phase 1+2
+engram-loop hardening fixes (asymmetric tag injection, parser
+broadening, step-tag at trace boundary) closes the empirical gaps
+discovered while dogfooding the new MCP boundary from v1.1.0. Three
+defensive `skip-and-warn` resilience fixes for malformed input files
+(agents, yaml, run state). No removed CLI commands, no removed MCP
+tools.
+
+### Added
+
+- **Commands → Skills migration (Phase 1 pilot + Phase 2 bulk + Phase 3
+  workflow:dev).** Sixteen slash commands now ship in BOTH formats
+  under `templates/claude/`:
+  - **Phase 1 pilot** — `/vault:engram-stats` migrated standalone first
+    to prove the dual-deploy pattern end-to-end. (`58c4c29`)
+  - **Phase 2 group A (vault)** — 8 skills: `vault:from-spec`,
+    `vault:analyze`, `vault:bug`, `vault:adr`, `vault:debt`,
+    `vault:deps`, `vault:security-scan`, `vault:test-gaps`. (`0e51787`)
+  - **Phase 2 group B (git)** — 4 skills: `git:new-branch`,
+    `git:pr-review`, `git:changelog`, `git:merge`. (`f645930`)
+  - **Phase 2 group C (session)** — 3 skills: `session:resume`,
+    `session:handover`, `session:review`. (`7f03a22`)
+  - **Phase 3 — `/workflow:dev`** — the dispatcher + 12 step files
+    (`preflight`, `read`, `plan`, `plan-review`, `plan-fix`, `coder`,
+    `review`, `verify`, `commit`, `vault-updates`, `test`, plus
+    `principles`) relocated to `templates/claude/skills/workflow__dev/`
+    via byte-identical `cp` (no transcription risk). Slash registration
+    via mandatory `name: workflow:dev` frontmatter — flat
+    `<ns>__<verb>/` layout convention (skills do NOT honour
+    nested-directory-as-namespace). (`28941cc`)
+
+  Total: 18 skill directories ship (16 migrated + 1 pilot +
+  `obsidian-markdown` standalone). All skill bodies copied verbatim
+  from legacy commands — runtime behaviour identical.
+
+- **`.claude/.dev-workflow.lock` per-component version tracking.**
+  `dev-workflow init` and `update` write a small JSON state file with
+  `{commands_version, skills_version}` per the active package version.
+  Future migrations (e.g. task-042 one-time cleanup of legacy commands)
+  read this to detect which artifacts came from which release. Lock
+  itself is gitignored — purely local state. (`8c0c5b8`)
+
+- **`dev-workflow doctor` skill frontmatter check.** New diagnostic
+  enumerates `.claude/skills/*/SKILL.md`, parses minimal frontmatter,
+  reports missing `name:` or `description:` fields as failures. Names
+  the failing file and the missing field — actionable, not vague.
+  Complements existing agent-template and settings-template checks.
+  (`378d7df`)
+
+- **Claude Code v2.1.101+ runtime check.** `dev-workflow init` calls
+  the `claude` binary (corrected from `claude-code` after local probe),
+  parses the version, and refuses to run if installed version is
+  pre-2.1.101. `doctor` reports three statuses: `ok`, `too-old`,
+  `not-detected`. The `not-detected` path is deliberately non-fatal
+  (`ok: true`) — CI without `claude` installed doesn't break
+  dev-workflow init or update. (`606f5f3`)
+
+- **`dev-workflow init` skills install reporting.** Console output
+  during init now includes a `✓ skills/` line with the count of
+  bundled skill directories shipped, alongside the existing
+  `✓ commands/` and `✓ agents/` lines. (`ad55b98`)
+
+- **MCP `tools/call` per-tool human-readable result formatter.**
+  Six common tools whose results were previously stringified as
+  multi-line JSON (`workflow_start`, `step_start`, `step_complete`,
+  `memory_store`, `memory_judge`, `vault_record`) now render as one-line
+  `✓` summaries with the essential data (runId, judgments applied,
+  fallback count, stored id, written filepath). Defense: if shape
+  mismatch on a named formatter, fall through to JSON — never lose
+  data. Programmatic consumers see identical handler return shapes;
+  only `content[0].text` in JSON-RPC response changes. Reduces visual
+  noise in a typical 11-step pipeline from ~20 multi-line blocks to
+  ~20 single-line ticks. (`04f0fcf`)
+
+- **`dev-workflow workflow cleanup` subcommand for stale runs.**
+  `dev-workflow workflow cleanup [--older-than <N>h|<N>d]
+  [--status <comma-list>] [--dry-run|--delete]`. Default: 24h threshold,
+  status filter `running,paused`, action = mark aborted (preserve state
+  + trace JSONL). Sets `run.status = "aborted"`,
+  `run.completedAt = now`, `run.abortReason = "auto-aborted:
+  orchestrator never finalized"`. Idempotent — re-runs are no-ops
+  because default filter excludes `aborted`. Type changes additive:
+  `WorkflowStatus` gains `"aborted"`, `WorkflowRun` gains
+  `abortReason?: string`. `--delete` mode removes both the run JSON and
+  the engram-trace JSONL. (`2c18ef1`)
+
+- **Docs-invariant test coverage extended.** Four new invariant
+  classes pin different drift surfaces beyond pipeline step / MCP tool
+  counts:
+  - Hook removal (negative): hooks.mdx must NOT mention any non-declared
+    hook event. (`328b66a`)
+  - Skill directory frontmatter: each `templates/claude/skills/<dir>/
+    SKILL.md` has `name:` + `description:` non-empty, namespaced dirs
+    pin `name: <ns>:<verb>`. (`328b66a`)
+  - Workflow YAML name=filename: each `templates/workflows/<x>.yaml`
+    declares `name: <x>`. resolveWorkflow uses yaml.name as registry
+    key, so filename drift would break workflow resolution silently.
+    (`98af1d7`)
+  - Skill description min-length (> 20 chars): catches `description:
+    TODO` / `description: WIP` placeholders the existing length>0 test
+    accepts. (`98af1d7`)
+
+### Changed
+
+- **`dev-workflow update` skills directory is additive, never
+  overwrites user modifications.** Each bundled SKILL.md hashed
+  (sha256) against the destination file; on mismatch, update skips the
+  file and emits an informational notice. Earlier behaviour copied
+  unconditionally with `force: true`. Mirrors the conservative
+  treatment commands and agents already get. (`3082399`)
+
+- **`memory_search` proxy drops volatile tags
+  (`run:`, `step:`, `phase:`) from the engram filter.** Engram daemon
+  applies the `tags` parameter with **AND semantics** ("all tags must
+  match"). The previous proxy used `buildAutoTags` for search,
+  injecting unique-per-run `run:<runId>` — intersection always empty,
+  every cross-run query returned `[]` regardless of daemon state. New
+  helper `buildSearchTags(c)` keeps only stable scope (`branch:`,
+  `task:`). Store path and auto-mirror paths unchanged — they still
+  carry the full attribution set for memory provenance. Empirical
+  effect: cross-run reuse and per-step hit rate moved from 0% to
+  expected non-zero on first run with the fix. (`9f621dd`)
+
+- **`parseEngramFeedback` regex broadened.** Accepts four equivalent
+  forms of judgment lines per memory: with/without leading `-` list
+  marker, with/without `memory:` id prefix. The original strict
+  `^\s*-\s*` + bare-uuid regex matched none of the legitimate variants
+  subagents produced, sending all judgments into `fallbackIds`. Strict
+  superset of the prior regex — all existing engram-feedback tests
+  pass unchanged. (`5cfabe7`)
+
+- **`engram-stats perStepHitRate` reads step name from a top-level
+  trace JSONL field, falls back to legacy `step:<name>` tag.** After
+  the asymmetric tag injection fix (`9f621dd`) stripped the `step:` tag
+  from the wire, the existing perStepHitRate aggregator returned an
+  empty object for every post-hotfix run. `step_start` now sets
+  `process.env["ENGRAM_STEP"]`, the trace appender reads it and
+  enriches each event with a top-level `step` field. Three aggregators
+  prefer the top-level field, fall back to the tag for pre-fix traces
+  — backwards-compat preserved, no trace migration needed. (`9e0ff42`)
+
+- **Pipeline subagents dispatched via `subagent_type:
+  general-purpose`.** The conversational orchestrator picks the
+  built-in subagent_type from the prose label in `_dispatch.md` —
+  `Explore` (read-only) and `Full` (read+write) were semantic role
+  labels but Claude Code interpreted them as built-in subagent_type
+  values. Built-in `Explore` is FULLY ISOLATED from MCP tools (cannot
+  call `mcp__dev-workflow__memory_*`) — confirmed empirically. Path D
+  fix: orchestrator always dispatches via `general-purpose`; role
+  enforcement moves to each agent template's `## Dispatch context` +
+  `## Permissions (VIOLATION = ABORT)` preamble, honoured by the model
+  under explicit directive. (`d7f13ea`)
+
+- **`dev-workflow validate` warns on missing Permissions block in
+  custom agent templates.** Each `.dev-vault/agents/*.md` is checked
+  for the canonical `## Permissions (VIOLATION = ABORT)` heading. Path
+  D moved the per-role permission enforcement into the template body —
+  an agent template lacking the block effectively gets unrestricted
+  access regardless of its frontmatter declarations. Warning, not
+  error — non-blocking but visible. (`a447a55`)
+
+### Fixed
+
+- **`AgentRegistry.loadDirectory` skip-and-warn instead of throwing on
+  malformed `.dev-vault/agents/*.md`.** The first broken agent file
+  (e.g. missing `name:` field) used to throw an uncaught exception
+  from `new AgentRegistry()`, taking down `dev-workflow validate`
+  before its own defensive validators ran. Now each parse failure
+  emits `warning: failed to load agent at <filepath>: <message>\n` to
+  stderr and iteration continues. (`b8fd37a`)
+
+- **`WorkflowState.list()` skip-and-warn instead of silent
+  continue on corrupt run JSON.** Pre-fix, `JSON.parse` failure was
+  swallowed silently (`catch {}`) — a corrupt run state file became
+  invisible during diagnostics. Now emits
+  `warning: failed to load run state at <filepath>: <message>\n` to
+  stderr and continues. `bumpTelemetry`'s silent catch is deliberately
+  preserved (fires per `memory_*` proxy call, would inundate stderr).
+  (`61b7d78`)
+
+- **`loadCustomWorkflows` skip-and-warn instead of silent continue on
+  malformed `.dev-vault/workflows/*.yaml`.** Mirrors the AgentRegistry
+  and WorkflowState fixes — third skip-and-warn instance in two days.
+  Common helper extraction deferred until 4th instance per rule of
+  three. (`edcea5a`)
+
+- **`parseGameplanPhase` recognizes YAML null literals.** Hand-coded
+  frontmatter parser is intentionally minimal and treats every scalar
+  after `key:` as a literal string, including YAML special tokens
+  (`null`, `~`). Setting `current-phase: null` in gameplan frontmatter
+  returned the 4-char string `"null"`, which matched
+  `VALID_PHASE_NAME_PATTERN /^[a-z0-9][a-z0-9-]{0,63}$/` and
+  propagated as a phase named `null` through `buildAutoTags()` — emitted
+  as engram tag `phase:null`. New `NULL_LITERAL_SENTINELS: ReadonlySet
+  = {"null", "~"}` checked before regex inside the consumer at
+  `parseGameplanPhase` (strict lowercase only, pinned by 2 tests
+  asserting uppercase/mixed-case route through the regex). (`dcda8bb`)
+
+### Documentation
+
+- **Subagent template Engram Feedback empty-search guidance.** All six
+  agent prompts (`reader`, `planner`, `coder`, `reviewer`, `architect`,
+  `debugger`) plus six step files include an explicit empty-case
+  pattern: `(no memories retrieved for query N) — placeholder, no
+  per-memory feedback to emit`. Eliminates the placeholder judgments
+  (`none-returned: 0.1`) that subagents emitted when search returned
+  zero results. Docs-invariant test pins the guidance in all 12 files +
+  three reviewer blocks. (`07f6408`)
+
+- **`installation.mdx` + `concepts/hooks.mdx` corrected to 3 hooks.**
+  The PostToolUse + PreCompact hooks were removed in `a9d2785` but
+  intro count text still read "5 hooks". Updated to "3 hooks"
+  (SessionStart + SessionEnd + TaskCompleted) in installation.mdx
+  + hooks.mdx intro. (`43f5580`)
+
+- **`hooks.mdx` table rows + JSON example + section for PostToolUse
+  and PreCompact removed.** Structural cleanup matching the intro
+  count fix. The new docs-invariant negative test guards against
+  reintroduction. (`b7b9a6f`)
+
+- **Gitignore `.dev-workflow-upgrade-backup`.** The `/vault:upgrade`
+  slash creates timestamped backup directories at the repo root;
+  these are now ignored. (`9eeb59b`)
+
 ## [1.1.0] — 2026-05-13
 
 Two-day minor release accumulating 27 commits since v1.0.1. Three new
