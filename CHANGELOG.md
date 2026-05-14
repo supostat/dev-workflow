@@ -5,6 +5,84 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **17 new bundled skills** completing the commands-to-skills migration
+  audit (commit `1c5e9c8`). Closes the gap surfaced during the first
+  task-041 attempt: tasks 033/034/035 (Phase 2 migrations) had moved
+  only the 16 commands named in the migration spec, but the bundled
+  set was 29 — 17 commands had no skill counterpart. All migrated
+  byte-for-byte:
+  - **Root** (4): `intake`, `profile`, `task`, `workflow`
+  - **`vault/`** (7): `vault__arch`, `vault__pattern`,
+    `vault__project-review`, `vault__rollback`, `vault__search`,
+    `vault__snapshot`, `vault__upgrade`
+  - **`workflow/`** (6): `workflow__create`, `workflow__graph`,
+    `workflow__hotfix`, `workflow__intake`, `workflow__review`,
+    `workflow__test`
+
+  Bundled skill directory total: **18 → 35**. Tests grew 1253 → 1287
+  via existing docs-invariant auto-enforcement (frontmatter shape +
+  description min-length) — 2 invariant sub-tests per new skill.
+
+### Changed
+
+- **BREAKING:** `dev-workflow init` and `update` no longer write
+  `.claude/commands/` to user projects (commit `6c999e2`). The
+  `templates/claude/commands/` directory has been removed from the
+  package entirely (47 files: dispatcher + 12 step files + 4 git
+  commands + 3 session commands + 16 vault commands + 4 root + 7
+  workflow commands). Skills are now the only shipped slash format.
+
+  **Migration impact**:
+  - **New installs** receive only `.claude/{skills, agents}/` plus
+    `settings.json`, `.mcp.json`, and `.dev-workflow.lock`. Requires
+    Claude Code v2.1.101+ (enforced at runtime by `init` and
+    `doctor`).
+  - **Existing projects** with previously installed `.claude/commands/`
+    are NOT modified by `update` — those files stay where they are.
+    Skill precedence handles slash collisions automatically. A
+    follow-up release (task-042) will offer a one-time cleanup prompt
+    detecting legacy commands + sha256-hashed user modifications.
+  - **Rollback path**: pin `@engramm/dev-workflow@1.2.0` (the
+    dual-deploy minor release published 2026-05-13).
+
+- **Runtime step-file resolvers redirected** to skill paths. Files
+  modified: `src/lib/workflow-render.ts` (`BUILTIN_STEP_FILES` map +
+  `PLAN_FIX_STEP_FILE` + `ALLOWED_STEP_FILE_PREFIXES` + startsWith
+  check), `src/cli/run.ts` (`STEP_FILE_ALLOWED_PREFIXES`),
+  `src/hooks/workflow-shim-sync.ts` (auto-gen shim body delegates by
+  `/workflow:dev` skill name instead of a file-path reference to the
+  removed `_dispatch.md`). User-project shim destination
+  (`.claude/commands/workflow/<name>.md`) is unchanged — only the
+  shim body content reflects the new delegation pattern.
+
+- **`src/mcp/tools.ts`** `workflow_create` description updated to
+  reflect new shim-as-skill-delegate semantics.
+
+### Removed
+
+- `templates/claude/commands/` directory (47 files):
+  - Top-level: `intake.md`, `profile.md`, `task.md`, `workflow.md`
+  - `git/` (4): `changelog.md`, `merge.md`, `new-branch.md`,
+    `pr-review.md`
+  - `session/` (3): `handover.md`, `resume.md`, `review.md`
+  - `vault/` (16): `adr.md`, `analyze.md`, `arch.md`, `bug.md`,
+    `debt.md`, `deps.md`, `engram-stats.md`, `from-spec.md`,
+    `pattern.md`, `project-review.md`, `rollback.md`, `search.md`,
+    `security-scan.md`, `snapshot.md`, `test-gaps.md`, `upgrade.md`
+  - `workflow/` (8): `_dispatch.md`, `create.md`, `dev.md`, `graph.md`,
+    `hotfix.md`, `intake.md`, `review.md`, `test.md`
+  - `workflow/steps/` (12): `coder.md`, `commit.md`, `plan-fix.md`,
+    `plan-review.md`, `plan.md`, `preflight.md`, `principles.md`,
+    `read.md`, `review.md`, `test.md`, `vault-updates.md`,
+    `verify.md`
+
+  All 47 files have skill counterparts under `templates/claude/skills/`.
+  Body content is byte-identical to the removed legacy files.
+
 ## [1.2.0] — 2026-05-14
 
 One-day minor release accumulating 27 commits since v1.1.0. Headline:
