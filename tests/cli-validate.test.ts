@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -188,13 +188,30 @@ describe("validate CLI command", () => {
     expect(log).not.toContain("failed to parse");
   });
 
-  // Note: the helper's "failed to parse" path is currently unreachable through
-  // the `validate` CLI because `AgentRegistry` constructor (run.ts:384) throws
-  // uncaught on the same malformed file before our helper runs at line 415.
-  // The defensive try/catch in `validateCustomAgentPermissions` is kept for
-  // use from non-validate callers and for the day AgentRegistry becomes
-  // skip-and-warn — see debt
-  // `.dev-vault/debt/2026-05-13-agentregistry-constructor-throws-uncaught-on-malformed-agent-files...`.
+  it("emits 'failed to parse' warning when custom agent file is malformed (missing name field)", () => {
+    mkdirSync(join(projectRoot, ".dev-vault", "agents"), { recursive: true });
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "broken.md"),
+      `---\ndescription: no name field\nvault: []\n---\nBody without name\n`,
+      "utf-8");
+    writeFileSync(join(projectRoot, ".dev-vault", "agents", "good.md"),
+      `---\nname: good\ndescription: well-formed sibling\nvault: []\n---\n## Permissions (VIOLATION = ABORT)\n\n- Read allowed.\n`,
+      "utf-8");
+    const filepath = writeWorkflowYaml(projectRoot,
+      `name: flow\ndescription: test\nsteps:\n  - name: a\n    agent: good\n`);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    validate([filepath]);
+
+    expect(process.exitCode).not.toBe(1);
+    const log = joinedLog();
+    expect(log).toContain('custom agent ".dev-vault/agents/broken.md" failed to parse');
+    expect(log).toContain("missing 'name'");
+    // Sibling well-formed agent should not trigger "missing canonical" warning
+    expect(log).not.toContain('custom agent "good"');
+    // AgentRegistry constructor also emits its own stderr warning for the malformed file
+    expect(stderrSpy).toHaveBeenCalled();
+    stderrSpy.mockRestore();
+  });
 
   it("warns when stepFile contains .. (path traversal)", () => {
     const filepath = writeWorkflowYaml(projectRoot,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -198,6 +198,34 @@ Custom prompt.
     const registry = new AgentRegistry(builtinDir);
 
     expect(registry.list()).toHaveLength(1);
+  });
+
+  it("skips malformed agent file and emits stderr warning", () => {
+    writeAgentFile(builtinDir, "broken.md", `---\ndescription: missing name field\nvault: []\n---\nBody\n`);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const registry = new AgentRegistry(builtinDir);
+
+    expect(registry.list()).toHaveLength(0);
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const message = String(stderrSpy.mock.calls[0]![0]);
+    expect(message).toContain("warning: failed to load agent at");
+    expect(message).toContain("broken.md");
+    expect(message).toContain("missing 'name'");
+    stderrSpy.mockRestore();
+  });
+
+  it("continues loading well-formed siblings when one file is malformed", () => {
+    writeAgentFile(builtinDir, "broken.md", `---\ndescription: missing name field\nvault: []\n---\nBody\n`);
+    writeAgentFile(builtinDir, "good.md", SAMPLE_AGENT);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const registry = new AgentRegistry(builtinDir);
+
+    expect(registry.list()).toHaveLength(1);
+    expect(registry.has("coder")).toBe(true);
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
   });
 });
 

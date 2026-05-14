@@ -36,8 +36,16 @@ export class AgentRegistry {
     const files = readdirSync(directory).filter((file) => file.endsWith(".md"));
 
     for (const file of files) {
-      const definition = parseAgentFile(join(directory, file));
-      this.agents.set(definition.name, definition);
+      const filepath = join(directory, file);
+      try {
+        const definition = parseAgentFile(filepath);
+        this.agents.set(definition.name, definition);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(
+          `warning: failed to load agent at ${filepath}: ${message}\n`,
+        );
+      }
     }
   }
 }
