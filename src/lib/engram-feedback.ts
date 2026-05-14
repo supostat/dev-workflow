@@ -15,7 +15,10 @@ interface SectionSplit {
 
 const HEADING_REGEX = /^##\s+Engram Feedback\s*$/im;
 const NEXT_HEADING_REGEX = /^##\s+\S/m;
-const LINE_REGEX = /^\s*-\s*([^\s:]+)\s*:\s*([+\-]?\d+(?:\.\d+)?)\s*[—–-]\s?(.*)$/;
+// The leading `-` list marker and the `memory:` id prefix are both optional —
+// orchestrators emit any of: `<id>: …`, `- <id>: …`, `memory:<id>: …`,
+// `- memory:<id>: …`. All four forms parse to the same id/score/explanation.
+const LINE_REGEX = /^\s*-?\s*(?:memory:)?([^\s:]+)\s*:\s*([+\-]?\d+(?:\.\d+)?)\s*[—–-]\s?(.*)$/;
 
 export function extractEngramFeedbackSection(output: string): SectionSplit {
   const headingMatch = HEADING_REGEX.exec(output);

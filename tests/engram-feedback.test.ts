@@ -187,6 +187,73 @@ describe("parseEngramFeedback()", () => {
     expect(result.judgments.has("MixedCaseID")).toBe(true);
   });
 
+  it("accepts bare uuid line without list marker or memory: prefix", () => {
+    const output = [
+      "## Engram Feedback",
+      "3f5a9c2e-1234-5678-90ab-cdef12345678: 0.8 — bare form",
+    ].join("\n");
+    const result = parseEngramFeedback(output, ["3f5a9c2e-1234-5678-90ab-cdef12345678"]);
+    expect(result.judgments.get("3f5a9c2e-1234-5678-90ab-cdef12345678")).toEqual({
+      score: 0.8,
+      explanation: "bare form",
+    });
+  });
+
+  it("accepts memory: prefix without list marker", () => {
+    const output = [
+      "## Engram Feedback",
+      "memory:e79e341c-1d56-4b6d-9d9a-aa8e40489eba: 0.85 — direct precedent",
+    ].join("\n");
+    const result = parseEngramFeedback(output, ["e79e341c-1d56-4b6d-9d9a-aa8e40489eba"]);
+    expect(result.judgments.get("e79e341c-1d56-4b6d-9d9a-aa8e40489eba")).toEqual({
+      score: 0.85,
+      explanation: "direct precedent",
+    });
+  });
+
+  it("accepts both list marker and memory: prefix together (regression from run-2efb1a7353d5)", () => {
+    const output = [
+      "## Engram Feedback",
+      "- memory:e79e341c-1d56-4b6d-9d9a-aa8e40489eba: 0.85 — direct precedent. Same UX failure mode.",
+      "- memory:01aa854b-8361-4d48-acb3-3e3b2d3c1261: 0.55 — relevant parser coverage philosophy.",
+      "- memory:c525c4b2-ff9b-478d-93e4-bceba9757e68: 0.30 — touches this file but different concern.",
+      "- memory:aa20fa63-bc65-42e6-beb6-4f88c0969f7e: 0.25 — defense-in-depth at render boundary.",
+      "- memory:aba23525-40de-4348-8a64-0c99720c31c9: 0.20 — prototype pollution tangential.",
+    ].join("\n");
+    const expected = [
+      "e79e341c-1d56-4b6d-9d9a-aa8e40489eba",
+      "01aa854b-8361-4d48-acb3-3e3b2d3c1261",
+      "c525c4b2-ff9b-478d-93e4-bceba9757e68",
+      "aa20fa63-bc65-42e6-beb6-4f88c0969f7e",
+      "aba23525-40de-4348-8a64-0c99720c31c9",
+    ];
+    const result = parseEngramFeedback(output, expected);
+    expect(result.judgments.size).toBe(5);
+    expect(result.fallbackIds).toEqual([]);
+    expect(result.judgments.get("e79e341c-1d56-4b6d-9d9a-aa8e40489eba")?.score).toBe(0.85);
+    expect(result.judgments.get("aba23525-40de-4348-8a64-0c99720c31c9")?.score).toBe(0.2);
+    expect(result.judgments.get("aa20fa63-bc65-42e6-beb6-4f88c0969f7e")?.explanation).toBe(
+      "defense-in-depth at render boundary.",
+    );
+  });
+
+  it("parses all four prefix variants equivalently in the same block", () => {
+    const output = [
+      "## Engram Feedback",
+      "id-bare: 0.1 — no marker no prefix",
+      "- id-marker: 0.2 — marker only",
+      "memory:id-prefix: 0.3 — prefix only",
+      "- memory:id-both: 0.4 — marker and prefix",
+    ].join("\n");
+    const expected = ["id-bare", "id-marker", "id-prefix", "id-both"];
+    const result = parseEngramFeedback(output, expected);
+    expect(result.judgments.size).toBe(4);
+    expect(result.judgments.get("id-bare")?.score).toBe(0.1);
+    expect(result.judgments.get("id-marker")?.score).toBe(0.2);
+    expect(result.judgments.get("id-prefix")?.score).toBe(0.3);
+    expect(result.judgments.get("id-both")?.score).toBe(0.4);
+  });
+
   it("integrates with realistic reviewer output containing severity keywords in body", () => {
     const output = [
       "severity: high",
