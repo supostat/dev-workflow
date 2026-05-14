@@ -120,3 +120,32 @@ export function writeLock(projectRoot: string, partial: Partial<Omit<LockState, 
   mkdirSync(dirname(filepath), { recursive: true });
   writeFileSync(filepath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
 }
+
+/**
+ * Remove a per-component `*_version` field from the lock. Reads existing,
+ * writes back without the named field. Preserves `version`, `updated_at`,
+ * and any other component fields. No-op (returns silently) if no lock
+ * exists or the field is already absent.
+ *
+ * `writeLock` cannot clear fields — when `partial.X` is undefined it
+ * preserves `existing.X` via nullish coalescing. This helper is the
+ * explicit clear path used by task-042 legacy cleanup to remove
+ * `commands_version` after the legacy directory is moved to backup.
+ */
+export function clearLockField(
+  projectRoot: string,
+  field: "commands_version" | "agents_version" | "skills_version",
+): void {
+  const existing = readLock(projectRoot);
+  if (!existing || existing[field] === undefined) return;
+  const cleared: LockState = {
+    version: LOCK_SCHEMA_VERSION,
+    commands_version: field === "commands_version" ? undefined : existing.commands_version,
+    agents_version: field === "agents_version" ? undefined : existing.agents_version,
+    skills_version: field === "skills_version" ? undefined : existing.skills_version,
+    updated_at: new Date().toISOString(),
+  };
+  const filepath = lockPath(projectRoot);
+  mkdirSync(dirname(filepath), { recursive: true });
+  writeFileSync(filepath, JSON.stringify(cleared, null, 2) + "\n", "utf-8");
+}

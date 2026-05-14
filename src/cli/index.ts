@@ -101,7 +101,10 @@ switch (command) {
     importVault(args.slice(1));
     break;
   case "update":
-    update();
+    update({
+      cleanupLegacyCommands: args.includes("--cleanup-legacy-commands"),
+      noInteractive: args.includes("--no-interactive"),
+    });
     break;
   case "templates-root":
     templatesRoot();

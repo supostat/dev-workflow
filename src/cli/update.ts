@@ -6,8 +6,19 @@ import { PACKAGE_ROOT } from "../lib/package-root.js";
 import { updateSkillsAdditively } from "../lib/skills-update.js";
 import { getPackageVersion, writeLock } from "../lib/migration-lock.js";
 import type { LockState } from "../lib/migration-lock.js";
+import {
+  detectLegacyCommands,
+  cleanupLegacyCommands,
+} from "../lib/legacy-commands-cleanup.js";
 
-export function update(): void {
+export interface UpdateOptions {
+  /** Run cleanup of legacy `.claude/commands/` after detection. */
+  cleanupLegacyCommands?: boolean;
+  /** Suppress detection notice and any interactive prompts. */
+  noInteractive?: boolean;
+}
+
+export function update(options: UpdateOptions = {}): void {
   const context = detectContext();
   if (!context) {
     console.error("Not a git repository.");
@@ -50,6 +61,21 @@ export function update(): void {
   if (Object.keys(lockBumps).length > 0) {
     writeLock(projectRoot, lockBumps);
     console.log(keyValue("\u2713 .dev-workflow.lock", `tracked at v${packageVersion}`));
+  }
+
+  const legacy = detectLegacyCommands(projectRoot);
+  if (legacy) {
+    if (options.cleanupLegacyCommands) {
+      const result = cleanupLegacyCommands(legacy, projectRoot);
+      console.log(keyValue("\u2713 legacy commands", `moved to ${result.backupPath}`));
+      console.log(keyValue("\u2713 .dev-workflow.lock", "commands_version cleared"));
+    } else if (!options.noInteractive) {
+      process.stderr.write(
+        `note: legacy .claude/commands/ detected (commands_version=${legacy.lockedVersion} in lock).\n` +
+        `note: skills format superseded this directory; the bundled package no longer ships commands.\n` +
+        `note: to move it to a timestamped backup, re-run with --cleanup-legacy-commands.\n`,
+      );
+    }
   }
 
   console.log(`\n${icon.tip} Updated ${updated} components. Vault data untouched.`);
