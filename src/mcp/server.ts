@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline";
 import { getToolDefinitions } from "./tools.js";
+import { formatToolResult } from "./format-result.js";
 import type { ToolHandlers } from "./handlers.js";
 
 interface JsonRpcRequest {
@@ -102,7 +103,7 @@ export class McpServer {
         try {
           const result = await this.handlers.handle(params.name, params.arguments ?? {});
           return successResponse(id, {
-            content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }],
+            content: [{ type: "text", text: formatToolResult(params.name, result) }],
           });
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : "Tool execution failed";

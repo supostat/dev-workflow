@@ -827,6 +827,17 @@ describe("McpServer.handleLine", () => {
     expect(result.content[0]!.text).toContain("Stack");
   });
 
+  it("tools/call response wraps named-tool result through formatToolResult (memory_judge → '✓ judged')", async () => {
+    // engram unreachable in tests (ENGRAM_SOCKET_PATH stubbed) → handler still returns {ok: true};
+    // formatter should render it as "✓ judged" instead of multi-line JSON.
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "memory_judge", arguments: { memory_id: "mem-test", score: 0.5, explanation: "x" } },
+    }));
+    const result = response!.result as { content: Array<{ text: string }> };
+    expect(result.content[0]!.text).toBe("✓ judged");
+  });
+
   it("tools/call returns invalid-params (-32602) when params is null", async () => {
     const response = await server.handleLine(JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "tools/call", params: null,
