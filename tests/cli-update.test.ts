@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { update } from "../src/cli/update.js";
-import { LOCK_FILENAME, LOCK_SCHEMA_VERSION } from "../src/lib/migration-lock.js";
+import { LOCK_FILENAME, LOCK_SCHEMA_VERSION, getPackageVersion } from "../src/lib/migration-lock.js";
 
 interface LockInput {
   version?: number;
@@ -107,7 +107,7 @@ describe("dev-workflow update — legacy commands cleanup (task-042)", () => {
 
     const lock = JSON.parse(readFileSync(join(claudeDir, LOCK_FILENAME), "utf-8")) as Record<string, unknown>;
     expect(lock["commands_version"]).toBeUndefined();
-    expect(lock["agents_version"]).toBe("1.2.0");
+    expect(lock["agents_version"]).toBe(getPackageVersion());
   });
 
   it("--cleanup-legacy-commands: backup path timestamp matches ISO format without colons", () => {
@@ -151,7 +151,7 @@ describe("dev-workflow update — legacy commands cleanup (task-042)", () => {
     const entries = execSync(`ls ${join(projectRoot, ".claude")}`, { encoding: "utf-8" }).split("\n");
     expect(entries.some((e) => e.startsWith("commands.legacy-bak-"))).toBe(false);
     const lock = JSON.parse(readFileSync(join(projectRoot, ".claude", LOCK_FILENAME), "utf-8")) as Record<string, unknown>;
-    expect(lock["agents_version"]).toBe("1.2.0");
+    expect(lock["agents_version"]).toBe(getPackageVersion());
   });
 
   it("--cleanup-legacy-commands: emits success line via console.log", () => {

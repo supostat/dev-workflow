@@ -5,7 +5,29 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] — 2026-05-14
+
+Five-commit major release shipped the same day as v1.2.0. Headline:
+**the legacy `templates/claude/commands/` directory is gone** —
+dev-workflow ships skills format exclusively. New installs receive
+`.claude/{agents, skills}/`; existing user projects keep their
+`.claude/commands/` untouched (skill precedence handles slash
+collisions automatically). A new `dev-workflow update
+--cleanup-legacy-commands` flag offers an opt-in backup-rename for
+the legacy directory. 17 additional skill counterparts complete the
+commands-to-skills migration audit gap surfaced in run-c8ae60065d2a,
+covering 4 root commands (`intake`, `profile`, `task`, `workflow`),
+5 missing `vault/*`, 7 missing `workflow/*`, plus
+`vault/{snapshot,upgrade}`. Minimum Claude Code v2.1.101 enforced at
+`init` (refuses too-old); `doctor` reports `ok`/`too-old`/
+`not-detected`.
+
+**BREAKING:** `dev-workflow init` and `update` no longer write
+`.claude/commands/` to user projects. Migration safety: existing user
+projects with `.claude/commands/` are NOT modified by `update` — only
+NEW installs are skills-only. Rollback path: pin
+`@engramm/dev-workflow@1.2.0` (the dual-deploy minor release where
+both formats shipped side-by-side).
 
 ### Changed
 
