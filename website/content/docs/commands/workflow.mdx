@@ -89,12 +89,11 @@ Planner обязан включить в план:
 
 ## Архитектура: step-файлы
 
-Оркестратор (`dev.md`, ~14 строк — thin shim) не содержит инструкции для каждого шага.
-Перед каждым шагом он **читает step-файл** через Read tool — свежие сфокусированные инструкции.
+Тело skill (`SKILL.md`) — оркестратор pipeline. Перед каждым шагом он **читает step-файл** через Read tool — свежие сфокусированные инструкции.
 
 ```
-.claude/commands/workflow/
-  dev.md               ← оркестратор (~14 строк, thin shim)
+.claude/skills/workflow__dev/
+  SKILL.md             ← оркестратор (тело skill — вся dispatcher логика)
   steps/
     principles.md      ← engineering principles (inlined в plan, coder, review)
     preflight.md       ← Step 0: baseline + phase task creation

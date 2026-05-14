@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Docs sync for v2.0.0** (task-043). `README.md`, `website/content/docs/installation.mdx`, `website/content/docs/commands/workflow.mdx`, `website/content/docs/commands/vault.mdx`, and `templates/project/spec-md.example` updated to reference `.claude/skills/` instead of the now-removed `.claude/commands/`. User-facing documentation now matches what the package actually ships. `installation.mdx` install-table row counts skills (35 total: vault\_\_* 9 + session\_\_* 3 + git\_\_* 4 + workflow\_\_* 7 + 4 root + `obsidian-markdown`).
+
 ### Added
+
+- **`dev-workflow update --cleanup-legacy-commands` flag**
+  (commit `d354b25`). After v2.0.0 dropped the bundled
+  `templates/claude/commands/` directory, existing user projects still
+  carry `.claude/commands/` from earlier installs. The flag detects
+  this state and renames the directory to
+  `.claude/commands.legacy-bak-<ISO-timestamp>/`, clearing
+  `commands_version` from `.dev-workflow.lock`. Detection triggers on
+  both signals together: lock has a populated `commands_version` AND
+  `.claude/commands/` exists on disk.
+
+  Three modes:
+  - Default (no flag): emits a stderr notice with detection info and
+    opt-in instructions. Non-destructive.
+  - `--cleanup-legacy-commands`: performs the rename + lock clear.
+  - `--no-interactive`: suppresses the notice silently (CI-friendly).
+  - Combo `--no-interactive --cleanup-legacy-commands`: runs cleanup
+    quietly with only the success summary printed.
+
+  Strategy is backup-rename (not sha256 per-file hash compare) because
+  the universe of legacy bundled commands is closed after v2.0.0
+  — shipping a versioned hash manifest would carry drift risk that
+  backup-rename does not. Cleanup is reversible via `mv`.
 
 - **17 new bundled skills** completing the commands-to-skills migration
   audit (commit `1c5e9c8`). Closes the gap surfaced during the first

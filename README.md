@@ -30,7 +30,7 @@ dev-workflow gives it a **strict protocol**: every task goes through an 11-step 
 - **Engram memory** — persistent long-term store with semantic search via Voyage AI embeddings; auto-decorated with pipeline tags (step/branch/run/task)
 - **3 hooks** — SessionStart, SessionEnd, TaskCompleted
 - **From spec to code** — `/vault:from-spec` fills vault from SPEC.md in 4 phased steps
-- **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore, and scaffolds `.claude/{commands,agents,skills}/`
+- **Auto-setup** — `init` generates CLAUDE.md, permissions, .mcp.json, stack-based .gitignore, and scaffolds `.claude/{agents,skills}/`
 - **Plan persistence** — approved plans saved to vault for audit and session resume
 - **Modular prompts** — thin shim orchestrator (~14 lines) + 11 step files read on demand
 
@@ -139,7 +139,7 @@ Violation = immediate pipeline abort.
 
 ```bash
 dev-workflow init [--force] [--detect]   # Initialize vault, hooks, CLAUDE.md, .mcp.json
-dev-workflow update                      # Update commands/agents from package
+dev-workflow update                      # Update agents/skills from package (additive for skills)
 dev-workflow templates-root              # Print absolute path to bundled templates/
 dev-workflow settings-template           # Print bundled .claude/settings.json (absolute paths)
 dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)

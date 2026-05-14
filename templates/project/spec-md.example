@@ -11,7 +11,7 @@
 -->
 
 > **Bootstrap order (run once, in this order):**
-> 1. `git init && dev-workflow init` — installs CLAUDE.md, `.claude/`, `.mcp.json`, copies commands and agents.
+> 1. `git init && dev-workflow init` — installs CLAUDE.md, `.claude/`, `.mcp.json`, copies agents and skills.
 > 2. `/vault:from-spec docs/SPEC.md` — populates `.dev-vault/{stack,conventions,knowledge,gameplan}.md` from this file.
 > 3. `dev-workflow task list` then `/workflow:dev "<phase 1 task>"` — start the first implementation cycle.
 >
