@@ -206,4 +206,77 @@ describe("doctor CLI — E2E", () => {
     await doctor(false);
     expect(logJoined()).toMatch(/Permissions\s+\d+ allow, \d+ deny/);
   });
+
+  describe("Skills frontmatter check", () => {
+    function writeSkill(skillName: string, content: string): void {
+      const skillDir = join(projectRoot, ".claude", "skills", skillName);
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(join(skillDir, "SKILL.md"), content, "utf-8");
+    }
+
+    it("clean state: bundled skill with valid frontmatter reports ok", async () => {
+      init({ force: true });
+      logOutput.length = 0;
+      await doctor(false);
+      // init copies bundled obsidian-markdown skill which has valid frontmatter
+      expect(logJoined()).toMatch(/Skills\s+frontmatter ok/);
+    });
+
+    it("missing 'name:' field surfaces as named issue", async () => {
+      init({ force: true });
+      writeSkill("broken-name", "---\ndescription: has description but no name\n---\nBody");
+      logOutput.length = 0;
+      await doctor(false);
+      const log = logJoined();
+      expect(log).toContain("Skills");
+      expect(log).toContain("frontmatter issue");
+      expect(log).toContain("broken-name/SKILL.md");
+      expect(log).toContain("missing 'name:' field");
+    });
+
+    it("missing 'description:' field surfaces as named issue", async () => {
+      init({ force: true });
+      writeSkill("broken-desc", "---\nname: broken-desc\n---\nBody");
+      logOutput.length = 0;
+      await doctor(false);
+      const log = logJoined();
+      expect(log).toContain("broken-desc/SKILL.md");
+      expect(log).toContain("missing 'description:' field");
+    });
+
+    it("no frontmatter at all → both name and description reported", async () => {
+      init({ force: true });
+      writeSkill("naked", "no frontmatter just body\n");
+      logOutput.length = 0;
+      await doctor(false);
+      const log = logJoined();
+      expect(log).toContain("naked/SKILL.md");
+      expect(log).toContain("missing 'name:' field");
+      expect(log).toContain("missing 'description:' field");
+    });
+
+    it("non-skill subdirectory (no SKILL.md) is skipped silently", async () => {
+      init({ force: true });
+      const notASkillDir = join(projectRoot, ".claude", "skills", "not-a-skill");
+      mkdirSync(notASkillDir, { recursive: true });
+      writeFileSync(join(notASkillDir, "README.md"), "# not a skill", "utf-8");
+      logOutput.length = 0;
+      await doctor(false);
+      const log = logJoined();
+      // Should still report ok because the directory is skipped, not flagged
+      expect(log).toMatch(/Skills\s+frontmatter ok/);
+    });
+
+    it("each problem appended to issues list (visible in final Issues block)", async () => {
+      init({ force: true });
+      writeSkill("issue1", "---\ndescription: only-desc\n---\n");
+      writeSkill("issue2", "---\nname: only-name\n---\n");
+      logOutput.length = 0;
+      await doctor(false);
+      const log = logJoined();
+      expect(log).toContain("Issues:");
+      expect(log).toMatch(/skill .*issue1.*missing 'name:'/);
+      expect(log).toMatch(/skill .*issue2.*missing 'description:'/);
+    });
+  });
 });

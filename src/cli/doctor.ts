@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { VaultReader } from "../lib/reader.js";
 import { TaskManager } from "../tasks/manager.js";
@@ -7,6 +7,56 @@ import { AgentRegistry } from "../agents/registry.js";
 import { getBuiltinWorkflows } from "../workflow/builtin.js";
 import { icon } from "../lib/output.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
+import { parseFrontmatter } from "../lib/frontmatter.js";
+
+export interface SkillProblem {
+  filepath: string;
+  reason: string;
+}
+
+/**
+ * Walk `<projectRoot>/.claude/skills/<name>/SKILL.md` and report frontmatter
+ * problems: missing `name:` (required by Claude Code) or missing `description:`
+ * (required for discoverability).
+ *
+ * `parseFrontmatter` is tolerant — a malformed `---` block surfaces as
+ * "missing fields" rather than a separate error category, so the two
+ * "missing field" branches cover the practical parse-failure surface.
+ *
+ * Returns `filepath` as project-relative when possible (falls back to
+ * absolute) so doctor output is concise.
+ */
+export function checkSkills(projectRoot: string): SkillProblem[] {
+  const skillsDir = join(projectRoot, ".claude", "skills");
+  if (!existsSync(skillsDir)) return [];
+
+  const problems: SkillProblem[] = [];
+  for (const entry of readdirSync(skillsDir)) {
+    const skillMd = join(skillsDir, entry, "SKILL.md");
+    if (!existsSync(skillMd)) continue;
+    if (!statSync(skillMd).isFile()) continue;
+
+    const display = relative(projectRoot, skillMd);
+    let raw: string;
+    try {
+      raw = readFileSync(skillMd, "utf-8");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      problems.push({ filepath: display, reason: `unreadable: ${msg}` });
+      continue;
+    }
+
+    const { fields } = parseFrontmatter(raw);
+    if (fields["name"] === undefined) {
+      problems.push({ filepath: display, reason: "missing 'name:' field" });
+    }
+    if (fields["description"] === undefined) {
+      problems.push({ filepath: display, reason: "missing 'description:' field" });
+    }
+  }
+
+  return problems;
+}
 
 function fileLineCount(filepath: string): number {
   if (!existsSync(filepath)) return 0;
@@ -104,6 +154,18 @@ export async function doctor(fix: boolean = false): Promise<void> {
   const builtinCount = getBuiltinWorkflows().length;
   const customCount = countCustomWorkflows(context.vaultPath);
   console.log(`  Workflows:     ${builtinCount} builtin${customCount > 0 ? ` + ${customCount} custom` : ""}`);
+
+  // Skills frontmatter
+  const skillProblems = checkSkills(context.projectRoot);
+  if (skillProblems.length === 0) {
+    console.log(`  ${icon.success} Skills          frontmatter ok`);
+  } else {
+    console.log(`  ${icon.error} Skills          ${skillProblems.length} frontmatter issue(s)`);
+    for (const problem of skillProblems) {
+      console.log(`    ${icon.error} ${problem.filepath}: ${problem.reason}`);
+      issues.push(`skill ${problem.filepath}: ${problem.reason}`);
+    }
+  }
 
   // CLAUDE.md
   const claudeMdPath = join(context.projectRoot, "CLAUDE.md");
