@@ -8,6 +8,7 @@ import { icon, section, keyValue } from "../lib/output.js";
 import { renderTemplate } from "../lib/templates.js";
 import { isEngramAvailable } from "../lib/engram.js";
 import { buildSettingsJson } from "../lib/settings-template.js";
+import { getPackageVersion, writeLock } from "../lib/migration-lock.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 interface InitOptions {
@@ -153,6 +154,13 @@ export function init(options: InitOptions): void {
   console.log(keyValue("\u2713 agents/", "2 agents installed"));
   const skillCount = existsSync(skillsTargetDir) ? readdirSync(skillsTargetDir).length : 0;
   console.log(keyValue("\u2713 skills/", `${skillCount} skill(s) installed`));
+  const packageVersion = getPackageVersion();
+  writeLock(projectRoot, {
+    commands_version: packageVersion,
+    agents_version: packageVersion,
+    skills_version: packageVersion,
+  });
+  console.log(keyValue("\u2713 .dev-workflow.lock", `tracked at v${packageVersion}`));
 
   const writer = new VaultWriter(context);
   writer.scaffold();
