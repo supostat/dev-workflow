@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -126,5 +126,49 @@ describe("WorkflowState.bumpTelemetry", () => {
     }
 
     expect(state.load("run-005").telemetry?.search).toBe(50);
+  });
+});
+
+describe("WorkflowState.list — corrupt run JSON skip-and-warn", () => {
+  let vaultPath: string;
+  let runsDir: string;
+
+  beforeEach(() => {
+    vaultPath = mkdtempSync(join(tmpdir(), "wf-list-"));
+    runsDir = join(vaultPath, "workflow-state", "runs");
+    mkdirSync(runsDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(vaultPath, { recursive: true, force: true });
+  });
+
+  it("skips corrupt JSON file and emits exactly one stderr warning", () => {
+    writeFileSync(join(runsDir, "run-broken.json"), "{not valid json", "utf-8");
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const state = new WorkflowState(vaultPath);
+    const runs = state.list();
+
+    expect(runs).toEqual([]);
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const message = String(stderrSpy.mock.calls[0]![0]);
+    expect(message).toContain("warning: failed to load run state at");
+    expect(message).toContain("run-broken.json");
+    stderrSpy.mockRestore();
+  });
+
+  it("continues loading valid siblings when one file is corrupt", () => {
+    writeFileSync(join(runsDir, "run-broken.json"), "{corrupt", "utf-8");
+    const state = new WorkflowState(vaultPath);
+    state.save(makeRun("run-good", { startedAt: "2026-05-14T07:00:00.000Z" }));
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const runs = state.list();
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.id).toBe("run-good");
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
   });
 });

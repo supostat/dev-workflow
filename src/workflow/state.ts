@@ -88,11 +88,15 @@ export class WorkflowState {
 
     const runs: WorkflowRun[] = [];
     for (const file of files) {
+      const filepath = join(this.workflowsDir, file);
       try {
-        const content = readFileSync(join(this.workflowsDir, file), "utf-8");
+        const content = readFileSync(filepath, "utf-8");
         runs.push(parseSafeJson<WorkflowRun>(content));
-      } catch {
-        continue;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(
+          `warning: failed to load run state at ${filepath}: ${message}\n`,
+        );
       }
     }
 
