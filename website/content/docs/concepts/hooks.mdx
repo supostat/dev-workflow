@@ -1,6 +1,6 @@
 ---
 title: Хуки
-description: Автоматика Claude Code — session, post-edit, task completed, pre-compact
+description: Автоматика Claude Code — session-start, session-end, task-completed
 ---
 
 # Хуки
@@ -13,9 +13,7 @@ description: Автоматика Claude Code — session, post-edit, task compl
 |------------|-------|-----------|
 | **SessionStart** | Начало сессии | Загружает vault-контекст, intelligence, задачи, workflow |
 | **SessionEnd** | Конец сессии | Сохраняет daily log, обновляет intelligence, паузит workflow |
-| **PostToolUse** | После Write/Edit/MultiEdit | Трекает редактирование файлов в intelligence |
 | **TaskCompleted** | После завершения задачи | Записывает в daily log с названием задачи |
-| **PreCompact** | Перед сжатием контекста | Сохраняет маркер для восстановления |
 
 ## Stdin JSON
 
@@ -25,11 +23,8 @@ description: Автоматика Claude Code — session, post-edit, task compl
 {
   "session_id": "abc123",
   "cwd": "/path/to/project",
-  "hook_event_name": "PostToolUse",
-  "tool_name": "Edit",
-  "tool_input": {
-    "file_path": "/path/to/file.ts"
-  }
+  "hook_event_name": "SessionStart",
+  "source": "startup"
 }
 ```
 
@@ -39,9 +34,7 @@ description: Автоматика Claude Code — session, post-edit, task compl
 |-----|---|
 | SessionStart | `cwd`, `source` |
 | SessionEnd | `cwd` |
-| PostToolUse | `cwd`, `tool_input.file_path` |
 | TaskCompleted | `cwd`, `task_subject` |
-| PreCompact | `cwd`, `compaction_trigger` |
 
 ## Формат ответа
 
@@ -80,17 +73,16 @@ description: Автоматика Claude Code — session, post-edit, task compl
 - Обновляет intelligence: co-edited файлы, данные сессии
 - Если workflow был running — ставит на паузу
 
-## PostToolUse (Write/Edit/MultiEdit)
+## TaskCompleted
 
-Трекает каждый отредактированный файл:
+Срабатывает после завершения задачи через `dev-workflow task` либо TodoWrite-маркер:
 
-- Извлекает `tool_input.file_path` из stdin JSON
-- Записывает в `.dev-vault/.edit-log.json`
-- Обновляет intelligence store (file-edit паттерн)
+- Извлекает `task_subject` из stdin JSON
+- Дописывает запись в `.dev-vault/daily/<date>.md` с названием задачи и ссылкой на коммит, если он есть
 
 ## Ручной запуск (для тестирования)
 
 ```bash
-echo '{}' | node /path/to/dist/hooks/session-start.js
-echo '{"tool_input":{"file_path":"src/file.ts"}}' | node /path/to/dist/hooks/post-edit.js
+echo '{"cwd":"'"$PWD"'","source":"startup"}' | node /path/to/dist/hooks/session-start.js
+echo '{"cwd":"'"$PWD"'"}' | node /path/to/dist/hooks/session-end.js
 ```
