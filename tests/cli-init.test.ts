@@ -103,6 +103,24 @@ describe("init CLI command — E2E", () => {
     expect(existsSync(join(agentsDir, "researcher.md"))).toBe(true);
   });
 
+  it("copies .claude/skills/ from templates and reports count", () => {
+    const logOutput: string[] = [];
+    const origLog = console.log;
+    console.log = ((msg: string) => { logOutput.push(String(msg)); return true; }) as typeof console.log;
+    try {
+      init({ force: true });
+    } finally {
+      console.log = origLog;
+    }
+    const skillsDir = join(projectRoot, ".claude", "skills");
+    expect(existsSync(skillsDir)).toBe(true);
+    expect(statSync(skillsDir).isDirectory()).toBe(true);
+    // Spot-check: bundled obsidian-markdown skill from project genesis
+    expect(existsSync(join(skillsDir, "obsidian-markdown", "SKILL.md"))).toBe(true);
+    // Console output emits skills count alongside commands/agents
+    expect(logOutput.some((line) => line.includes("skills/") && /\d+ skill\(s\) installed/.test(line))).toBe(true);
+  });
+
   it("creates .dev-vault/ scaffold (stack/conventions/knowledge/gameplan)", () => {
     init({ force: true });
     const vaultPath = join(projectRoot, ".dev-vault");

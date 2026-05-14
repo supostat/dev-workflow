@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, cpSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
@@ -151,6 +151,8 @@ export function init(options: InitOptions): void {
   console.log(keyValue("\u2713 settings.json", "hooks + MCP configured"));
   console.log(keyValue("\u2713 commands/", "17 commands installed"));
   console.log(keyValue("\u2713 agents/", "2 agents installed"));
+  const skillCount = existsSync(skillsTargetDir) ? readdirSync(skillsTargetDir).length : 0;
+  console.log(keyValue("\u2713 skills/", `${skillCount} skill(s) installed`));
 
   const writer = new VaultWriter(context);
   writer.scaffold();
