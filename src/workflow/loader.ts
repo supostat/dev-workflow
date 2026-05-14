@@ -129,11 +129,15 @@ export function loadCustomWorkflows(vaultPath: string): WorkflowDefinition[] {
 
   const workflows: WorkflowDefinition[] = [];
   for (const file of files) {
+    const filepath = join(workflowsDir, file);
     try {
-      const content = readFileSync(join(workflowsDir, file), "utf-8");
+      const content = readFileSync(filepath, "utf-8");
       workflows.push(parseWorkflowYaml(content));
-    } catch {
-      continue;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `warning: failed to load workflow at ${filepath}: ${message}\n`,
+      );
     }
   }
 

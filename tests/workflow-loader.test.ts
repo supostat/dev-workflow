@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -335,7 +335,7 @@ steps:
     expect(workflows).toHaveLength(0);
   });
 
-  it("skips malformed yaml files", () => {
+  it("skips malformed yaml files and emits stderr warning for each", () => {
     writeFileSync(join(vaultPath, "workflows", "good.yaml"), `
 name: good
 description: Good
@@ -348,10 +348,52 @@ steps:
 this is not valid yaml for a workflow
 `, "utf-8");
 
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
     const workflows = loadCustomWorkflows(vaultPath);
 
     expect(workflows).toHaveLength(1);
     expect(workflows[0]!.name).toBe("good");
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const message = String(stderrSpy.mock.calls[0]![0]);
+    expect(message).toContain("warning: failed to load workflow at");
+    expect(message).toContain("bad.yaml");
+    expect(message).toContain("missing 'name'");
+    stderrSpy.mockRestore();
+  });
+
+  it("emits one stderr warning per malformed file when multiple are malformed", () => {
+    writeFileSync(join(vaultPath, "workflows", "good.yaml"), `
+name: good
+description: Good
+steps:
+  - name: read
+    agent: reader
+`, "utf-8");
+
+    writeFileSync(join(vaultPath, "workflows", "missing-name.yaml"), `
+description: no name field
+steps:
+  - name: read
+    agent: reader
+`, "utf-8");
+
+    writeFileSync(join(vaultPath, "workflows", "no-steps.yaml"), `
+name: empty
+description: has no steps
+`, "utf-8");
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const workflows = loadCustomWorkflows(vaultPath);
+
+    expect(workflows).toHaveLength(1);
+    expect(workflows[0]!.name).toBe("good");
+    expect(stderrSpy).toHaveBeenCalledTimes(2);
+    const messages = stderrSpy.mock.calls.map((call) => String(call[0]));
+    expect(messages.some((m) => m.includes("missing-name.yaml") && m.includes("missing 'name'"))).toBe(true);
+    expect(messages.some((m) => m.includes("no-steps.yaml") && m.includes("no steps"))).toBe(true);
+    stderrSpy.mockRestore();
   });
 
   it("ignores non-yaml files", () => {
