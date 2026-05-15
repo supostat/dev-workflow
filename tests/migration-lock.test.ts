@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   LOCK_FILENAME,
   LOCK_SCHEMA_VERSION,
+  clearLockField,
   getPackageVersion,
   readLock,
   writeLock,
@@ -178,6 +179,57 @@ describe("migration-lock", () => {
 
       expect(second).not.toBe(first);
       expect(new Date(second).getTime()).toBeGreaterThan(new Date(first).getTime());
+    });
+  });
+
+  describe("clearLockField", () => {
+    it("preserves last_sync_version / last_sync_at / auto_sync when clearing commands_version", () => {
+      mkdirSync(join(projectRoot, ".claude"), { recursive: true });
+      writeFileSync(
+        lockFilePath(),
+        JSON.stringify({
+          version: 1,
+          commands_version: "1.0.0",
+          agents_version: "1.0.0",
+          skills_version: "1.0.0",
+          last_sync_version: "2.0.0",
+          last_sync_at: "2026-05-14T08:00:00.000Z",
+          auto_sync: false,
+          updated_at: "2026-01-01T00:00:00.000Z",
+        }, null, 2),
+        "utf-8",
+      );
+
+      clearLockField(projectRoot, "commands_version");
+
+      const parsed = readLock(projectRoot)!;
+      expect(parsed.last_sync_version).toBe("2.0.0");
+      expect(parsed.last_sync_at).toBe("2026-05-14T08:00:00.000Z");
+      expect(parsed.auto_sync).toBe(false);
+      expect(parsed.agents_version).toBe("1.0.0");
+      expect(parsed.skills_version).toBe("1.0.0");
+    });
+
+    it("clears the targeted field so it becomes undefined", () => {
+      mkdirSync(join(projectRoot, ".claude"), { recursive: true });
+      writeFileSync(
+        lockFilePath(),
+        JSON.stringify({
+          version: 1,
+          commands_version: "1.0.0",
+          agents_version: "1.0.0",
+          skills_version: "1.0.0",
+          updated_at: "2026-01-01T00:00:00.000Z",
+        }, null, 2),
+        "utf-8",
+      );
+
+      clearLockField(projectRoot, "commands_version");
+
+      const parsed = readLock(projectRoot)!;
+      expect(parsed.commands_version).toBeUndefined();
+      expect(parsed.agents_version).toBe("1.0.0");
+      expect(parsed.skills_version).toBe("1.0.0");
     });
   });
 });

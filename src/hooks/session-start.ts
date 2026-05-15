@@ -17,6 +17,8 @@ import { syncWorkflowShims } from "./workflow-shim-sync.js";
 import { readStdin, hookSuccess } from "./stdin.js";
 import { hashString, formatHash } from "../lib/spec-hash.js";
 import { parseFrontmatter } from "../lib/frontmatter.js";
+import { syncBundledArtifacts } from "../lib/auto-sync.js";
+import { PACKAGE_ROOT } from "../lib/package-root.js";
 
 export async function run(): Promise<void> {
   const input = await readStdin();
@@ -194,6 +196,16 @@ export async function run(): Promise<void> {
       // existsSync), YAML parse failures inside parseFrontmatter, hash compute
       // exceptions on unreadable buffers. Session-start hook must not block.
     }
+  }
+
+  // Fire-and-forget reconciliation of bundled skills/agents/settings against
+  // the installed dev-workflow package (task-052). Order-independent of the
+  // rendered message. Mirrors the gcEngramTraces pattern — session-start must
+  // never fail because a sync hit an fs error.
+  try {
+    syncBundledArtifacts(context.projectRoot, PACKAGE_ROOT);
+  } catch {
+    // Silent — auto-sync is best-effort hygiene, not core session-start work.
   }
 
   const message = sections.join("\n");

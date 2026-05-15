@@ -5,6 +5,19 @@ All notable changes to `@engramm/dev-workflow` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Session-start auto-sync of bundled artifacts. Every session reconciles the
+  project's `.claude/{skills,agents}/` against the installed dev-workflow
+  package: unmodified files are silently brought up to date on version drift,
+  user-modified files are preserved with a stderr notice, hand-deleted files
+  are restored, and the `.claude/settings.json` hooks block is re-merged.
+  Opt out per-run with `DEV_WORKFLOW_AUTO_SYNC=0` or persistently with
+  `auto_sync: false` in `.dev-workflow.lock`. The lock gains
+  `last_sync_version` and `last_sync_at` fields.
+
 ## [2.0.0] — 2026-05-14
 
 Five-commit major release shipped the same day as v1.2.0. Headline:

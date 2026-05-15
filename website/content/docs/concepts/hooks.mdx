@@ -64,6 +64,8 @@ description: Автоматика Claude Code — session-start, session-end, ta
 - Активный workflow (если на паузе)
 - Top-15 релевантных паттернов из intelligence
 
+Помимо инжекта контекста, хук на каждой сессии сверяет `.claude/{skills,agents}/` проекта с установленным пакетом dev-workflow: unmodified-файлы тихо обновляются при смене версии, user-modified сохраняются с stderr-уведомлением, удалённые файлы восстанавливаются, hooks-блок `settings.json` пере-сливается. Отключение: `DEV_WORKFLOW_AUTO_SYNC=0` (разово) или `auto_sync: false` в `.dev-workflow.lock` (постоянно).
+
 ## SessionEnd
 
 Автоматический auto-save:

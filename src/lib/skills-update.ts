@@ -1,6 +1,7 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { createHash } from "node:crypto";
+import { hashFile } from "./spec-hash.js";
+import { walkFiles } from "./fs-walk.js";
 
 export interface SkillsUpdateResult {
   added: number;
@@ -11,8 +12,8 @@ export interface SkillsUpdateResult {
  * Update skills directory additively. Per-file logic:
  *
  *  - Target missing → copy (counts as added).
- *  - Target exists, sha256(template) === sha256(target) → silently overwrite-or-skip
- *    (no-op in effect — file is byte-identical to bundled version).
+ *  - Target exists, sha256(template) === sha256(target) → no-op / skip
+ *    (file is byte-identical to bundled version, nothing is written).
  *  - Target exists, hashes differ → SKIP, emit stderr warning
  *    `note: skipping user-modified skill <relative-path>`, count as skipped.
  *
@@ -48,19 +49,4 @@ export function updateSkillsAdditively(
   }
 
   return result;
-}
-
-function* walkFiles(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      yield* walkFiles(full);
-    } else {
-      yield full;
-    }
-  }
-}
-
-function hashFile(filepath: string): string {
-  return createHash("sha256").update(readFileSync(filepath)).digest("hex");
 }

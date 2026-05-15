@@ -27,6 +27,8 @@ export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-
 export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";
 export { loadCommunicationConfig } from "./lib/communication.js";
 export { getActiveProfile, setActiveProfile, clearActiveProfile } from "./lib/communication-state.js";
+export { syncBundledArtifacts } from "./lib/auto-sync.js";
+export type { AutoSyncResult, AutoSyncOptions } from "./lib/auto-sync.js";
 
 export type { ProjectContext, VaultData, DailyLog, BranchContext, CommunicationProfile, CommunicationConfig, ToneType, VerbosityType, ExpertiseType, LanguageType, OutputType } from "./lib/types.js";
 export type { Frontmatter } from "./lib/frontmatter.js";

@@ -18,12 +18,22 @@ export const LOCK_SCHEMA_VERSION = 1;
  * release may stop shipping `commands/` entirely — at which point new
  * lock files will omit `commands_version`, while existing user-project
  * lock files keep their last-written value for migration detection.
+ *
+ * The `last_sync_*` fields and `auto_sync` are written/read by the
+ * session-start auto-sync routine (task-052): `last_sync_version` records
+ * which package version last reconciled bundled skills/agents,
+ * `last_sync_at` is the ISO timestamp of that reconciliation, and
+ * `auto_sync` is a persistent per-project opt-out (`false` disables the
+ * session-start sync entirely).
  */
 export interface LockState {
   version: number;
   commands_version?: string;
   agents_version?: string;
   skills_version?: string;
+  last_sync_version?: string;
+  last_sync_at?: string;
+  auto_sync?: boolean;
   updated_at: string;
 }
 
@@ -113,6 +123,9 @@ export function writeLock(projectRoot: string, partial: Partial<Omit<LockState, 
     commands_version: partial.commands_version ?? existing?.commands_version,
     agents_version: partial.agents_version ?? existing?.agents_version,
     skills_version: partial.skills_version ?? existing?.skills_version,
+    last_sync_version: partial.last_sync_version ?? existing?.last_sync_version,
+    last_sync_at: partial.last_sync_at ?? existing?.last_sync_at,
+    auto_sync: partial.auto_sync ?? existing?.auto_sync,
     updated_at: new Date().toISOString(),
   };
 
@@ -143,6 +156,9 @@ export function clearLockField(
     commands_version: field === "commands_version" ? undefined : existing.commands_version,
     agents_version: field === "agents_version" ? undefined : existing.agents_version,
     skills_version: field === "skills_version" ? undefined : existing.skills_version,
+    last_sync_version: existing.last_sync_version,
+    last_sync_at: existing.last_sync_at,
+    auto_sync: existing.auto_sync,
     updated_at: new Date().toISOString(),
   };
   const filepath = lockPath(projectRoot);
