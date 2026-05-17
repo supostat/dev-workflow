@@ -60,6 +60,16 @@ describe("resolveSocketPath", () => {
     expect(resolveSocketPath()).toBe("/tmp/fake-home/.engram/engram.sock");
   });
 
+  it("returns project socket when .engram/ dir exists but .sock file is absent", () => {
+    // Daemon mid-restart: the `.engram/` directory persists but the `.sock`
+    // file is briefly gone. Resolution must stay on the project socket, not
+    // fall back to a possibly-stale global socket (ECONNREFUSED).
+    process.env["HOME"] = "/tmp/fake-home";
+    mkdirSync(join(tempDir, ".engram"), { recursive: true });
+    // Deliberately do NOT create the .sock file.
+    expect(resolveSocketPath()).toBe(join(tempDir, ".engram", "engram.sock"));
+  });
+
   it("falls back to /tmp when HOME is unset and no cwd-local socket", () => {
     delete process.env["HOME"];
     expect(resolveSocketPath()).toBe("/tmp/.engram/engram.sock");

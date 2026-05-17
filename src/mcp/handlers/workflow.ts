@@ -181,12 +181,14 @@ export function workflowStart(
   new WorkflowState(vaultPath).save(run);
 
   const traceFilePath = join(vaultPath, "workflow-state", "runs", `${runId}.engram-trace.jsonl`);
-  if (!process.env["ENGRAM_TRACE_FILE"]) {
-    process.env["ENGRAM_TRACE_FILE"] = traceFilePath;
-  }
-  if (!process.env["ENGRAM_RUN_ID"]) {
-    process.env["ENGRAM_RUN_ID"] = runId;
-  }
+  // Repoint the engram trace env vars to THIS run, unconditionally. The MCP
+  // server is a long-lived process serving sequential workflow runs and these
+  // env vars are process-global. A conditional "set only if unset" left every
+  // run after the first writing its trace events into the first run's
+  // .engram-trace.jsonl — later runs showed "no trace" and a false 0%
+  // search-hit-rate. Each workflow_start supersedes the previous run.
+  process.env["ENGRAM_TRACE_FILE"] = traceFilePath;
+  process.env["ENGRAM_RUN_ID"] = runId;
 
   return { runId, traceFilePath };
 }

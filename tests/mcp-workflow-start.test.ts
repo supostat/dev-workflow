@@ -137,16 +137,19 @@ describe("workflow_start MCP handler", () => {
     expect(process.env["ENGRAM_TRACE_FILE"]).toBe(result.traceFilePath);
   });
 
-  it("does NOT overwrite ENGRAM_TRACE_FILE if already set", async () => {
-    const preset = "/tmp/preset-trace-file.jsonl";
-    process.env["ENGRAM_TRACE_FILE"] = preset;
+  it("repoints ENGRAM_TRACE_FILE to the new run even when already set", async () => {
+    // The MCP server is long-lived and serves sequential runs. Each
+    // workflow_start MUST repoint the trace env to its own run; a stale
+    // preset (left by an earlier run) would otherwise capture this run's
+    // trace events into the wrong .engram-trace.jsonl.
+    process.env["ENGRAM_TRACE_FILE"] = "/tmp/preset-trace-file.jsonl";
 
-    await handlers.handle("workflow_start", {
+    const result = await handlers.handle("workflow_start", {
       workflowName: "dev",
-      taskDescription: "preserve env",
-    });
+      taskDescription: "repoint env",
+    }) as WorkflowStartResult;
 
-    expect(process.env["ENGRAM_TRACE_FILE"]).toBe(preset);
+    expect(process.env["ENGRAM_TRACE_FILE"]).toBe(result.traceFilePath);
   });
 
   it("sets ENGRAM_RUN_ID env var to the generated runId", async () => {
@@ -158,15 +161,37 @@ describe("workflow_start MCP handler", () => {
     expect(process.env["ENGRAM_RUN_ID"]).toBe(result.runId);
   });
 
-  it("does NOT overwrite ENGRAM_RUN_ID if already set", async () => {
-    process.env["ENGRAM_RUN_ID"] = "run-preset-id-99";
+  it("repoints ENGRAM_RUN_ID to the new run even when already set", async () => {
+    process.env["ENGRAM_RUN_ID"] = "run-0000deadbeef";
 
-    await handlers.handle("workflow_start", {
+    const result = await handlers.handle("workflow_start", {
       workflowName: "dev",
-      taskDescription: "preserve runid env",
-    });
+      taskDescription: "repoint runid env",
+    }) as WorkflowStartResult;
 
-    expect(process.env["ENGRAM_RUN_ID"]).toBe("run-preset-id-99");
+    expect(process.env["ENGRAM_RUN_ID"]).toBe(result.runId);
+  });
+
+  it("sequential runs each repoint trace env to their own run", async () => {
+    // Regression guard: the original `if (!process.env[...])` guard left every
+    // run after the first writing trace events into run #1's file. Each
+    // workflow_start in the same process must supersede the previous run.
+    const first = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "first sequential run",
+    }) as WorkflowStartResult;
+    expect(process.env["ENGRAM_TRACE_FILE"]).toBe(first.traceFilePath);
+    expect(process.env["ENGRAM_RUN_ID"]).toBe(first.runId);
+
+    const second = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "second sequential run",
+    }) as WorkflowStartResult;
+
+    expect(second.runId).not.toBe(first.runId);
+    expect(second.traceFilePath).not.toBe(first.traceFilePath);
+    expect(process.env["ENGRAM_TRACE_FILE"]).toBe(second.traceFilePath);
+    expect(process.env["ENGRAM_RUN_ID"]).toBe(second.runId);
   });
 
   it("WorkflowRun.currentStep equals the first step name in the workflow", async () => {

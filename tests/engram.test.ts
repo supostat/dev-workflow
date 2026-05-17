@@ -7,6 +7,7 @@ import {
   engramHealth,
   engramSearch,
   engramStore,
+  isRetryableError,
   PENDING_JUDGMENTS_THRESHOLD,
 } from "../src/lib/engram.js";
 
@@ -313,5 +314,31 @@ describe("EngramBridge.afterStep wire format", () => {
 
     expect(id).toBe("stored-id");
     expect(capturedParams!["tags"]).toEqual(["proj", "branch", "plan", "completed"]);
+  });
+});
+
+describe("isRetryableError", () => {
+  it("retries on connect/request timeout", () => {
+    expect(isRetryableError(new Error("connect timeout"))).toBe(true);
+    expect(isRetryableError(new Error("request timeout"))).toBe(true);
+  });
+
+  it("retries on a daemon mid-restart: absent socket and stale (refused) socket", () => {
+    // `.sock` file briefly gone while the supervisor respawns the daemon.
+    expect(isRetryableError(new Error("socket not found"))).toBe(true);
+    // `.sock` file present but stale — the dead daemon left it behind.
+    const refused = Object.assign(new Error("connect ECONNREFUSED /x/.engram/engram.sock"), {
+      code: "ECONNREFUSED",
+    });
+    expect(isRetryableError(refused)).toBe(true);
+  });
+
+  it("does not retry non-transient failures", () => {
+    expect(isRetryableError(new Error("invalid response"))).toBe(false);
+    expect(isRetryableError(new Error("response too large"))).toBe(false);
+    expect(isRetryableError(new Error("engram error"))).toBe(false);
+    expect(isRetryableError("not an Error")).toBe(false);
+    const otherErrno = Object.assign(new Error("EACCES"), { code: "EACCES" });
+    expect(isRetryableError(otherErrno)).toBe(false);
   });
 });

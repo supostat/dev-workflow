@@ -7,7 +7,8 @@ import { appendEngramTrace } from "./engram-trace.js";
 /**
  * Resolve the engram socket path with priority:
  *   1. ENGRAM_SOCKET_PATH env var (trusted local boundary; no validation)
- *   2. <cwd>/.engram/engram.sock (per-project, current engram deploy model)
+ *   2. <cwd>/.engram/engram.sock — chosen whenever `<cwd>/.engram/` exists
+ *      as a directory (per-project deploy marker)
  *   3. $HOME/.engram/engram.sock (legacy / system-wide fallback)
  *
  * Per-call evaluation — cwd may change between calls in test/async paths.
@@ -19,8 +20,14 @@ import { appendEngramTrace } from "./engram-trace.js";
 export function resolveSocketPath(): string {
   const envPath = process.env["ENGRAM_SOCKET_PATH"];
   if (envPath && envPath.length > 0) return envPath;
-  const projectPath = join(process.cwd(), ".engram", "engram.sock");
-  if (existsSync(projectPath)) return projectPath;
+  // A `<cwd>/.engram/` directory marks a per-project engram deployment. Its
+  // socket is canonical even while the `.sock` file is momentarily absent —
+  // the daemon is mid-restart for ~1s while the MCP supervisor respawns it.
+  // Probe the DIRECTORY, not the `.sock` file: returning the project socket
+  // path lets the caller retry against the right socket instead of silently
+  // falling back to a possibly-stale global socket (which ECONNREFUSEs).
+  const projectEngramDir = join(process.cwd(), ".engram");
+  if (existsSync(projectEngramDir)) return join(projectEngramDir, "engram.sock");
   return join(process.env["HOME"] ?? "/tmp", ".engram", "engram.sock");
 }
 
@@ -31,12 +38,17 @@ const CONNECT_TIMEOUT_MS = 500;
 const REQUEST_TIMEOUT_MS = 5000;
 const RETRY_BACKOFF_MS = 300;
 
-function isRetryableError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const message = error.message;
-    return message === "connect timeout" || message === "request timeout";
-  }
-  return false;
+/** Exported primarily for testing. */
+export function isRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message;
+  if (message === "connect timeout" || message === "request timeout") return true;
+  // Transient during a per-project daemon restart (~1s): the `.sock` file is
+  // briefly absent ("socket not found") or present-but-stale (ECONNREFUSED)
+  // while the MCP supervisor respawns the daemon. One backoff retry catches
+  // the common short-restart case; a longer outage still fails fast.
+  if (message === "socket not found") return true;
+  return (error as NodeJS.ErrnoException).code === "ECONNREFUSED";
 }
 
 async function socketCallWithRetry(
