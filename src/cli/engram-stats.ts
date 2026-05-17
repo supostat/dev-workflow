@@ -160,7 +160,6 @@ export async function engramStats(args: string[]): Promise<void> {
   const stats = await collectEngramStats(context.vaultPath, {
     runCount,
     projectName: context.projectName,
-    branch: context.branch,
   });
 
   if (jsonMode) {

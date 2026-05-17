@@ -69,21 +69,20 @@ export function buildAutoTags(c: PipelineContext): string[] {
 /**
  * Build tags filter for memory_search (retrieval path).
  *
- * Asymmetric to buildAutoTags: drops volatile per-run scope tags
- * (run/step/phase) which would AND-exclude all prior memories — engram
- * applies tags filter with AND semantics, so a unique-per-run `run:<id>`
- * tag guarantees zero cross-run matches. Keeps stable scope tags
- * (branch/task) so retrieval is scoped to the project context without
- * narrowing to a single pipeline invocation.
+ * Returns an empty array: search-sites MUST NOT inject auto/scope tags
+ * (branch/task/run/step/phase) into the `tags` filter. Engram applies the
+ * `tags` filter with AND semantics, so any scope tag would AND-exclude every
+ * prior memory not stamped with that exact tag — silently hiding cross-run,
+ * cross-branch, and cross-task memories.
  *
- * Store path uses full buildAutoTags for attribution accuracy. See ADR
- * `2026-05-14-asymmetric-engram-tag-injection...` for the design split.
+ * Project isolation is provided by the `project` JSON-RPC param, not by tags.
+ * The `tags` filter is reserved for user-supplied tags and intentional
+ * single-record lookups (e.g. vault-mirror dedup by `vault-source:`).
+ *
+ * Store path still uses full buildAutoTags for attribution accuracy.
  */
-export function buildSearchTags(c: PipelineContext): string[] {
-  const tags: string[] = [];
-  if (c.branch) tags.push(`branch:${c.branch}`);
-  if (c.taskId) tags.push(`task:${c.taskId}`);
-  return tags;
+export function buildSearchTags(): string[] {
+  return [];
 }
 
 export function mergeTags(autoTags: string[], userTags?: string[]): string[] {

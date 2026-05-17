@@ -221,7 +221,6 @@ describe("collectEngramStats", () => {
     // ENGRAM_SOCKET_PATH points to a non-existent socket — engramHealth returns null
     const stats = await collectEngramStats(vaultPath, {
       projectName: "test",
-      branch: "main",
       // skipLive not set: real engramHealth + engramSearch fire, both fail-safe
     });
     expect(stats.live.health).toBeNull();

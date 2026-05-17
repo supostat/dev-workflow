@@ -68,7 +68,6 @@ export interface RunSummary {
 export interface CollectOptions {
   runCount?: number;
   projectName?: string;
-  branch?: string;
   /** Skip live engram queries (deterministic tests). */
   skipLive?: boolean;
 }
@@ -224,8 +223,7 @@ async function gatherLive(
 async function fetchTopMemoriesBestEffort(options: CollectOptions): Promise<EngramMemory[]> {
   if (!options.projectName) return [];
   try {
-    const tags = options.branch ? [`branch:${options.branch}`] : undefined;
-    return await engramSearch("recent activity", options.projectName, 5, tags);
+    return await engramSearch("recent activity", options.projectName, 5);
   } catch {
     return [];
   }

@@ -26,8 +26,7 @@ export async function memorySearch(
   opts: { limit?: number; tags?: string[] },
 ): Promise<unknown> {
   if (opts.tags) validateTags(opts.tags, "memory_search");
-  const pipelineCtx = loadPipelineContext(context);
-  const tags = mergeTags(buildSearchTags(pipelineCtx), opts.tags);
+  const tags = mergeTags(buildSearchTags(), opts.tags);
   const result = await engramSearch(
     query,
     context.projectName,
