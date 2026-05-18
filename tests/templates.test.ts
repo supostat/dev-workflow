@@ -57,6 +57,16 @@ describe("renderTemplate", () => {
   it("throws on unknown template", () => {
     expect(() => renderTemplate("nonexistent/template")).toThrow("Template not found");
   });
+
+  it("renders record templates without a section skeleton", () => {
+    for (const name of ["records/adr", "records/bug", "records/debt"]) {
+      const result = renderTemplate(name, { title: "Title", projectName: "P" });
+
+      expect(result).not.toMatch(/^## /m);
+      expect(result).toContain("---");
+      expect(result).toContain("# Title");
+    }
+  });
 });
 
 describe("listTemplates", () => {

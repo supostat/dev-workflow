@@ -118,14 +118,6 @@ status: accepted
 tags: [adr, {{projectName}}]
 ---
 # {{title}}
-
-## Context
-
-## Decision
-
-## Alternatives
-
-## Consequences
 `,
 
   "records/bug": `---
@@ -134,14 +126,6 @@ severity: {{severity}}
 tags: [bug, {{projectName}}]
 ---
 # {{title}}
-
-## Symptoms
-
-## Root Cause
-
-## Fix
-
-## Prevention
 `,
 
   "records/debt": `---
@@ -151,14 +135,6 @@ effort: {{effort}}
 tags: [debt, {{projectName}}]
 ---
 # {{title}}
-
-## Problem
-
-## Why Deferred
-
-## Proposal
-
-## Risk If Ignored
 `,
 
   "project/claude-md": `# {{projectName}}
