@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveWorkflow, listAvailableWorkflows } from "../src/cli/run.js";
+import { resolveWorkflow, listAvailableWorkflows } from "../src/workflow/resolver.js";
 
 describe("resolveWorkflow", () => {
   let vaultPath: string;

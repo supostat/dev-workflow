@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `auto_sync: false` in `.dev-workflow.lock`. The lock gains
   `last_sync_version` and `last_sync_at` fields.
 
+### Changed
+
+- **BREAKING:** the package entry point (`src/index.ts`) now exports only
+  the communication-profile integration API — `loadCommunicationConfig`,
+  `getActiveProfile`, `setActiveProfile`, `clearActiveProfile`, and the
+  `CommunicationProfile` / `CommunicationConfig` / `ToneType` /
+  `VerbosityType` / `ExpertiseType` / `LanguageType` / `OutputType` types.
+  Internal modules — vault readers/writers, the workflow engine and its
+  `StepExecutor` / `GateChecker` / `WorkflowResolver` types, the task
+  manager, the MCP server, the engram bridge, and the rest — are no longer
+  re-exported. They are consumed through the `dev-workflow` CLI and MCP
+  server, not as a programmatic import surface. Downstream code importing
+  these symbols from `@engramm/dev-workflow` must pin a prior version or
+  switch to the CLI/MCP interface.
+
 ## [2.0.0] — 2026-05-14
 
 Five-commit major release shipped the same day as v1.2.0. Headline:

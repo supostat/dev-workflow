@@ -6,7 +6,7 @@ import {
   renderEffective,
 } from "../lib/workflow-render.js";
 import type { WorkflowDefinition } from "../workflow/types.js";
-import { listAvailableWorkflows, resolveWorkflow } from "./run.js";
+import { listAvailableWorkflows, resolveWorkflow } from "../workflow/resolver.js";
 import { runWorkflowCleanup } from "./workflow-cleanup.js";
 
 const SUBCOMMANDS: ReadonlySet<string> = new Set(["show", "graph", "effective", "cleanup"]);

@@ -106,7 +106,7 @@ step + gate. The pipeline still aborts on the first failure.
 
 ### Path 3: add a binary to the allowlist (last resort)
 
-The allowlist lives in `src/cli/run.ts` as `ALLOWED_GATE_BINARIES`. To
+The allowlist lives in `src/workflow/gate-runner.ts` as `ALLOWED_GATE_BINARIES`. To
 add a binary you'd need to fork or PR — and PRs require a security
 review explaining why the binary can't be replaced by a `node` script
 or a multi-step split.

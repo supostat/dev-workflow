@@ -1,37 +1,20 @@
-export { detectContext } from "./lib/context.js";
-export { VaultReader } from "./lib/reader.js";
-export { VaultWriter } from "./lib/writer.js";
-export { renderTemplate } from "./lib/templates.js";
-export { interpolate } from "./lib/interpolate.js";
-export { parseFrontmatter, serializeFrontmatter } from "./lib/frontmatter.js";
-export { readFileOrNull, writeFileSafe, slugify, todayDate } from "./lib/fs-helpers.js";
-export { icon, table, progressBar, box, section, statusIcon, stepLine, keyValue, divider } from "./lib/output.js";
-export { detectStack, renderStackMarkdown } from "./lib/stack-detect.js";
-export { detectConventions, renderConventionsMarkdown } from "./lib/conventions-detect.js";
-export { AgentRegistry } from "./agents/registry.js";
-export { AgentContextBuilder } from "./agents/context-builder.js";
-export { parseAgentFile } from "./agents/loader.js";
-export { TaskManager } from "./tasks/manager.js";
-export { TaskTracker } from "./tasks/tracker.js";
-export { WorkflowEngine } from "./workflow/engine.js";
-export type { StepExecutor, GateChecker, WorkflowResolver } from "./workflow/engine.js";
-export { WorkflowState } from "./workflow/state.js";
-export { getBuiltinWorkflows, getBuiltinWorkflow } from "./workflow/builtin.js";
-export { parseWorkflowYaml, loadCustomWorkflows } from "./workflow/loader.js";
-export { McpServer } from "./mcp/server.js";
-export { ToolHandlers } from "./mcp/handlers.js";
-export { getToolDefinitions } from "./mcp/tools.js";
-export { engramSearch, engramStore, engramStoreStrict, engramJudge, engramHealth, formatEngramResults, EngramBridge, isEngramAvailable } from "./lib/engram.js";
-export type { EngramBeforeStepResult, EngramHealthStatus } from "./lib/engram.js";
-export { parseEngramFeedback, extractEngramFeedbackSection } from "./lib/engram-feedback.js";
-export type { EngramFeedbackResult, EngramFeedbackJudgment } from "./lib/engram-feedback.js";
+// Public package surface for `@engramm/dev-workflow`.
+//
+// Only the communication-profile integration API is re-exported here.
+// Every other module (vault readers/writers, the workflow engine, the task
+// manager, the MCP server, the engram bridge, etc.) is internal — consumed
+// through the `dev-workflow` CLI and MCP server, not imported directly — and
+// is deliberately NOT part of the public surface.
+
 export { loadCommunicationConfig } from "./lib/communication.js";
 export { getActiveProfile, setActiveProfile, clearActiveProfile } from "./lib/communication-state.js";
-export { syncBundledArtifacts } from "./lib/auto-sync.js";
-export type { AutoSyncResult, AutoSyncOptions } from "./lib/auto-sync.js";
 
-export type { ProjectContext, VaultData, DailyLog, BranchContext, CommunicationProfile, CommunicationConfig, ToneType, VerbosityType, ExpertiseType, LanguageType, OutputType } from "./lib/types.js";
-export type { Frontmatter } from "./lib/frontmatter.js";
-export type { AgentDefinition, PreparedAgent, AgentPermissions, VaultSection, GitOperation } from "./agents/types.js";
-export type { Task, TaskStatus, TaskPriority, TaskFilter } from "./tasks/types.js";
-export type { WorkflowDefinition, WorkflowRun, StepDefinition, WorkflowStatus, StepState, GateType } from "./workflow/types.js";
+export type {
+  CommunicationProfile,
+  CommunicationConfig,
+  ToneType,
+  VerbosityType,
+  ExpertiseType,
+  LanguageType,
+  OutputType,
+} from "./lib/types.js";

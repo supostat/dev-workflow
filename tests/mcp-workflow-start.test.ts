@@ -347,7 +347,7 @@ steps:
     // (intake.yaml owns routing). Verify resolution succeeds and the resolved
     // definition truly has an empty match array — guards against accidental
     // hard-dependence on the field.
-    const { resolveWorkflow } = await import("../src/cli/run.js");
+    const { resolveWorkflow } = await import("../src/workflow/resolver.js");
     const resolved = resolveWorkflow("hotfix", context.vaultPath);
     expect(resolved.match).toEqual([]);
 

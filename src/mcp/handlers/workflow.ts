@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveWorkflow } from "../../cli/run.js";
+import { resolveWorkflow } from "../../workflow/resolver.js";
 import { parseGameplanPhase } from "../../lib/gameplan-parser.js";
 import { WorkflowState } from "../../workflow/state.js";
 import type { StepState, WorkflowRun } from "../../workflow/types.js";
@@ -90,9 +90,9 @@ function validateWorkflowStartInput(
  * entry point (slash orchestrator) uses prefixed-hex. Two generators by
  * design — engine generator stays untouched.
  *
- * resolveWorkflow is imported from `src/cli/run.ts` directly: a grep audit
- * (`grep -rn "from.*mcp" src/cli/run.ts`) confirmed no MCP imports there,
- * so no circular dependency.
+ * resolveWorkflow is imported from the `src/workflow/` domain layer
+ * (`workflow/resolver.ts`) — an MCP handler depending on a domain module,
+ * the expected direction of the dependency graph.
  *
  * **Concurrency limitation**: dev-workflow assumes one active workflow run
  * per Node.js process. ENGRAM_TRACE_FILE and ENGRAM_RUN_ID env vars are
