@@ -60,6 +60,7 @@ Usage:
   dev-workflow workflow cleanup [options] Mark/delete stale paused or running runs
   dev-workflow vault diff [SPEC.md]    Compare SPEC.md against vault sections
   dev-workflow serve                     Start MCP server
+  dev-workflow web [--port N] [--open]  Start the web dashboard (127.0.0.1)
   dev-workflow help                      Show this help
 
 Workflows: dev, hotfix, review, test
@@ -139,6 +140,10 @@ switch (command) {
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);
+    break;
+  }
+  case "web": {
+    import("./web.js").then((m) => m.web(args.slice(1))).catch(handleAsyncError);
     break;
   }
   case "version":

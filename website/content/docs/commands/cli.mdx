@@ -82,3 +82,11 @@ Workflow: `dev`, `hotfix`, `review`, `test`.
 ```bash
 dev-workflow serve    # запуск MCP-сервера (stdin/stdout JSON-RPC)
 ```
+
+## Веб-дашборд
+
+```bash
+dev-workflow web [--port N] [--open]    # запуск дашборда на http://127.0.0.1:3737
+```
+
+Дашборд жёстко привязан к `127.0.0.1` — флага `--host` нет по дизайну. При занятом порте — fallback на +1..+4 (до 5 попыток). `--open` открывает браузер (по умолчанию в TTY), `--no-open` отключает. Ctrl+C — graceful shutdown.

@@ -158,6 +158,7 @@ dev-workflow search "query"              # Search vault
 dev-workflow config show|get|set         # Configuration
 dev-workflow export|import               # Vault backup
 dev-workflow serve                       # Start MCP server
+dev-workflow web [--port N] [--open]     # Start the web dashboard (http://127.0.0.1:3737)
 ```
 
 ## MCP Tools
