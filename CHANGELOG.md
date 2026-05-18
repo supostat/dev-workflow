@@ -7,8 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-05-18
+
+Headline: the **web dashboard**. dev-workflow now ships a local six-page
+dashboard, served by a dependency-light Node HTTP API and launched with the
+new `dev-workflow web` command.
+
+**BREAKING:** the package entry point is trimmed to the communication-profile
+API only — see Changed.
+
 ### Added
 
+- **Web dashboard.** A six-page local dashboard — Overview, Vault, Tasks,
+  Workflow, Engram, and Settings — built as a static Next.js export and
+  served over a hand-written Node `http` API (17 REST endpoints plus four
+  Server-Sent-Events streams). It covers vault editing, task CRUD, read-only
+  workflow-run inspection with a live engram trace tail, engram statistics,
+  and communication-profile settings. Multi-project navigation is backed by
+  a registry in `~/.config/dev-workflow/projects.json`. chokidar is the one
+  new runtime dependency, scoped to file-watching for the SSE streams.
+- **`dev-workflow web`** — start the dashboard on `http://127.0.0.1`
+  (loopback only, by design — there is no `--host` flag). `--port` sets the
+  port (default 3737, with fallback to the next four when one is busy); the
+  browser opens automatically in a TTY (`--open` / `--no-open` override);
+  Ctrl+C triggers a graceful shutdown.
 - Session-start auto-sync of bundled artifacts. Every session reconciles the
   project's `.claude/{skills,agents}/` against the installed dev-workflow
   package: unmodified files are silently brought up to date on version drift,
@@ -32,6 +54,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server, not as a programmatic import surface. Downstream code importing
   these symbols from `@engramm/dev-workflow` must pin a prior version or
   switch to the CLI/MCP interface.
+
+### Fixed
+
+- The engram `memory_search` proxy no longer injects pipeline scope tags
+  (`branch:` / `task:` / `run:` / `step:`) into the daemon tag filter. The
+  filter applies AND semantics, so a scope tag absent from prior memories
+  excluded every cross-branch and cross-task result — `memory_search`
+  returned empty on essentially every query. Project scoping now rides the
+  `project` JSON-RPC parameter instead.
+- The engram trace file path is resolved per workflow run, and socket-path
+  resolution is hardened against a stale or missing daemon socket.
+- The `tests-pass` gate no longer throws when a step declares no shell
+  command, and the `adr` / `bug` / `debt` record templates no longer emit a
+  duplicated empty section skeleton.
+
+### Security
+
+- Hardened the hand-written frontmatter parser against prototype pollution —
+  `__proto__` / `constructor` / `prototype` keys are rejected and parsed
+  objects use a null prototype. Added path-traversal validation for
+  phase-file references and tightened workflow gate-config validation.
 
 ## [2.0.0] — 2026-05-14
 
@@ -1045,5 +1088,6 @@ explicitly elsewhere (e.g. in step files or hooks), update accordingly.
 `dev-workflow validate` (which runs in `session-start` and on demand) will
 warn about stale references — re-run it after upgrading.
 
+[3.0.0]: https://github.com/supostat/dev-workflow/compare/v2.0.0...v3.0.0
 [0.2.0]: https://github.com/supostat/dev-workflow/compare/v0.1.7...v0.2.0
 [0.1.7]: https://github.com/supostat/dev-workflow/releases/tag/v0.1.7
