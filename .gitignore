@@ -40,3 +40,9 @@ out/
 .next/
 .engram/
 .dev-workflow-upgrade-backup
+
+# dashboard workspace (web-dashboard phase)
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dist/dashboard/

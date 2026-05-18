@@ -1,0 +1,138 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Design tokens — GitHub-faithful palette, locked by the web-dashboard
+ * design-system ADR (2026-05-15). Four token groups: (a) color palette,
+ * (b) status colors, (c) shadows, (d) density spacing. Tailwind 4 CSS-first:
+ * no tailwind.config.ts — fontFamily and status colors are exposed to
+ * utilities through the @theme block below.
+ */
+
+/* (a) Color palette — light mode */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 215 14% 16%;
+  --card: 210 17% 98%;
+  --card-foreground: 215 14% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 14% 16%;
+  --primary: 215 14% 16%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 17% 95%;
+  --secondary-foreground: 215 14% 16%;
+  --muted: 210 17% 95%;
+  --muted-foreground: 215 9% 38%;
+  --accent: 210 17% 95%;
+  --accent-foreground: 215 14% 16%;
+  --destructive: 0 78% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 18% 88%;
+  --input: 210 18% 88%;
+  --ring: 212 92% 45%;
+  --radius: 0.375rem;
+
+  /* (b) Status colors — light mode */
+  --status-running: 212 92% 45%;
+  --status-paused: 35 100% 42%;
+  --status-done: 137 55% 36%;
+  --status-aborted: 215 9% 50%;
+  --status-failed: 0 78% 50%;
+
+  /* (c) Shadows — light mode */
+  --shadow-sm: 0 1px 0 rgba(27, 31, 36, 0.04);
+  --shadow: 0 3px 6px rgba(140, 149, 159, 0.15);
+  --shadow-md: 0 8px 24px rgba(140, 149, 159, 0.20);
+
+  /* (d) Density spacing */
+  --spacing-comfortable: 1rem;
+  --spacing-comfortable-y: 0.75rem;
+  --spacing-compact: 0.5rem;
+  --spacing-compact-y: 0.375rem;
+}
+
+/* (a) Color palette — dark mode */
+.dark {
+  --background: 220 13% 9%;
+  --foreground: 210 17% 82%;
+  --card: 215 21% 11%;
+  --card-foreground: 210 17% 82%;
+  --popover: 215 21% 11%;
+  --popover-foreground: 210 17% 82%;
+  --primary: 210 17% 82%;
+  --primary-foreground: 220 13% 9%;
+  --secondary: 215 14% 16%;
+  --secondary-foreground: 210 17% 82%;
+  --muted: 215 14% 16%;
+  --muted-foreground: 213 12% 58%;
+  --accent: 215 14% 16%;
+  --accent-foreground: 210 17% 82%;
+  --destructive: 0 64% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 14% 21%;
+  --input: 215 14% 21%;
+  --ring: 212 92% 56%;
+
+  /* (b) Status colors — dark mode */
+  --status-running: 212 92% 56%;
+  --status-paused: 41 95% 56%;
+  --status-done: 137 60% 56%;
+  --status-aborted: 213 12% 58%;
+  --status-failed: 0 64% 51%;
+
+  /* (c) Shadows — dark mode (opacity-only changes) */
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.30);
+  --shadow: 0 3px 6px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50);
+}
+
+/*
+ * Tailwind 4 theme bindings — maps CSS variables to utility-class color
+ * tokens. shadcn components consume the --color-* names; status-* and the
+ * font families are added so workflow badges and the design typography
+ * resolve through `bg-status-running`, `font-mono`, etc.
+ */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-status-running: hsl(var(--status-running));
+  --color-status-paused: hsl(var(--status-paused));
+  --color-status-done: hsl(var(--status-done));
+  --color-status-aborted: hsl(var(--status-aborted));
+  --color-status-failed: hsl(var(--status-failed));
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+}
