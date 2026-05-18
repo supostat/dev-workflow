@@ -134,11 +134,14 @@ function createTestEnv() {
   const agentsDir = join(projectRoot, "test-agents");
   mkdirSync(agentsDir, { recursive: true });
   for (const name of ["reader", "tester", "reviewer", "coder"]) {
+    // The real bundled tester agent declares `shell: [npm test]`; mirror that
+    // so the tests-pass gate has a shell command (it now throws without one).
+    const shellLine = name === "tester" ? "shell: [npm test]\n" : "";
     writeFileSync(join(agentsDir, `${name}.md`), `---
 name: ${name}
 description: Test ${name}
 vault: []
----
+${shellLine}---
 Agent ${name}
 `, "utf-8");
   }
@@ -305,5 +308,104 @@ describe("WorkflowEngine.executeLoop — gate exception safety", () => {
     expect(run.status).toBe("completed");
     expect(run.steps["test"]!.status).toBe("completed");
     expect(run.steps["test"]!.error).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkflowEngine — tests-pass gate with no agent shell command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("WorkflowEngine.executeLoop — tests-pass gate missing shell command", () => {
+  let env: ReturnType<typeof createTestEnv>;
+
+  beforeEach(() => {
+    env = createTestEnv();
+  });
+
+  afterEach(() => {
+    rmSync(env.projectRoot, { recursive: true, force: true });
+  });
+
+  it("throws when the tests-pass agent declares no shell command → step + run failed", async () => {
+    // A tester agent with no `shell:` frontmatter has an empty shellCommands
+    // array. The tests-pass gate must throw rather than silently fall back to
+    // "npm test".
+    const agentsDir = join(env.projectRoot, "no-shell-agents");
+    mkdirSync(agentsDir, { recursive: true });
+    writeFileSync(join(agentsDir, "tester.md"), `---
+name: tester
+description: Tester without shell
+vault: []
+---
+Tester agent
+`, "utf-8");
+    const registry = new AgentRegistry(agentsDir);
+    const workflow: WorkflowDefinition = {
+      name: "tests-no-shell",
+      description: "tests-pass agent has empty shellCommands",
+      steps: [
+        { name: "test", agent: "tester", input: [], gate: "tests-pass", onFail: null, maxAttempts: 1 },
+      ],
+    };
+    let checkTestsPassCalled = false;
+    const gateChecker = createMockGateChecker({
+      checkTestsPass: async () => { checkTestsPassCalled = true; return true; },
+    });
+
+    const engine = new WorkflowEngine(
+      registry,
+      env.contextBuilder,
+      env.state,
+      env.taskManager,
+      createMockExecutor(),
+      gateChecker,
+    );
+    const run = await engine.start(workflow, "Empty shellCommands");
+
+    expect(checkTestsPassCalled).toBe(false);
+    expect(run.status).toBe("failed");
+    expect(run.steps["test"]!.status).toBe("failed");
+    expect(run.steps["test"]!.error).toContain("declares no shell command");
+    expect(run.steps["test"]!.error).toContain("test");
+    expect(run.steps["test"]!.error).toContain("tester");
+  });
+
+  it("happy path — agent with a shell command passes the verbatim command to the gate", async () => {
+    const agentsDir = join(env.projectRoot, "shell-agents");
+    mkdirSync(agentsDir, { recursive: true });
+    writeFileSync(join(agentsDir, "tester.md"), `---
+name: tester
+description: Tester with shell
+vault: []
+shell: [npm run verify]
+---
+Tester agent
+`, "utf-8");
+    const registry = new AgentRegistry(agentsDir);
+    const workflow: WorkflowDefinition = {
+      name: "tests-with-shell",
+      description: "tests-pass agent has a shell command",
+      steps: [
+        { name: "test", agent: "tester", input: [], gate: "tests-pass", onFail: null, maxAttempts: 1 },
+      ],
+    };
+    let receivedCommand = "";
+    const gateChecker = createMockGateChecker({
+      checkTestsPass: async (command: string) => { receivedCommand = command; return true; },
+    });
+
+    const engine = new WorkflowEngine(
+      registry,
+      env.contextBuilder,
+      env.state,
+      env.taskManager,
+      createMockExecutor(),
+      gateChecker,
+    );
+    const run = await engine.start(workflow, "Shell command passthrough");
+
+    expect(receivedCommand).toBe("npm run verify");
+    expect(run.status).toBe("completed");
+    expect(run.steps["test"]!.status).toBe("completed");
   });
 });

@@ -17,18 +17,7 @@ vi.mock("../src/lib/engram.js", async () => {
   };
 });
 
-vi.mock("../src/mcp/handlers/helpers.js", async () => {
-  const actual = await vi.importActual<typeof import("../src/mcp/handlers/helpers.js")>(
-    "../src/mcp/handlers/helpers.js",
-  );
-  return {
-    ...actual,
-    bumpTelemetry: vi.fn(() => undefined),
-  };
-});
-
 import { engramJudge } from "../src/lib/engram.js";
-import { bumpTelemetry } from "../src/mcp/handlers/helpers.js";
 import { ToolHandlers } from "../src/mcp/handlers.js";
 import { VaultReader } from "../src/lib/reader.js";
 import { VaultWriter } from "../src/lib/writer.js";
@@ -86,7 +75,6 @@ describe("step_complete MCP handler — happy path", () => {
 
   beforeEach(() => {
     vi.mocked(engramJudge).mockClear();
-    vi.mocked(bumpTelemetry).mockClear();
   });
 
   afterEach(() => {
@@ -125,8 +113,6 @@ describe("step_complete MCP handler — happy path", () => {
     expect(engramJudge).toHaveBeenCalledWith(UUID_A, 0.9, "directly applied");
     expect(engramJudge).toHaveBeenCalledWith(UUID_B, 0.5, "context only");
     expect(engramJudge).toHaveBeenCalledWith(UUID_C, 0.1, "not useful");
-    expect(bumpTelemetry).toHaveBeenCalledTimes(1);
-    expect(bumpTelemetry).toHaveBeenCalledWith(env.context.vaultPath, "judge");
   });
 
   it("returns fallbackIds for memories without feedback lines (no blanket judge applied)", async () => {
@@ -175,7 +161,6 @@ describe("step_complete MCP handler — happy path", () => {
     expect(result.judgmentsApplied).toBe(0);
     expect(result.fallbackIds).toEqual([UUID_A, UUID_B]);
     expect(engramJudge).not.toHaveBeenCalled();
-    expect(bumpTelemetry).not.toHaveBeenCalled();
   });
 
   it("returns empty result and skips judge calls when beforeSearchMemoryIds is empty", async () => {
@@ -194,7 +179,6 @@ describe("step_complete MCP handler — happy path", () => {
     expect(result.antipatternIdsInBefore).toEqual([]);
     expect(result.antipatternJudgmentDistribution).toEqual({});
     expect(engramJudge).not.toHaveBeenCalled();
-    expect(bumpTelemetry).not.toHaveBeenCalled();
   });
 });
 
@@ -203,7 +187,6 @@ describe("step_complete MCP handler — antipattern observability", () => {
 
   beforeEach(() => {
     vi.mocked(engramJudge).mockClear();
-    vi.mocked(bumpTelemetry).mockClear();
   });
 
   afterEach(() => {
@@ -447,7 +430,6 @@ describe("step_complete MCP handler — runId optional", () => {
 
   beforeEach(() => {
     vi.mocked(engramJudge).mockClear();
-    vi.mocked(bumpTelemetry).mockClear();
   });
 
   afterEach(() => {
@@ -481,7 +463,6 @@ describe("step_complete MCP handler — JUDGE_CAP enforcement", () => {
 
   beforeEach(() => {
     vi.mocked(engramJudge).mockClear();
-    vi.mocked(bumpTelemetry).mockClear();
   });
 
   afterEach(() => {

@@ -278,4 +278,18 @@ describe("task CLI — E2E", () => {
     expect(process.exitCode).not.toBe(1);
     expect(logJoined()).toContain("Absolute path task");
   });
+
+  it("create-from-phase: rejects a relative path containing '..'", () => {
+    task(["create-from-phase", "../escape.md"]);
+    expect(process.exitCode).toBe(1);
+    expect(errJoined()).toContain("phaseFile must not contain '..'");
+    expect(logJoined()).not.toContain("Created");
+  });
+
+  it("create-from-phase: rejects a '..'-disguised nested path", () => {
+    task(["create-from-phase", "foo/../../escape.md"]);
+    expect(process.exitCode).toBe(1);
+    expect(errJoined()).toContain("phaseFile must not contain '..'");
+    expect(logJoined()).not.toContain("Created");
+  });
 });

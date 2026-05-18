@@ -7,7 +7,11 @@ const VAULT_DIR = ".dev-vault";
 
 function git(args: string[], cwd: string): string {
   try {
-    return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
+    return execFileSync("git", args, {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return "";
   }
@@ -25,8 +29,7 @@ function resolveProjectRoot(startDir: string): string | null {
   return null;
 }
 
-function resolveProjectName(projectRoot: string): string {
-  const remote = git(["remote", "get-url", "origin"], projectRoot);
+function resolveProjectName(projectRoot: string, remote: string): string {
   if (remote) {
     const match = remote.match(/\/([^/]+?)(?:\.git)?$/);
     if (match?.[1]) return match[1];
@@ -50,14 +53,14 @@ export function detectContext(cwd: string = process.cwd()): ProjectContext | nul
   if (!projectRoot) return null;
 
   const branch = git(["branch", "--show-current"], projectRoot) || "main";
-  const remote = git(["remote", "get-url", "origin"], projectRoot) || null;
+  const remote = git(["remote", "get-url", "origin"], projectRoot);
 
   return {
-    projectName: resolveProjectName(projectRoot),
+    projectName: resolveProjectName(projectRoot, remote),
     branch,
     parentBranch: resolveParentBranch(projectRoot),
     vaultPath: join(projectRoot, VAULT_DIR),
     projectRoot,
-    gitRemote: remote,
+    gitRemote: remote || null,
   };
 }

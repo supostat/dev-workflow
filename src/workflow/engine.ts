@@ -402,7 +402,12 @@ export class WorkflowEngine {
       }
 
       case "tests-pass": {
-        const command = agent.permissions.shellCommands[0] ?? "npm test";
+        const command = agent.permissions.shellCommands[0];
+        if (!command) {
+          throw new Error(
+            `tests-pass gate for step "${stepDef.name}" cannot run: agent "${stepDef.agent}" declares no shell command`,
+          );
+        }
         const passed = await this.gateChecker.checkTestsPass(command);
         return passed ? "passed" : "failed";
       }

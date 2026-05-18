@@ -3,20 +3,23 @@ export interface Frontmatter {
   body: string;
 }
 
+const RESERVED_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
 export function parseFrontmatter(raw: string): Frontmatter {
   const match = raw.match(/^---\n([\s\S]*?)\n---/);
   if (!match?.[1]) {
-    return { fields: {}, body: raw };
+    return { fields: Object.create(null), body: raw };
   }
 
   const yamlBlock = match[1];
-  const fields: Record<string, string | string[]> = {};
+  const fields: Record<string, string | string[]> = Object.create(null);
 
   for (const line of yamlBlock.split("\n")) {
     const fieldMatch = line.match(/^(\w[\w-]*):\s*(.+)$/);
     if (!fieldMatch) continue;
 
     const key = fieldMatch[1]!;
+    if (RESERVED_KEYS.has(key)) continue;
     const value = fieldMatch[2]!.trim();
 
     const arrayMatch = value.match(/^\[(.*)]\s*$/);

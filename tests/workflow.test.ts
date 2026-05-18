@@ -36,11 +36,14 @@ function createTestEnv() {
   const agentsDir = join(projectRoot, "test-agents");
   mkdirSync(agentsDir, { recursive: true });
   for (const name of ["reader", "planner", "plan-reviewer", "coder", "reviewer", "tester", "committer"]) {
+    // The real bundled tester agent declares `shell: [npm test]`; mirror that
+    // so the tests-pass gate has a shell command (it now throws without one).
+    const shellLine = name === "tester" ? "shell: [npm test]\n" : "";
     writeFileSync(join(agentsDir, `${name}.md`), `---
 name: ${name}
 description: Test ${name}
 vault: []
----
+${shellLine}---
 Agent ${name} for {{projectName}}: {{taskDescription}}
 `, "utf-8");
   }

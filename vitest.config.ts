@@ -13,7 +13,7 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/**/types.ts",
         "src/index.ts",
-        "src/hooks/**",
+        "src/hooks/stdin.ts",
       ],
       // Baseline established 2026-05-11 after enabling coverage-v8.
       //

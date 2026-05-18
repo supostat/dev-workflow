@@ -12,6 +12,7 @@ import { AgentContextBuilder } from "../src/agents/context-builder.js";
 import { TaskManager } from "../src/tasks/manager.js";
 import { TaskTracker } from "../src/tasks/tracker.js";
 import { parseWorkflowYaml } from "../src/workflow/loader.js";
+import { getPackageVersion } from "../src/lib/migration-lock.js";
 import type { ProjectContext } from "../src/lib/types.js";
 
 function createTestEnv() {
@@ -761,6 +762,12 @@ describe("ToolHandlers", () => {
       }) as { created: string[]; skipped: string[] };
       expect(result.created.length).toBe(1);
     });
+
+    it("task_create_from_phase rejects a relative path containing '..'", async () => {
+      await expect(env.handlers.handle("task_create_from_phase", {
+        phaseFile: "../escape.md",
+      })).rejects.toThrow(/phaseFile must not contain '\.\.'/);
+    });
   });
 });
 
@@ -799,8 +806,9 @@ describe("McpServer.handleLine", () => {
     const response = await server.handleLine(JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "initialize", params: {},
     }));
-    const result = response!.result as { serverInfo: { name: string } };
+    const result = response!.result as { serverInfo: { name: string; version: string } };
     expect(result.serverInfo.name).toBe("dev-workflow");
+    expect(result.serverInfo.version).toBe(getPackageVersion());
   });
 
   it("handles ping", async () => {

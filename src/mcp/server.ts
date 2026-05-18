@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { getToolDefinitions } from "./tools.js";
 import { formatToolResult } from "./format-result.js";
 import type { ToolHandlers } from "./handlers.js";
+import { getPackageVersion } from "../lib/migration-lock.js";
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -80,7 +81,7 @@ export class McpServer {
         return successResponse(id, {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "dev-workflow", version: "0.1.0" },
+          serverInfo: { name: "dev-workflow", version: getPackageVersion() },
         });
 
       case "notifications/initialized":

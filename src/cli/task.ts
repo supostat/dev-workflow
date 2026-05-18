@@ -2,7 +2,7 @@ import { detectContext } from "../lib/context.js";
 import { TaskManager } from "../tasks/manager.js";
 import { TaskTracker } from "../tasks/tracker.js";
 import type { TaskStatus } from "../tasks/types.js";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import { icon, statusIcon, table } from "../lib/output.js";
 import { createTasksFromPhase } from "../tasks/phase-tasks.js";
 
@@ -178,7 +178,24 @@ function taskCreateFromPhase(manager: TaskManager, projectRoot: string, phaseFil
     return;
   }
 
-  const fullPath = phaseFile.startsWith("/") ? phaseFile : join(projectRoot, phaseFile);
+  if (phaseFile.includes("..")) {
+    console.error("phaseFile must not contain '..'");
+    process.exitCode = 1;
+    return;
+  }
+
+  let fullPath: string;
+  if (phaseFile.startsWith("/")) {
+    fullPath = phaseFile;
+  } else {
+    const resolved = resolve(projectRoot, phaseFile);
+    if (resolved !== projectRoot && !resolved.startsWith(projectRoot + sep)) {
+      console.error("phaseFile escapes project root");
+      process.exitCode = 1;
+      return;
+    }
+    fullPath = resolved;
+  }
 
   try {
     const result = createTasksFromPhase(fullPath, manager);
