@@ -12,7 +12,7 @@
 // in `./api-types` and re-exported here. `request` throws `Error(body.error)`
 // on any non-2xx response.
 
-import type { Project, ApiTask, ApiWorkflowRun } from "./types";
+import type { Project, ApiTask } from "./types";
 import type {
   ProjectListResponse,
   ActiveProjectResponse,
@@ -22,6 +22,7 @@ import type {
   VaultSearchResponse,
   TaskListResponse,
   WorkflowRunListResponse,
+  ApiWorkflowRunDetail,
   EngramHealthResponse,
   EngramStatsResponse,
   SettingsResponse,
@@ -39,6 +40,10 @@ export type {
   VaultSearchResponse,
   TaskListResponse,
   WorkflowRunListResponse,
+  ApiWorkflowRunDetail,
+  ApiStepState,
+  ApiTelemetryCounters,
+  EngramTraceEvent,
   EngramHealthResponse,
   EngramStatsResponse,
   SettingsResponse,
@@ -212,8 +217,8 @@ export function getWorkflowRuns(
   );
 }
 
-export function getWorkflowRun(project: string, id: string): Promise<ApiWorkflowRun> {
-  return request<ApiWorkflowRun>(withProject(`/api/workflow/runs/${id}`, project));
+export function getWorkflowRun(project: string, id: string): Promise<ApiWorkflowRunDetail> {
+  return request<ApiWorkflowRunDetail>(withProject(`/api/workflow/runs/${id}`, project));
 }
 
 // ── engram ───────────────────────────────────────────────────────────────────

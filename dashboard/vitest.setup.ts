@@ -6,6 +6,8 @@
 //    and `project-context.tsx` open one on mount. The mock records every
 //    instance on `MockEventSource.instances`, lets a test fire `onopen` /
 //    `onerror` and dispatch named messages, and resets between tests.
+// 4. A no-op `ResizeObserver` — jsdom ships none, yet the radix `Switch`
+//    primitive (`react-use-size`) constructs one on mount.
 
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
@@ -64,6 +66,15 @@ export class MockEventSource {
 }
 
 (globalThis as { EventSource: unknown }).EventSource = MockEventSource;
+
+/** No-op `ResizeObserver` — jsdom ships none; the radix `Switch` needs one. */
+class MockResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+(globalThis as { ResizeObserver: unknown }).ResizeObserver = MockResizeObserver;
 
 afterEach(() => {
   cleanup();

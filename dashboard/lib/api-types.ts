@@ -8,6 +8,73 @@
 
 import type { Project, ApiTask, ApiWorkflowRun } from "./types";
 
+/**
+ * Engram telemetry counters carried by a workflow run — mirrors the core
+ * `TelemetryCounters` (src/workflow/types.ts). Counts of the engram
+ * operations a run performed across all of its steps.
+ */
+export interface ApiTelemetryCounters {
+  search: number;
+  store: number;
+  judge: number;
+  vaultRecord: number;
+  skipped: number;
+}
+
+/**
+ * Per-step execution state inside a workflow run — mirrors the core
+ * `StepState` (src/workflow/types.ts). Every field is explicitly present;
+ * nullable fields are `null` rather than absent.
+ */
+export interface ApiStepState {
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  output: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+  attempt: number;
+  engramMemoryId: string | null;
+  error: string | null;
+}
+
+/**
+ * A full workflow run as exposed by `GET /api/workflow/runs/:id` — mirrors the
+ * core `WorkflowRun` (src/workflow/types.ts). Distinct from the list shape
+ * `ApiWorkflowRun`: `currentStep` is non-null here (a persisted run always has
+ * a current step) and the per-step `steps` map plus telemetry are included.
+ */
+export interface ApiWorkflowRunDetail {
+  id: string;
+  workflowName: string;
+  taskId: string | null;
+  taskDescription: string;
+  phase: string | null;
+  currentStep: string;
+  startedAt: string;
+  completedAt: string | null;
+  status: "running" | "completed" | "failed" | "paused" | "aborted";
+  steps: Record<string, ApiStepState>;
+  telemetry?: ApiTelemetryCounters;
+  abortReason?: string;
+}
+
+/**
+ * One line of a workflow run's engram trace JSONL — mirrors the core
+ * `EngramTraceEvent` (src/lib/engram-trace.ts). Streamed line-by-line over the
+ * `trace` SSE topic; each SSE payload is a `{ line: string }` envelope whose
+ * `line` parses to this shape.
+ */
+export interface EngramTraceEvent {
+  ts: string;
+  method: string;
+  params: Record<string, unknown>;
+  ok: boolean;
+  response_summary: string;
+  duration_ms: number;
+  error?: string;
+  step?: string;
+}
+
 /** `GET /api/projects` — registry list with the active marker. */
 export interface ProjectListResponse {
   projects: Array<Project & { active: boolean }>;
@@ -80,6 +147,11 @@ export interface EngramStatsResponse {
     status: string;
     startedAt: string;
     completedAt: string | null;
+    durationMs: number | null;
+    stepCount: number;
+    completedSteps: number;
+    telemetry: ApiTelemetryCounters | null;
+    hasTrace: boolean;
   }>;
   warnings: Array<{ runId: string; issue: string }>;
   live: { health: unknown; topMemories: unknown[] };
