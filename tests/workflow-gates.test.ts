@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { CliGateChecker } from "../src/cli/run.js";
+import { CliGateChecker } from "../src/cli/cli-engine.js";
 import { ALLOWED_GATE_BINARIES } from "../src/workflow/gate-runner.js";
 import { WorkflowEngine } from "../src/workflow/engine.js";
 import type { GateChecker, StepExecutor, WorkflowResolver } from "../src/workflow/engine.js";

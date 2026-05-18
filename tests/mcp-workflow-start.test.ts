@@ -311,7 +311,7 @@ describe("workflow_start MCP handler", () => {
 
   it("minimal workflow with a single step initializes one StepState entry", async () => {
     // Custom workflow YAML in the vault — resolveWorkflow checks vault first
-    // (src/cli/run.ts:144-152), so this shadows any same-named template/builtin.
+    // (src/workflow/resolver.ts), so this shadows any same-named template/builtin.
     const workflowsDir = join(context.vaultPath, "workflows");
     mkdirSync(workflowsDir, { recursive: true });
     writeFileSync(join(workflowsDir, "solo.yaml"), `name: solo

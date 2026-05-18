@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDryRunPreview, type DryRunPreview } from "../src/cli/run.js";
+import { buildDryRunPreview, type DryRunPreview } from "../src/cli/dry-run.js";
 import { getBuiltinWorkflow } from "../src/workflow/builtin.js";
 import type { WorkflowDefinition } from "../src/workflow/types.js";
 

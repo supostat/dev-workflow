@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { validate } from "../src/cli/run.js";
+import { validate } from "../src/cli/validate.js";
 
 function writeWorkflowYaml(dir: string, content: string): string {
   const filepath = join(dir, "workflow.yaml");
