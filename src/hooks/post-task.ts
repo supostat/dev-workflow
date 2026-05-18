@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
+import { fileURLToPath } from "node:url";
 import { detectContext } from "../lib/context.js";
 import { VaultWriter } from "../lib/writer.js";
 import { engramStore } from "../lib/engram.js";
 import { existsSync } from "node:fs";
 import { readStdin, hookSuccess } from "./stdin.js";
 
-async function run(): Promise<void> {
+export async function run(): Promise<void> {
   const input = await readStdin();
 
   const context = detectContext(input.cwd);
@@ -42,6 +43,10 @@ async function run(): Promise<void> {
   hookSuccess("Post-task recorded.");
 }
 
-run().catch(() => {
-  hookSuccess("Post-task hook failed silently.");
-});
+const isMain = process.argv[1] !== undefined
+  && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
+  run().catch(() => {
+    hookSuccess("Post-task hook failed silently.");
+  });
+}
