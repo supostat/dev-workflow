@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ViewportGuard } from "@/components/layout/ViewportGuard";
 import { Navbar } from "@/components/layout/Navbar";
+import { ProjectProvider } from "@/lib/project-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -29,13 +30,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <ViewportGuard>
-            <TooltipProvider>
-              <Navbar />
-              <main className="px-6 py-6">{children}</main>
-              <Toaster />
-            </TooltipProvider>
-          </ViewportGuard>
+          <ProjectProvider>
+            <ViewportGuard>
+              <TooltipProvider>
+                <Navbar />
+                <main className="px-6 py-6">{children}</main>
+                <Toaster />
+              </TooltipProvider>
+            </ViewportGuard>
+          </ProjectProvider>
         </ThemeProvider>
       </body>
     </html>
