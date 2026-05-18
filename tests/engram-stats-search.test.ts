@@ -60,10 +60,26 @@ describe("collectEngramStats — live engram search call shape", () => {
 
     expect(engramSearch).toHaveBeenCalledTimes(1);
     const call = vi.mocked(engramSearch).mock.calls[0]!;
-    expect(call).toHaveLength(3);
     expect(call[0]).toBe("recent activity");
     expect(call[1]).toBe("my-project");
     expect(call[2]).toBe(5);
+    // tags slot stays undefined — top-memory search must not filter by tags.
     expect(call[3]).toBeUndefined();
+  });
+
+  it("threads CollectOptions.socketPath through to the live engramSearch call", async () => {
+    writeFileSync(
+      join(vaultPath, "workflow-state", "runs", "run-socket.json"),
+      JSON.stringify(makeRun("run-socket")),
+      "utf-8",
+    );
+
+    await collectEngramStats(vaultPath, {
+      projectName: "my-project",
+      socketPath: "/tmp/per-project.sock",
+    });
+
+    const call = vi.mocked(engramSearch).mock.calls[0]!;
+    expect(call[4]).toBe("/tmp/per-project.sock");
   });
 });

@@ -70,6 +70,13 @@ export interface CollectOptions {
   projectName?: string;
   /** Skip live engram queries (deterministic tests). */
   skipLive?: boolean;
+  /**
+   * Explicit engram socket path. The web server passes a per-project socket
+   * resolved by `EngramPool`; when omitted, `engram.ts` falls back to its own
+   * cwd/global resolution. Threaded into both live calls (`engramHealth`,
+   * `engramSearch`) so multi-project routing hits the right daemon.
+   */
+  socketPath?: string;
 }
 
 const RUNS_DIRNAME = join("workflow-state", "runs");
@@ -214,7 +221,7 @@ async function gatherLive(
     return { health: null, topMemories: [] };
   }
   const [health, topMemories] = await Promise.all([
-    engramHealth(),
+    engramHealth(options.socketPath),
     fetchTopMemoriesBestEffort(options),
   ]);
   return { health, topMemories };
@@ -223,7 +230,7 @@ async function gatherLive(
 async function fetchTopMemoriesBestEffort(options: CollectOptions): Promise<EngramMemory[]> {
   if (!options.projectName) return [];
   try {
-    return await engramSearch("recent activity", options.projectName, 5);
+    return await engramSearch("recent activity", options.projectName, 5, undefined, options.socketPath);
   } catch {
     return [];
   }

@@ -40,6 +40,20 @@ export function workflowCreate(vaultPath: string, input: WorkflowCreateInput): {
 }
 
 /**
+ * List persisted workflow runs, newest first, optionally filtered by status.
+ * Read-only — no state mutation. Backs the read-only `GET /api/workflow/runs`
+ * web endpoint. `status`, when provided, must be one of the
+ * {@link WorkflowStatus} values; an unrecognised value yields an empty list
+ * rather than throwing (the caller validates the query param at the boundary,
+ * this is defense-in-depth).
+ */
+export function workflowList(vaultPath: string, status?: string): WorkflowRun[] {
+  const runs = new WorkflowState(vaultPath).list();
+  if (status === undefined) return runs;
+  return runs.filter((run) => run.status === status);
+}
+
+/**
  * Validate `workflow_start` input at the MCP boundary. Throws on first
  * failure with a stable error code (E001..E003) — callers map these to
  * JSON-RPC error responses.

@@ -58,6 +58,16 @@ function registryPath(): string {
   return join(configHome, REGISTRY_DIRNAME, REGISTRY_FILENAME);
 }
 
+/**
+ * The absolute path of the registry file, resolved on each call (same
+ * semantics as the internal {@link registryPath}). Exposed so the web
+ * server's watcher can observe registry changes without re-deriving the XDG
+ * path — and so a test override of `XDG_CONFIG_HOME` is honoured uniformly.
+ */
+export function registryFilePath(): string {
+  return registryPath();
+}
+
 /** Shape-validate one registry entry, returning a clean Project or null. */
 function normalizeProjectEntry(name: string, entry: unknown): Project | null {
   if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return null;

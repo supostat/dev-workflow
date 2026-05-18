@@ -7,6 +7,9 @@
 // surface is internal, consumed by the bundled dashboard and the local
 // http server, not by external package consumers.
 
+import type { TaskStatus, TaskPriority } from "../tasks/types.js";
+import type { WorkflowStatus } from "../workflow/types.js";
+
 /** A single project registered in `~/.config/dev-workflow/projects.json`. */
 export interface Project {
   /** Unique registry key. Matches NAME_PATTERN in projects.ts. */
@@ -34,12 +37,17 @@ export interface ApiVaultSection {
   updatedAt: string;
 }
 
+// `GET /api/tasks` and `GET /api/workflow/runs` return raw domain objects, so
+// the API contract must reuse the domain status/priority unions verbatim — a
+// re-declared literal that drifts from `TaskStatus` / `WorkflowStatus` is a
+// latent contract bug. These aliases keep the web surface pinned to the source.
+
 /** A task as exposed by `GET /api/tasks`. */
 export interface ApiTask {
   id: string;
   title: string;
-  status: "todo" | "in-progress" | "blocked" | "done";
-  priority: "low" | "medium" | "high";
+  status: TaskStatus;
+  priority: TaskPriority;
   branch: string | null;
   created: string;
   updated: string;
@@ -49,7 +57,7 @@ export interface ApiTask {
 export interface ApiWorkflowRun {
   id: string;
   workflow: string;
-  status: "running" | "paused" | "done" | "aborted" | "failed";
+  status: WorkflowStatus;
   currentStep: string | null;
   startedAt: string;
   updatedAt: string;
@@ -72,7 +80,7 @@ export interface ApiSettings {
 }
 
 /** The topic an SSE stream carries. */
-export type SseTopic = "vault" | "runs" | "trace";
+export type SseTopic = "vault" | "runs" | "trace" | "projects";
 
 /** A single Server-Sent Event payload pushed to dashboard subscribers. */
 export interface SseEvent {

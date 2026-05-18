@@ -1,10 +1,23 @@
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ProjectContext, BranchContext } from "./types.js";
 import { renderTemplate } from "./templates.js";
 import { writeFileSafe, slugify, todayDate } from "./fs-helpers.js";
 
 export type AppendReason = "file-missing" | "section-missing" | "duplicate";
+
+/**
+ * The four top-level vault files writable through {@link VaultWriter.writeSection}.
+ * Anything outside this set is rejected — the section name reaches this code
+ * from a user-controlled HTTP path segment, so the whitelist is a security
+ * boundary, not a convenience.
+ */
+const WRITABLE_VAULT_SECTIONS: ReadonlySet<string> = new Set([
+  "stack",
+  "conventions",
+  "knowledge",
+  "gameplan",
+]);
 
 export interface AppendResult {
   appended: boolean;
@@ -102,6 +115,33 @@ export class VaultWriter {
     const filepath = join(this.vaultPath, dir, `${date}-${slug}.md`);
     writeFileSafe(filepath, content);
     return filepath;
+  }
+
+  /**
+   * Overwrite one top-level vault file (`stack`/`conventions`/`knowledge`/
+   * `gameplan`) with `content`. The previous file, if any, is copied to a
+   * sibling `.bak-<compactISO>` first; the returned `backupPath` is `null`
+   * when no prior file existed.
+   *
+   * `section` is validated against {@link WRITABLE_VAULT_SECTIONS} — an
+   * unknown section throws before any filesystem mutation, so a hostile path
+   * segment can never reach `join` and escape the vault directory.
+   */
+  writeSection(section: string, content: string): { backupPath: string | null } {
+    if (!WRITABLE_VAULT_SECTIONS.has(section)) {
+      throw new Error(
+        `Unknown vault section "${section}", expected stack|conventions|knowledge|gameplan`,
+      );
+    }
+    const filepath = join(this.vaultPath, `${section}.md`);
+    let backupPath: string | null = null;
+    if (existsSync(filepath)) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      backupPath = join(this.vaultPath, `${section}.md.bak-${stamp}`);
+      copyFileSync(filepath, backupPath);
+    }
+    writeFileSafe(filepath, content);
+    return { backupPath };
   }
 
   appendKnowledge(section: string, content: string): void {
