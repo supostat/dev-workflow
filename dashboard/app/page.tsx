@@ -15,7 +15,7 @@ import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
-import { useEventSource } from "@/lib/sse";
+import { eventSourceUrl, useEventSource } from "@/lib/sse";
 import { OverviewHeader } from "@/components/overview/OverviewHeader";
 import { OverviewStats } from "@/components/overview/OverviewStats";
 import { ActivityFeed } from "@/components/overview/ActivityFeed";
@@ -34,10 +34,8 @@ export default function OverviewPage() {
     if (boundApi !== null) void load();
   }, [boundApi, load]);
 
-  const eventsUrl = activeProject === null ? null : "/events/vault";
-  const runsUrl = activeProject === null ? null : "/events/runs";
-  useEventSource(eventsUrl, "vault", () => void load());
-  useEventSource(runsUrl, "runs", () => void load());
+  useEventSource(eventSourceUrl("vault", activeProject), "vault", () => void load());
+  useEventSource(eventSourceUrl("runs", activeProject), "runs", () => void load());
 
   if (!api.ready) {
     return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;

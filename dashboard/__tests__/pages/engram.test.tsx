@@ -155,8 +155,10 @@ describe("EngramPage", () => {
     await userEvent.click(await screen.findByRole("option", { name: "run-aaaaaaaaaaaa" }));
     await waitFor(() =>
       expect(
-        MockEventSource.instances.some((source) =>
-          source.url.includes("/events/trace?runId=run-aaaaaaaaaaaa"),
+        MockEventSource.instances.some(
+          (source) =>
+            source.url.includes("/events/trace?") &&
+            source.url.includes("runId=run-aaaaaaaaaaaa"),
         ),
       ).toBe(true),
     );

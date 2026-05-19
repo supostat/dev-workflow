@@ -48,11 +48,13 @@ interface VaultEditorProps {
   api: BoundApi | null;
   /** The vault section this editor instance is bound to. */
   section: VaultSection;
+  /** Active project name — scopes the `/events/vault` stream; null disables it. */
+  project: string | null;
 }
 
 /** Split editor + preview for one vault section. */
-export function VaultEditor({ api, section }: VaultEditorProps) {
-  const vault = useVaultDraft(api, section);
+export function VaultEditor({ api, section, project }: VaultEditorProps) {
+  const vault = useVaultDraft(api, section, project);
 
   if (vault.loading) return <Panel title={section}>Loading…</Panel>;
   if (vault.error !== null) {

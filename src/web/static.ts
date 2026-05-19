@@ -1,11 +1,12 @@
-// Static-file server for the bundled dashboard SPA (task-055).
+// Static-file server for the bundled dashboard (task-055).
 //
 // Serves `dist/dashboard/` with a strict path-traversal guard: the requested
 // path is decoded, NUL-rejected, joined under the static root, resolved, and
 // confirmed to stay inside that root via a `startsWith(root + sep)` prefix
 // check. Substring checks for ".." are deliberately NOT used — they miss
-// encoded payloads and reject legitimate names containing two dots. Unknown
-// paths fall back to index.html so client-side routing works (SPA mode).
+// encoded payloads and reject legitimate names containing two dots. A
+// directory request resolves to its `index.html`; a genuine miss serves the
+// pre-rendered `404.html` with status 404.
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve, sep, extname } from "node:path";
@@ -50,8 +51,9 @@ export function resolveStaticPath(pathname: string): string | null {
 
 /**
  * Serve the static asset addressed by `pathname`. Sends 400 on a malformed
- * or traversal path, the file with its content-type when it exists, and an
- * `index.html` SPA fallback otherwise (404 only when even index is absent).
+ * or traversal path, the file with its content-type when it exists, the
+ * `index.html` of a requested directory, and a 404 otherwise — the
+ * pre-rendered `404.html` when present, plain text when it is not.
  */
 export function serveStatic(res: ServerResponse, pathname: string): void {
   const resolved = resolveStaticPath(pathname);
@@ -63,12 +65,14 @@ export function serveStatic(res: ServerResponse, pathname: string): void {
     sendFile(res, resolved);
     return;
   }
-  const indexPath = resolve(STATIC_ROOT, "index.html");
-  if (isFile(indexPath)) {
-    sendFile(res, indexPath);
-    return;
+  if (isDirectory(resolved)) {
+    const indexPath = resolve(resolved, "index.html");
+    if (isFile(indexPath)) {
+      sendFile(res, indexPath);
+      return;
+    }
   }
-  sendPlain(res, 404, "Not Found");
+  serveNotFound(res);
 }
 
 function isFile(path: string): boolean {
@@ -77,6 +81,29 @@ function isFile(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Serve a 404. Uses the pre-rendered `dist/dashboard/404.html` when present —
+ * with an explicit `writeHead(404)` since `sendFile` hardcodes 200 — and
+ * falls back to a plain-text 404 when that page is absent.
+ */
+function serveNotFound(res: ServerResponse): void {
+  const notFoundPath = resolve(STATIC_ROOT, "404.html");
+  if (isFile(notFoundPath)) {
+    res.writeHead(404, { "Content-Type": CONTENT_TYPES[".html"] });
+    res.end(readFileSync(notFoundPath));
+    return;
+  }
+  sendPlain(res, 404, "Not Found");
 }
 
 function sendFile(res: ServerResponse, path: string): void {

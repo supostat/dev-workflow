@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useEventSource } from "@/lib/sse";
+import { eventSourceUrl, useEventSource } from "@/lib/sse";
 import type { BoundApi } from "@/lib/project-context";
 import type { VaultSection } from "@/lib/api";
 
@@ -47,7 +47,11 @@ export interface VaultDraft {
 }
 
 /** Manage the draft lifecycle for one vault `section`. */
-export function useVaultDraft(api: BoundApi | null, section: VaultSection): VaultDraft {
+export function useVaultDraft(
+  api: BoundApi | null,
+  section: VaultSection,
+  project: string | null,
+): VaultDraft {
   const [draft, setDraft] = useState("");
   const [loaded, setLoaded] = useState("");
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,7 @@ export function useVaultDraft(api: BoundApi | null, section: VaultSection): Vaul
   }, [load]);
 
   const save = useSaveDraft(api, section, draft, suppressUntil, setLoaded, setSaving);
-  useExternalEditWatch(section, suppressUntil, setExternalEdit);
+  useExternalEditWatch(section, project, suppressUntil, setExternalEdit);
   useUnsavedGuard(draft !== loaded);
 
   return {
@@ -122,10 +126,11 @@ function useSaveDraft(
 /** Subscribe to `/events/vault`; raise the banner on a non-echo section hit. */
 function useExternalEditWatch(
   section: VaultSection,
+  project: string | null,
   suppressUntil: { current: number },
   setExternalEdit: (value: boolean) => void,
 ): void {
-  useVaultEventSubscription((file) => {
+  useVaultEventSubscription(project, (file) => {
     if (file !== `${section}.md`) return;
     if (Date.now() < suppressUntil.current) return;
     setExternalEdit(true);
@@ -145,8 +150,11 @@ function useUnsavedGuard(dirty: boolean): void {
   }, [dirty]);
 }
 
-function useVaultEventSubscription(onFile: (file: string) => void): void {
-  useEventSource("/events/vault", "vault", (data: string) => {
+function useVaultEventSubscription(
+  project: string | null,
+  onFile: (file: string) => void,
+): void {
+  useEventSource(eventSourceUrl("vault", project), "vault", (data: string) => {
     const file = parseVaultEventFile(data);
     if (file !== null) onFile(file);
   });

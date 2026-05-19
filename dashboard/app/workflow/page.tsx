@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
 import type { ApiWorkflowRun } from "@/lib/types";
-import { useEventSource } from "@/lib/sse";
+import { eventSourceUrl, useEventSource } from "@/lib/sse";
 import { WorkflowFilters } from "@/components/workflow/WorkflowFilters";
 import { RunsTable } from "@/components/workflow/RunsTable";
 import {
@@ -25,8 +25,6 @@ import {
   collectWorkflows,
   type RunFilterState,
 } from "@/components/workflow/runFilter";
-
-const RUNS_EVENT_URL = "/events/runs";
 
 export default function WorkflowPage() {
   const api = useApi();
@@ -45,7 +43,7 @@ export default function WorkflowPage() {
     if (boundApi !== null) void reload();
   }, [boundApi, activeProject, reload]);
 
-  useEventSource(boundApi !== null ? RUNS_EVENT_URL : null, "runs", () => {
+  useEventSource(eventSourceUrl("runs", activeProject), "runs", () => {
     void reload();
   });
 

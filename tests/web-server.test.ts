@@ -220,6 +220,17 @@ describe("web server — static dashboard serving", () => {
     }
     writeFileSync(join(STATIC_ROOT, "index.html"), "<!doctype html><title>dash</title>", "utf-8");
     writeFileSync(join(STATIC_ROOT, "assets", "app.js"), "console.error('x');", "utf-8");
+    mkdirSync(join(STATIC_ROOT, "vault"), { recursive: true });
+    writeFileSync(
+      join(STATIC_ROOT, "vault", "index.html"),
+      "<!doctype html><title>vault page</title>",
+      "utf-8",
+    );
+    writeFileSync(
+      join(STATIC_ROOT, "404.html"),
+      "<!doctype html><title>not found</title>",
+      "utf-8",
+    );
 
     handle = createWebServer();
     await handle.listen(0);
@@ -230,6 +241,8 @@ describe("web server — static dashboard serving", () => {
     await handle.close();
     rmSync(join(STATIC_ROOT, "index.html"), { force: true });
     rmSync(join(STATIC_ROOT, "assets"), { recursive: true, force: true });
+    rmSync(join(STATIC_ROOT, "vault"), { recursive: true, force: true });
+    rmSync(join(STATIC_ROOT, "404.html"), { force: true });
     if (createdStaticRoot) rmSync(STATIC_ROOT, { recursive: true, force: true });
     if (originalConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = originalConfigHome;
@@ -251,10 +264,23 @@ describe("web server — static dashboard serving", () => {
     expect(result.headers["content-type"]).toContain("javascript");
   });
 
-  it("falls back to index.html for an unknown SPA route", async () => {
-    const result = await httpRequest(port, "GET", "/projects/some/deep/route");
+  it("serves a directory's index.html for a trailing-slash route", async () => {
+    const result = await httpRequest(port, "GET", "/vault/");
     expect(result.status).toBe(200);
-    expect(result.body).toContain("dash");
+    expect(result.headers["content-type"]).toContain("text/html");
+    expect(result.body).toContain("vault page");
+  });
+
+  it("serves a directory's index.html without a trailing slash", async () => {
+    const result = await httpRequest(port, "GET", "/vault");
+    expect(result.status).toBe(200);
+    expect(result.body).toContain("vault page");
+  });
+
+  it("serves 404.html with status 404 for a genuine miss", async () => {
+    const result = await httpRequest(port, "GET", "/projects/some/deep/route");
+    expect(result.status).toBe(404);
+    expect(result.body).toContain("not found");
   });
 
   it("rejects a traversal path with 400", async () => {

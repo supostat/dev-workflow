@@ -15,6 +15,25 @@ import { useEffect, useRef, useState } from "react";
 /** SSE topics the dashboard subscribes to — mirrors the server's `SseTopic`. */
 export type EventTopic = "vault" | "runs" | "trace" | "projects";
 
+/**
+ * Build a project-scoped SSE endpoint URL for `topic`. The server requires a
+ * `?project=` query parameter on the `vault`/`runs`/`trace` topics and 400s
+ * without it. Returns `null` when no project is resolved (the hook is then
+ * disabled). `extra` carries topic-specific params such as the trace `runId`.
+ */
+export function eventSourceUrl(
+  topic: EventTopic,
+  project: string | null,
+  extra?: Record<string, string>,
+): string | null {
+  if (project === null) return null;
+  const params = new URLSearchParams({ project });
+  for (const [key, value] of Object.entries(extra ?? {})) {
+    params.set(key, value);
+  }
+  return `/events/${topic}?${params.toString()}`;
+}
+
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 

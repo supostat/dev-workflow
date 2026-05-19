@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
 import type { ApiWorkflowRunDetail } from "@/lib/api";
+import { eventSourceUrl } from "@/lib/sse";
 import { RunStatusBadge } from "./RunStatusBadge";
 import { StepList } from "./StepList";
 import { TelemetryCounters } from "./TelemetryCounters";
@@ -63,7 +64,7 @@ export function RunDetail() {
   if (run === null) {
     return <p className="py-12 text-center text-sm text-muted-foreground">Loading run…</p>;
   }
-  return <RunTabs run={run} runId={runId} />;
+  return <RunTabs run={run} runId={runId} project={activeProject} />;
 }
 
 /** Build the generation-guarded run-detail loader. */
@@ -135,7 +136,15 @@ function ErrorState({
 }
 
 /** The tabbed detail of a loaded run. */
-function RunTabs({ run, runId }: { run: ApiWorkflowRunDetail; runId: string }) {
+function RunTabs({
+  run,
+  runId,
+  project,
+}: {
+  run: ApiWorkflowRunDetail;
+  runId: string;
+  project: string | null;
+}) {
   return (
     <Panel
       title={`Run ${run.id}`}
@@ -165,7 +174,7 @@ function RunTabs({ run, runId }: { run: ApiWorkflowRunDetail; runId: string }) {
           </ScrollArea>
         </TabsContent>
         <TabsContent value="trace">
-          <TraceTail url={`/events/trace?runId=${encodeURIComponent(runId)}`} />
+          <TraceTail url={eventSourceUrl("trace", project, { runId })} />
         </TabsContent>
       </Tabs>
     </Panel>

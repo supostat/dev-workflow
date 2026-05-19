@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { useEventSource } from "@/lib/sse";
+import { eventSourceUrl, useEventSource } from "@/lib/sse";
 import { MockEventSource } from "../../vitest.setup";
 
 describe("useEventSource", () => {
@@ -106,5 +106,48 @@ describe("useEventSource", () => {
     const source = MockEventSource.last;
     unmount();
     expect(source?.closed).toBe(true);
+  });
+});
+
+describe("eventSourceUrl", () => {
+  it("returns null when no project is resolved", () => {
+    expect(eventSourceUrl("runs", null)).toBeNull();
+  });
+
+  it("appends the project query parameter for a topic", () => {
+    expect(eventSourceUrl("vault", "demo")).toBe("/events/vault?project=demo");
+  });
+
+  it("merges extra params after the project", () => {
+    const url = eventSourceUrl("trace", "demo", { runId: "run-aaaaaaaaaaaa" });
+    expect(url).not.toBeNull();
+    expect(url).toContain("/events/trace?");
+    expect(url).toContain("project=demo");
+    expect(url).toContain("runId=run-aaaaaaaaaaaa");
+  });
+
+  it("percent-encodes a project name with reserved characters", () => {
+    const url = eventSourceUrl("vault", "my project");
+    expect(url).not.toBeNull();
+    expect(new URL(url ?? "", "http://localhost").searchParams.get("project")).toBe("my project");
+  });
+
+  it("drives the opened EventSource URL with the project query parameter", () => {
+    renderHook(() => useEventSource(eventSourceUrl("vault", "demo"), "vault", () => {}));
+    expect(MockEventSource.last?.url).toBe("/events/vault?project=demo");
+  });
+
+  it("opens a trace stream carrying both project and runId", () => {
+    renderHook(() =>
+      useEventSource(
+        eventSourceUrl("trace", "demo", { runId: "run-aaaaaaaaaaaa" }),
+        "trace",
+        () => {},
+      ),
+    );
+    const url = MockEventSource.last?.url ?? "";
+    expect(url).toContain("/events/trace?");
+    expect(url).toContain("project=demo");
+    expect(url).toContain("runId=run-aaaaaaaaaaaa");
   });
 });
