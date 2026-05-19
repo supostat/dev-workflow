@@ -16,6 +16,7 @@ src/                  TypeScript sources (Node 20+, ESM)
   agents/             Agent registry + loader + context builder
   tasks/              Task manager + tracker + phase parser
 tests/                Vitest suites — mirror src/ paths
+e2e/                  Playwright dashboard smoke harness
 templates/            Bundled assets shipped with the npm package
   workflows/          Builtin dev / hotfix / review / spike / etc.
   claude/             .claude/commands + agents shipped to downstream
@@ -38,6 +39,7 @@ pnpm install
 pnpm build
 pnpm test            # run unit + integration tests (currently ~840)
 pnpm test:coverage   # with coverage report (thresholds enforced)
+pnpm test:e2e        # Playwright dashboard smoke suite (needs: playwright install chromium)
 pnpm lint            # tsc --noEmit
 ```
 

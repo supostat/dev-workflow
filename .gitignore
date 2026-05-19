@@ -46,3 +46,7 @@ dashboard/node_modules/
 dashboard/.next/
 dashboard/out/
 dist/dashboard/
+
+# playwright e2e harness
+/test-results/
+/playwright-report/
