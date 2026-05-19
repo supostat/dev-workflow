@@ -34,6 +34,7 @@ import {
 } from "react";
 import {
   getActiveProject,
+  getProjects,
   putActiveProject,
   getVaultSection,
   patchVaultSection,
@@ -87,6 +88,8 @@ export type ApiBinding =
 /** Value carried by the project context. */
 interface ProjectContextValue {
   activeProject: string | null;
+  /** Names of every registered project, kept live by the `projects` SSE topic. */
+  projects: string[];
   loading: boolean;
   /** The active-project fetch failure, or null while the load succeeded. */
   error: string | null;
@@ -98,6 +101,7 @@ const ProjectContext = createContext<ProjectContextValue | null>(null);
 /** Provide the active-project context to the dashboard subtree. */
 export function ProjectProvider({ children }: { children: ReactNode }): ReactElement {
   const [activeProject, setActiveProjectState] = useState<string | null>(null);
+  const [projects, setProjects] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +115,14 @@ export function ProjectProvider({ children }: { children: ReactNode }): ReactEle
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setLoading(false);
+    }
+    try {
+      const registry = await getProjects();
+      setProjects(registry.projects.map((project) => project.name));
+    } catch {
+      // The navbar switcher list is non-critical: on a failed registry fetch
+      // it keeps its last-known list, while the active-project branch above
+      // owns the user-facing error surface.
     }
   }, []);
 
@@ -128,8 +140,8 @@ export function ProjectProvider({ children }: { children: ReactNode }): ReactEle
   }, []);
 
   const value = useMemo<ProjectContextValue>(
-    () => ({ activeProject, loading, error, setActiveProject }),
-    [activeProject, loading, error, setActiveProject],
+    () => ({ activeProject, projects, loading, error, setActiveProject }),
+    [activeProject, projects, loading, error, setActiveProject],
   );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;

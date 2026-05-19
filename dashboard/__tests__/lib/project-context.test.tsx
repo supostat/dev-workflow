@@ -11,13 +11,31 @@ import type { ReactNode } from "react";
 import { ProjectProvider, useActiveProject, useApi } from "@/lib/project-context";
 import { MockEventSource } from "../../vitest.setup";
 
-/** Stub `fetch` so `/api/projects/active` and the PUT both resolve. */
-function stubProjectFetch(activeName: string | null): ReturnType<typeof vi.fn> {
+/**
+ * Stub `fetch` so `/api/projects/active`, `/api/projects`, and the PUT all
+ * resolve. `projectNames` controls the registry list returned by
+ * `GET /api/projects` (defaults to just the active project).
+ */
+function stubProjectFetch(
+  activeName: string | null,
+  projectNames: string[] = activeName === null ? [] : [activeName],
+): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn((input: string, init?: RequestInit) => {
-    const body =
-      init?.method === "PUT"
-        ? { activeProject: "switched" }
-        : { activeProject: activeName === null ? null : { name: activeName, path: "/p", lastSeen: "" } };
+    let body: unknown;
+    if (init?.method === "PUT") {
+      body = { activeProject: "switched" };
+    } else if (String(input) === "/api/projects") {
+      body = {
+        projects: projectNames.map((name) => ({
+          name, path: "/p", lastSeen: "", active: name === activeName,
+        })),
+        activeProject: activeName,
+      };
+    } else {
+      body = {
+        activeProject: activeName === null ? null : { name: activeName, path: "/p", lastSeen: "" },
+      };
+    }
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -63,6 +81,18 @@ describe("ProjectProvider", () => {
     const callsBefore = fetchMock.mock.calls.length;
     act(() => MockEventSource.last?.emit("projects", "switched"));
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore));
+  });
+
+  it("exposes the registry list and picks up a new project on the projects SSE event", async () => {
+    stubProjectFetch("demo", ["demo"]);
+    const { result } = renderHook(() => useActiveProject(), { wrapper });
+    await waitFor(() => expect(result.current.projects).toEqual(["demo"]));
+
+    // A project is registered elsewhere; the registry now has two entries and
+    // the server fans a `projects` SSE event.
+    stubProjectFetch("demo", ["demo", "added"]);
+    act(() => MockEventSource.last?.emit("projects", ""));
+    await waitFor(() => expect(result.current.projects).toEqual(["demo", "added"]));
   });
 
   it("settles loading and surfaces the error when the mount fetch rejects", async () => {

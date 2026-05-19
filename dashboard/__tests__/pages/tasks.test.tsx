@@ -173,6 +173,12 @@ describe("TasksPage", () => {
       if (input.startsWith("/api/projects/active")) {
         return ok({ activeProject: { name: activeName, path: "/p", lastSeen: "" } });
       }
+      if (input === "/api/projects") {
+        return ok({
+          projects: [{ name: activeName, path: "/p", lastSeen: "", active: true }],
+          activeProject: activeName,
+        });
+      }
       getTasksCalls += 1;
       if (getTasksCalls === 1) {
         // The first project's list — held open until after the switch.

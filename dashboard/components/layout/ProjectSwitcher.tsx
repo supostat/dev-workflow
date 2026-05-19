@@ -1,11 +1,12 @@
 "use client";
 
 // Navbar project switcher — a dropdown over the registered projects. The
-// active project comes from `ProjectContext`; the registry list is fetched on
-// mount. Selecting a project PUTs `/api/projects/active` through the context,
-// which also fans the change out to other tabs over SSE.
+// active project and the registry list both come from `ProjectContext`; the
+// provider keeps the list live via its `/events/projects` SSE subscription, so
+// a project added in Settings appears here without a reload. Selecting a
+// project PUTs `/api/projects/active` through the context, which also fans the
+// change out to other tabs over SSE.
 
-import { useEffect, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,19 +15,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getProjects } from "@/lib/api";
 import { useActiveProject } from "@/lib/project-context";
 
 /** Dropdown that lists registry projects and switches the active one. */
 export function ProjectSwitcher() {
-  const { activeProject, setActiveProject } = useActiveProject();
-  const [projects, setProjects] = useState<string[]>([]);
-
-  useEffect(() => {
-    void getProjects().then((response) => {
-      setProjects(response.projects.map((project) => project.name));
-    });
-  }, []);
+  const { activeProject, projects, setActiveProject } = useActiveProject();
 
   return (
     <DropdownMenu>

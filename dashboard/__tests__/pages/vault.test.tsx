@@ -133,6 +133,12 @@ describe("VaultPage", () => {
       if (input.startsWith("/api/projects/active")) {
         return ok({ activeProject: { name: "demo", path: "/p", lastSeen: "" } });
       }
+      if (input === "/api/projects") {
+        return ok({
+          projects: [{ name: "demo", path: "/p", lastSeen: "", active: true }],
+          activeProject: "demo",
+        });
+      }
       sectionCalls += 1;
       if (sectionCalls === 1) return fail("disk offline");
       return ok({ section: "stack", content: "# Stack\nrecovered" });
