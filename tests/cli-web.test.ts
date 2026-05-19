@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { existsSync } from "node:fs";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type AddressInfo, type Server } from "node:net";
@@ -11,6 +12,7 @@ import {
   browserOpenCommand,
   webHelpText,
   listenWithFallback,
+  registerCurrentProject,
 } from "../src/cli/web.js";
 import { createWebServer, type WebServerHandle } from "../src/web/server.js";
 
@@ -193,9 +195,19 @@ interface SpawnedWeb {
   exited: Promise<number | null>;
 }
 
+/** Optional overrides for {@link spawnWeb} beyond the CLI arguments. */
+interface SpawnWebOptions {
+  /** Extra environment entries layered over the isolated defaults. */
+  extraEnv?: NodeJS.ProcessEnv;
+  /** Working directory for the spawned process (defaults to the runner cwd). */
+  cwd?: string;
+}
+
 /** Spawn the built `dev-workflow web` CLI with isolated config + engram env. */
-function spawnWeb(args: string[], extraEnv: NodeJS.ProcessEnv = {}): SpawnedWeb {
+function spawnWeb(args: string[], options: SpawnWebOptions = {}): SpawnedWeb {
+  const { extraEnv = {}, cwd } = options;
   const child = spawn(process.execPath, [CLI_PATH, "web", ...args], {
+    cwd,
     env: {
       ...process.env,
       XDG_CONFIG_HOME: join(PACKAGE_ROOT, "dist"),
@@ -331,11 +343,150 @@ describe("dev-workflow web — subprocess E2E", () => {
     const base = await allocateEphemeralPort();
     // Strip PATH so neither `open`/`xdg-open` nor `cmd` resolves — the spawn
     // fails into the swallow path and the server must stay up.
-    const spawned = spawnWeb(["--port", String(base), "--open"], { PATH: "" });
+    const spawned = spawnWeb(["--port", String(base), "--open"], { extraEnv: { PATH: "" } });
     activeChild = spawned;
 
     const port = await spawned.port;
     const response = await httpGet(port, "/api/projects");
     expect(response.status).toBe(200);
   }, 20000);
+});
+
+// ---------------------------------------------------------------------------
+// Group E2 — cold-start project registration (subprocess + unit)
+// ---------------------------------------------------------------------------
+
+describe("dev-workflow web — cold-start project registration", () => {
+  let activeChild: SpawnedWeb | undefined;
+  const tempDirs: string[] = [];
+
+  beforeAll(() => {
+    expect(existsSync(CLI_PATH)).toBe(true);
+  });
+
+  afterEach(async () => {
+    if (activeChild) {
+      await killWeb(activeChild);
+      activeChild = undefined;
+    }
+    while (tempDirs.length > 0) {
+      rmSync(tempDirs.pop()!, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * Create an isolated temp dir, tracked for afterEach cleanup. The path is
+   * canonicalised — macOS `tmpdir()` is a `/var → /private/var` symlink, and
+   * the spawned process's `process.cwd()` reports the resolved path.
+   */
+  function makeTempDir(prefix: string): string {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+    tempDirs.push(dir);
+    return dir;
+  }
+
+  /** Spawn the CLI from `projectDir` with a fresh isolated registry home. */
+  function spawnFromProject(port: number, projectDir: string, configHome: string): SpawnedWeb {
+    return spawnWeb(["--port", String(port), "--no-open"], {
+      cwd: projectDir,
+      extraEnv: { XDG_CONFIG_HOME: configHome },
+    });
+  }
+
+  it("registers the launch directory as the active project", async () => {
+    const base = await allocateEphemeralPort();
+    const configHome = makeTempDir("cli-web-config-");
+    const projectDir = makeTempDir("cli-web-myproject-");
+
+    const spawned = spawnFromProject(base, projectDir, configHome);
+    activeChild = spawned;
+
+    const port = await spawned.port;
+    const response = await httpGet(port, "/api/projects");
+    expect(response.status).toBe(200);
+    const payload = JSON.parse(response.body) as {
+      projects: Array<{ name: string; path: string; active: boolean }>;
+      activeProject: string | null;
+    };
+    const registered = payload.projects.find((project) => project.path === projectDir);
+    expect(registered).toBeDefined();
+    expect(registered?.active).toBe(true);
+    expect(payload.activeProject).toBe(registered?.name);
+  }, 20000);
+
+  it("is idempotent across two serialized launches from the same directory", async () => {
+    const configHome = makeTempDir("cli-web-config-");
+    const projectDir = makeTempDir("cli-web-idem-");
+
+    const firstPort = await allocateEphemeralPort();
+    const first = spawnFromProject(firstPort, projectDir, configHome);
+    await first.port;
+    first.child.kill("SIGINT");
+    await first.exited;
+
+    const secondPort = await allocateEphemeralPort();
+    const second = spawnFromProject(secondPort, projectDir, configHome);
+    activeChild = second;
+    const port = await second.port;
+
+    const response = await httpGet(port, "/api/projects");
+    const payload = JSON.parse(response.body) as { projects: Array<{ path: string }> };
+    const matching = payload.projects.filter((project) => project.path === projectDir);
+    expect(matching).toHaveLength(1);
+  }, 30000);
+
+  it("starts and warns when the directory basename yields no valid name", async () => {
+    const base = await allocateEphemeralPort();
+    const configHome = makeTempDir("cli-web-config-");
+    // A basename of only separators/dots slugifies to an empty, invalid name.
+    const unsluggableDir = join(makeTempDir("cli-web-bad-"), "---");
+    mkdirSync(unsluggableDir, { recursive: true });
+
+    const spawned = spawnFromProject(base, unsluggableDir, configHome);
+    activeChild = spawned;
+
+    const port = await spawned.port;
+    const response = await httpGet(port, "/api/projects");
+    expect(response.status).toBe(200);
+    expect(spawned.stderr()).toContain("Could not register the current project");
+  }, 20000);
+});
+
+describe("registerCurrentProject", () => {
+  it("keeps an already-active project rather than reclaiming the active slot", () => {
+    const configHome = mkdtempSync(join(tmpdir(), "register-unit-"));
+    const firstDir = mkdtempSync(join(tmpdir(), "register-first-"));
+    const secondDir = mkdtempSync(join(tmpdir(), "register-second-"));
+    const previousConfigHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = configHome;
+    const cwdSpy = vi.spyOn(process, "cwd");
+
+    try {
+      cwdSpy.mockReturnValue(firstDir);
+      registerCurrentProject();
+
+      cwdSpy.mockReturnValue(secondDir);
+      registerCurrentProject();
+
+      const registryPath = join(configHome, "dev-workflow", "projects.json");
+      const registry = JSON.parse(readFileSync(registryPath, "utf-8")) as {
+        projects: Record<string, { path: string }>;
+        activeProject: string | null;
+      };
+      expect(Object.keys(registry.projects)).toHaveLength(2);
+      const active = registry.activeProject;
+      expect(active).not.toBeNull();
+      expect(registry.projects[active!].path).toBe(firstDir);
+    } finally {
+      cwdSpy.mockRestore();
+      if (previousConfigHome === undefined) {
+        delete process.env.XDG_CONFIG_HOME;
+      } else {
+        process.env.XDG_CONFIG_HOME = previousConfigHome;
+      }
+      rmSync(configHome, { recursive: true, force: true });
+      rmSync(firstDir, { recursive: true, force: true });
+      rmSync(secondDir, { recursive: true, force: true });
+    }
+  });
 });

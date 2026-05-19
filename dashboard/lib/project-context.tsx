@@ -11,8 +11,14 @@
 // A failed active-project fetch settles `loading` to false and surfaces the
 // reason through `error` — the provider never hangs on a network failure.
 //
-// `useApi` returns a DISCRIMINATED value: `{ ready: false }` while the active
-// project is still loading or unset, `{ ready: true, api }` once resolved.
+// `useApi` returns a 4-state DISCRIMINATED value so pages can tell the
+// non-ready cases apart instead of hanging on a single "loading" branch:
+//   - `{ ready: true, api }`                    — a project is active;
+//   - `{ ready: false, reason: "loading" }`     — the mount fetch is in flight;
+//   - `{ ready: false, reason: "no-project" }`  — the fetch settled with no
+//                                                 registered/active project;
+//   - `{ ready: false, reason: "error", message }` — the fetch failed; the
+//                                                 message surfaces the cause.
 // Pages gate on `ready` instead of calling a project-scoped wrapper with no
 // project — there is no bare throw during the fetch-on-mount window (R5).
 
@@ -71,10 +77,12 @@ type OmitProject<Fn> = Fn extends (project: string, ...rest: infer R) => infer T
   ? (...args: R) => T
   : never;
 
-/** Discriminated `useApi()` result — see the file header. */
+/** 4-state discriminated `useApi()` result — see the file header. */
 export type ApiBinding =
-  | { ready: false }
-  | { ready: true; api: BoundApi };
+  | { ready: true; api: BoundApi }
+  | { ready: false; reason: "loading" }
+  | { ready: false; reason: "no-project" }
+  | { ready: false; reason: "error"; message: string };
 
 /** Value carried by the project context. */
 interface ProjectContextValue {
@@ -137,16 +145,19 @@ export function useActiveProject(): ProjectContextValue {
 }
 
 /**
- * Bind the project-scoped REST wrappers to the active project. Returns
- * `{ ready: false }` while no project is resolved; pages render a loading
- * state on that branch and use `api` only once `ready` is true.
+ * Bind the project-scoped REST wrappers to the active project. While no
+ * project is resolved it returns one of three non-ready discriminants —
+ * `loading`, `no-project`, or `error` — so pages can render the right notice;
+ * `api` is available only once `ready` is true.
  */
 export function useApi(): ApiBinding {
-  const { activeProject } = useActiveProject();
+  const { activeProject, loading, error } = useActiveProject();
   return useMemo<ApiBinding>(() => {
-    if (activeProject === null) return { ready: false };
-    return { ready: true, api: bindApi(activeProject) };
-  }, [activeProject]);
+    if (activeProject !== null) return { ready: true, api: bindApi(activeProject) };
+    if (error !== null) return { ready: false, reason: "error", message: error };
+    if (loading) return { ready: false, reason: "loading" };
+    return { ready: false, reason: "no-project" };
+  }, [activeProject, loading, error]);
 }
 
 /** Partially apply every project-scoped wrapper with `project`. */

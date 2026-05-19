@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
 import type { SettingsResponse } from "@/lib/api";
@@ -38,7 +39,7 @@ export default function SettingsPage() {
   }, [boundApi, activeProject, reload]);
 
   if (!api.ready) {
-    return <p className="py-12 text-center text-sm text-muted-foreground">Loading project…</p>;
+    return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
   }
   if (error !== null) {
     return (

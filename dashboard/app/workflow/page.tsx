@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Panel } from "@/components/layout/Panel";
+import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
@@ -49,7 +50,7 @@ export default function WorkflowPage() {
   });
 
   if (!api.ready) {
-    return <p className="py-12 text-center text-sm text-muted-foreground">Loading project…</p>;
+    return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
   }
 
   const visible = applyRunFilter(runs, filter);

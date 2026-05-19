@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Panel } from "@/components/layout/Panel";
+import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
@@ -38,7 +39,9 @@ export default function OverviewPage() {
   useEventSource(eventsUrl, "vault", () => void load());
   useEventSource(runsUrl, "runs", () => void load());
 
-  if (!api.ready) return <CenteredNotice message="Loading project…" />;
+  if (!api.ready) {
+    return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
+  }
   if (error !== null) return <OverviewError message={error} onRetry={() => void load()} />;
   if (data === null) return <CenteredNotice message="Loading overview…" />;
   return <OverviewBody project={activeProject ?? ""} data={data} />;

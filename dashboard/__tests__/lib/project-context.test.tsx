@@ -1,8 +1,9 @@
 // Tests for the active-project context. `fetch` is stubbed; the mock
 // `EventSource` from `vitest.setup.ts` covers the `/events/projects` stream.
 // Covers: the active project loads on mount, `setActiveProject` PUTs and
-// updates, `useApi()` flips its `{ ready }` discriminant, an SSE event
-// triggers a re-fetch, and `useActiveProject` throws outside the provider.
+// updates, `useApi()` walks its 4-state discriminant (loading / no-project /
+// error / ready), an SSE event triggers a re-fetch, and `useActiveProject`
+// throws outside the provider.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -75,21 +76,44 @@ describe("ProjectProvider", () => {
 });
 
 describe("useApi", () => {
-  it("is not ready before the active project resolves, ready after", async () => {
+  it("reports the loading reason before the active project resolves", () => {
     stubProjectFetch("demo");
     const { result } = renderHook(() => useApi(), { wrapper });
     expect(result.current.ready).toBe(false);
+    if (!result.current.ready) {
+      expect(result.current.reason).toBe("loading");
+    }
+  });
+
+  it("becomes ready once a project resolves", async () => {
+    stubProjectFetch("demo");
+    const { result } = renderHook(() => useApi(), { wrapper });
     await waitFor(() => expect(result.current.ready).toBe(true));
     if (result.current.ready) {
       expect(typeof result.current.api.getTasks).toBe("function");
     }
   });
 
-  it("stays not-ready when no project is active", async () => {
+  it("settles on the no-project reason when no project is active", async () => {
     stubProjectFetch(null);
     const { result } = renderHook(() => useApi(), { wrapper });
-    await waitFor(() => expect(MockEventSource.instances.length).toBeGreaterThan(0));
-    expect(result.current.ready).toBe(false);
+    await waitFor(() => {
+      expect(result.current.ready).toBe(false);
+      if (!result.current.ready) expect(result.current.reason).toBe("no-project");
+    });
+  });
+
+  it("reports the error reason with the message when the mount fetch rejects", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useApi(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.ready).toBe(false);
+      if (!result.current.ready) expect(result.current.reason).toBe("error");
+    });
+    if (!result.current.ready && result.current.reason === "error") {
+      expect(result.current.message).toBe("network down");
+    }
   });
 });
 

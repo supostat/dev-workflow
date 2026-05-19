@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { platform } from "node:os";
 import type { AddressInfo } from "node:net";
 import { createWebServer, DEFAULT_PORT, type WebServerHandle } from "../web/server.js";
+import { addProject, loadRegistry, setActiveProject } from "../web/projects.js";
 
 /** Parsed `dev-workflow web` invocation. */
 interface WebOptions {
@@ -204,6 +205,28 @@ export function installShutdownHandlers(handle: WebServerHandle): void {
 }
 
 /**
+ * Register the current working directory in the project registry so the
+ * dashboard has an active project to bind to on a cold start.
+ *
+ * Idempotent via `addProject`; only claims the active slot when none is set,
+ * so a user's prior choice is preserved. Best-effort: any failure (un-sluggable
+ * basename, read-only config dir) is reported once on stderr and swallowed —
+ * never throws, never sets `process.exitCode`. The dashboard still serves; the
+ * user can register a project from Settings instead.
+ */
+export function registerCurrentProject(): void {
+  try {
+    const project = addProject(process.cwd());
+    if (loadRegistry().activeProject === null) {
+      setActiveProject(project.name);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "could not register project";
+    process.stderr.write(`Could not register the current project — ${message}\n`);
+  }
+}
+
+/**
  * `dev-workflow web` entry point.
  *
  * Owns every deliberate exit: argument-parse and listen failures set
@@ -237,6 +260,8 @@ export async function web(args: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
+
+  registerCurrentProject();
 
   const url = `http://127.0.0.1:${boundPort}`;
   console.log(`dev-workflow dashboard at ${url} (press Ctrl+C to stop)`);

@@ -8,6 +8,7 @@
 // on `useApi().ready` and renders a loading notice until the project resolves.
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { useApi } from "@/lib/project-context";
 import type { VaultSection } from "@/lib/api";
 import { VaultEditor } from "@/components/vault/VaultEditor";
@@ -24,9 +25,7 @@ export default function VaultPage() {
   const api = useApi();
 
   if (!api.ready) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">Loading project…</p>
-    );
+    return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
   }
 
   return (

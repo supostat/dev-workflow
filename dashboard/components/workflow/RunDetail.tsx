@@ -18,6 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Panel } from "@/components/layout/Panel";
+import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,7 +54,7 @@ export function RunDetail() {
   }, [boundApi, activeProject, runId, reload]);
 
   if (!api.ready) {
-    return <p className="py-12 text-center text-sm text-muted-foreground">Loading project…</p>;
+    return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
   }
   if (runId === null) return <NoRunState />;
   if (error !== null) {
