@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] — 2026-05-19
+
+A patch release for the web dashboard. v3.0.0 shipped with a set of
+dashboard-versus-server integration bugs that a manual browser pass
+surfaced — all are fixed here. Their shared root cause, a dashboard↔server
+seam exercised only by unit mocks, is closed by a new end-to-end smoke
+harness.
+
+### Fixed
+
+- **The dashboard no longer hangs on "Loading project…" on a cold start.**
+  `dev-workflow web` on an empty project registry left every page stuck on a
+  spinner. The launch directory is now registered on first listen, and
+  `useApi()` distinguishes loading from an empty registry from an error so
+  pages render a real notice instead of waiting forever. (`51ae734`)
+- **The Overview page no longer crashes and the Workflow page renders run
+  data.** The `ApiWorkflowRun` type declared phantom `workflow` / `updatedAt`
+  fields while the endpoint serves a full `WorkflowRun` (`workflowName` /
+  `startedAt` / `completedAt`); six call sites read `undefined`. The type now
+  matches the served shape. (`f7ae4db`)
+- **Each dashboard route serves its own page.** The static server fell back
+  to the root `index.html` for every route, so all six pages rendered as
+  Overview; it now resolves the per-route `<dir>/index.html` from the Next
+  export and returns `404.html` on a genuine miss. Project-scoped SSE streams
+  were opened without the required `?project=` query parameter, causing a
+  400 reconnect flood — all five streams now go through an `eventSourceUrl`
+  builder. (`a19560e`)
+- **The Engram page no longer floods `/events/trace` with 400s.**
+  `eventSourceUrl` now returns `null` for the `trace` topic until a run id is
+  selected, since the server requires `runId` for that topic. (`b35dc99`)
+- **The navbar project switcher refreshes live.** Adding a project through
+  Settings now appears in the switcher without a page reload — the project
+  list moved into `ProjectProvider`, which already subscribes to the
+  `projects` SSE topic, so no extra connection is opened. (`6fa3c3a`)
+- **The Settings directory picker selects a real path.** The previous
+  `webkitdirectory` input opened a browser upload dialog and never exposed an
+  absolute path. It is replaced by a server-side directory browser backed by
+  a new read-only `GET /api/fs/browse` endpoint (path-traversal guarded,
+  result capped at 1000 entries). (`235b1c6`)
+
+### Added
+
+- **Playwright end-to-end smoke harness.** `pnpm test:e2e` starts a real
+  `dev-workflow web` against a hermetic fixture and exercises all six
+  dashboard routes in headless Chromium — asserting unique per-route
+  content, no 4xx/5xx, SSE without a 400 flood, no console errors, and both
+  cold-start scenarios. A separate `e2e.yml` CI workflow runs it on push and
+  pull request to `main`. It retroactively catches the entire v3.0.0 bug
+  series; `@playwright/test` is a dev dependency only. (`bf0410e`)
+
 ## [3.0.0] — 2026-05-18
 
 Headline: the **web dashboard**. dev-workflow now ships a local six-page
@@ -1088,6 +1138,7 @@ explicitly elsewhere (e.g. in step files or hooks), update accordingly.
 `dev-workflow validate` (which runs in `session-start` and on demand) will
 warn about stale references — re-run it after upgrading.
 
+[3.0.1]: https://github.com/supostat/dev-workflow/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/supostat/dev-workflow/compare/v2.0.0...v3.0.0
 [0.2.0]: https://github.com/supostat/dev-workflow/compare/v0.1.7...v0.2.0
 [0.1.7]: https://github.com/supostat/dev-workflow/releases/tag/v0.1.7
