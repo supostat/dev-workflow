@@ -29,7 +29,7 @@ export function applyRunFilter(runs: ApiWorkflowRun[], filter: RunFilterState): 
   const needle = filter.search.trim().toLowerCase();
   return runs.filter((run) => {
     if (filter.statuses.size > 0 && !filter.statuses.has(run.status)) return false;
-    if (filter.workflow !== null && run.workflow !== filter.workflow) return false;
+    if (filter.workflow !== null && run.workflowName !== filter.workflow) return false;
     if (needle.length > 0 && !matchesSearch(run, needle)) return false;
     return true;
   });
@@ -39,7 +39,7 @@ export function applyRunFilter(runs: ApiWorkflowRun[], filter: RunFilterState): 
 function matchesSearch(run: ApiWorkflowRun, needle: string): boolean {
   return (
     run.id.toLowerCase().includes(needle) ||
-    run.workflow.toLowerCase().includes(needle)
+    run.workflowName.toLowerCase().includes(needle)
   );
 }
 
@@ -49,6 +49,6 @@ function matchesSearch(run: ApiWorkflowRun, needle: string): boolean {
  */
 export function collectWorkflows(runs: ApiWorkflowRun[]): string[] {
   const workflows = new Set<string>();
-  for (const run of runs) workflows.add(run.workflow);
+  for (const run of runs) workflows.add(run.workflowName);
   return [...workflows].sort((left, right) => left.localeCompare(right));
 }

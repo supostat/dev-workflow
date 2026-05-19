@@ -258,7 +258,11 @@ describe("web API — 17 endpoints, mutations, traversal", () => {
 
   it("GET /api/workflow/runs lists runs", async () => {
     const result = await httpRequest(port, "GET", q("/api/workflow/runs"));
-    expect(JSON.parse(result.body).runs).toHaveLength(1);
+    const runs = JSON.parse(result.body).runs;
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ workflowName: "dev" });
+    expect(runs[0].workflow).toBeUndefined();
+    expect(runs[0].updatedAt).toBeUndefined();
   });
 
   it("GET /api/workflow/runs/:id reads a single run", async () => {

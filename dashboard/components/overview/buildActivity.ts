@@ -98,8 +98,8 @@ function runRows(runs: ApiWorkflowRun[]): ActivityEntry[] {
   return runs.map((run) => ({
     id: `run:${run.id}`,
     kind: "run" as const,
-    title: `${run.workflow} run ${run.status}`,
-    timestamp: run.updatedAt,
+    title: `${run.workflowName} run ${run.status}`,
+    timestamp: run.completedAt ?? run.startedAt,
   }));
 }
 

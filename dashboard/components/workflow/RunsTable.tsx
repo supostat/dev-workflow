@@ -1,8 +1,8 @@
 "use client";
 
 // Read-only Workflow runs data table. Columns mirror the list endpoint
-// (`GET /api/workflow/runs`): id / workflow / status / currentStep /
-// startedAt / updatedAt. A row click navigates to the run-detail route — a
+// (`GET /api/workflow/runs`): id / workflowName / status / currentStep /
+// startedAt / completedAt. A row click navigates to the run-detail route — a
 // real query-param page (`/workflow/run/?id=...`) because the static export
 // cannot pre-render runtime ids as path segments.
 
@@ -18,7 +18,7 @@ import {
 import type { ApiWorkflowRun } from "@/lib/types";
 import { RunStatusBadge } from "./RunStatusBadge";
 
-const COLUMNS = ["ID", "Workflow", "Status", "Current step", "Started", "Updated"] as const;
+const COLUMNS = ["ID", "Workflow", "Status", "Current step", "Started", "Completed"] as const;
 
 interface RunsTableProps {
   /** Runs to render, already filtered by the page. */
@@ -60,13 +60,13 @@ function RunRow({ run, onOpen }: { run: ApiWorkflowRun; onOpen: () => void }) {
   return (
     <TableRow className="cursor-pointer" onClick={onOpen}>
       <TableCell className="font-mono text-xs">{run.id}</TableCell>
-      <TableCell>{run.workflow}</TableCell>
+      <TableCell>{run.workflowName}</TableCell>
       <TableCell>
         <RunStatusBadge status={run.status} />
       </TableCell>
-      <TableCell className="font-mono text-xs">{run.currentStep ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs">{run.currentStep}</TableCell>
       <TableCell className="font-mono text-xs">{run.startedAt}</TableCell>
-      <TableCell className="font-mono text-xs">{run.updatedAt}</TableCell>
+      <TableCell className="font-mono text-xs">{run.completedAt ?? "—"}</TableCell>
     </TableRow>
   );
 }

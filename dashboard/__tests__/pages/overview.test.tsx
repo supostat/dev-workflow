@@ -45,7 +45,7 @@ function stubOverviewFetch(): ReturnType<typeof vi.fn> {
       return ok({ tasks: [{ id: "task-007", title: "Wire feed", status: "pending", priority: "high", branch: null, created: "2026-05-09T00:00:00.000Z", updated: "2026-05-09T00:00:00.000Z" }] });
     }
     if (input.startsWith("/api/workflow/runs")) {
-      return ok({ runs: [{ id: "run-003", workflow: "dev", status: "paused", currentStep: null, startedAt: "2026-05-11T00:00:00.000Z", updatedAt: "2026-05-11T00:00:00.000Z" }] });
+      return ok({ runs: [{ id: "run-003", workflowName: "dev", taskId: null, taskDescription: "Run three", phase: null, status: "paused", currentStep: "code", startedAt: "2026-05-11T00:00:00.000Z", completedAt: null, steps: {} }] });
     }
     return ok({});
   });

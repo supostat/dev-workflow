@@ -28,11 +28,15 @@ function task(overrides: Partial<ApiTask>): ApiTask {
 function run(overrides: Partial<ApiWorkflowRun>): ApiWorkflowRun {
   return {
     id: "run-001",
-    workflow: "dev",
+    workflowName: "dev",
+    taskId: null,
+    taskDescription: "Sample run",
+    phase: null,
     status: "running",
-    currentStep: null,
+    currentStep: "code",
     startedAt: "2026-05-01T00:00:00.000Z",
-    updatedAt: "2026-05-01T00:00:00.000Z",
+    completedAt: null,
+    steps: {},
     ...overrides,
   };
 }
@@ -60,7 +64,7 @@ describe("buildActivity", () => {
       stubApi(
         GAMEPLAN,
         [task({ id: "task-009", updated: "2026-05-09T00:00:00.000Z" })],
-        [run({ id: "run-009", updatedAt: "2026-05-12T00:00:00.000Z" })],
+        [run({ id: "run-009", completedAt: "2026-05-12T00:00:00.000Z" })],
       ),
     );
     expect(data.feed.map((entry) => entry.id)).toEqual([
@@ -68,6 +72,18 @@ describe("buildActivity", () => {
       "vault:gameplan",
       "task:task-009",
     ]);
+  });
+
+  it("renders the run feed entry title from the real workflowName", async () => {
+    const data = await buildActivity(
+      stubApi(
+        GAMEPLAN,
+        [],
+        [run({ id: "run-009", workflowName: "hotfix" })],
+      ),
+    );
+    const runEntry = data.feed.find((entry) => entry.id === "run:run-009");
+    expect(runEntry?.title).toContain("hotfix");
   });
 
   it("caps the feed at the 10 newest rows", async () => {

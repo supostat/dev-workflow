@@ -29,14 +29,6 @@ export interface ProjectRegistry {
   activeProject: string | null;
 }
 
-/** One editable vault section returned by `GET /api/vault/:section`. */
-export interface ApiVaultSection {
-  section: "stack" | "conventions" | "knowledge" | "gameplan";
-  content: string;
-  /** ISO timestamp of the file's last modification. */
-  updatedAt: string;
-}
-
 // `GET /api/tasks` and `GET /api/workflow/runs` return raw domain objects, so
 // the API contract must reuse the domain status/priority unions verbatim — a
 // re-declared literal that drifts from `TaskStatus` / `WorkflowStatus` is a
@@ -53,30 +45,55 @@ export interface ApiTask {
   updated: string;
 }
 
-/** A workflow run as exposed by the read-only `GET /api/workflow/runs`. */
+/**
+ * Engram telemetry counters carried by a workflow run — mirrors the core
+ * `TelemetryCounters` (src/workflow/types.ts). Counts of the engram operations
+ * a run performed across all of its steps.
+ */
+export interface ApiTelemetryCounters {
+  search: number;
+  store: number;
+  judge: number;
+  vaultRecord: number;
+  skipped: number;
+}
+
+/**
+ * Per-step execution state inside a workflow run — mirrors the core `StepState`
+ * (src/workflow/types.ts). Every field is explicitly present; nullable fields
+ * are `null` rather than absent.
+ */
+export interface ApiStepState {
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  output: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+  attempt: number;
+  engramMemoryId: string | null;
+  error: string | null;
+}
+
+/**
+ * A workflow run as exposed by the read-only workflow endpoints — mirrors the
+ * core `WorkflowRun` (src/workflow/types.ts) verbatim. Both `GET
+ * /api/workflow/runs` and `GET /api/workflow/runs/:id` serve this full shape:
+ * `workflowList` does no slimming, so the list rows and the detail object are
+ * identical — there is no separate slimmed list type.
+ */
 export interface ApiWorkflowRun {
   id: string;
-  workflow: string;
-  status: WorkflowStatus;
-  currentStep: string | null;
+  workflowName: string;
+  taskId: string | null;
+  taskDescription: string;
+  phase: string | null;
+  currentStep: string;
   startedAt: string;
-  updatedAt: string;
-}
-
-/** Aggregated engram activity for `GET /api/engram/stats`. */
-export interface ApiEngramStats {
-  totalMemories: number;
-  byMethod: Record<string, number>;
-  byStep: Record<string, number>;
-  byType: Record<string, number>;
-  daemonHealthy: boolean;
-}
-
-/** Communication-profile settings for `GET /api/settings`. */
-export interface ApiSettings {
-  activeProfile: string | null;
-  availableProfiles: string[];
-  lockFilePresent: boolean;
+  completedAt: string | null;
+  status: WorkflowStatus;
+  steps: Record<string, ApiStepState>;
+  telemetry?: ApiTelemetryCounters;
+  abortReason?: string;
 }
 
 /** The topic an SSE stream carries. */

@@ -21,19 +21,27 @@ vi.mock("next/navigation", () => ({
 const RUNS: ApiWorkflowRun[] = [
   {
     id: "run-aaaaaaaaaaaa",
-    workflow: "dev",
+    workflowName: "dev",
+    taskId: null,
+    taskDescription: "First run",
+    phase: null,
     status: "running",
     currentStep: "code",
     startedAt: "2026-05-01T00:00:00.000Z",
-    updatedAt: "2026-05-01T01:00:00.000Z",
+    completedAt: null,
+    steps: {},
   },
   {
     id: "run-bbbbbbbbbbbb",
-    workflow: "review",
+    workflowName: "review",
+    taskId: null,
+    taskDescription: "Second run",
+    phase: null,
     status: "completed",
-    currentStep: null,
+    currentStep: "commit",
     startedAt: "2026-05-02T00:00:00.000Z",
-    updatedAt: "2026-05-02T01:00:00.000Z",
+    completedAt: "2026-05-02T01:00:00.000Z",
+    steps: {},
   },
 ];
 
@@ -90,6 +98,21 @@ describe("WorkflowPage", () => {
     expect(screen.getByText("run-bbbbbbbbbbbb")).toBeInTheDocument();
     expect(screen.getByText("running")).toHaveClass("bg-status-running");
     expect(screen.getByText("completed")).toHaveClass("bg-status-done");
+  });
+
+  it("renders the Workflow column from each run's workflowName", async () => {
+    stubWorkflowFetch();
+    renderWorkflow();
+    await screen.findByText("run-aaaaaaaaaaaa");
+    expect(screen.getByText("dev")).toBeInTheDocument();
+    expect(screen.getByText("review")).toBeInTheDocument();
+  });
+
+  it("renders the em-dash placeholder in the Completed cell of a running run", async () => {
+    stubWorkflowFetch();
+    renderWorkflow();
+    await screen.findByText("run-aaaaaaaaaaaa");
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("shows the CLI-hint banner", async () => {

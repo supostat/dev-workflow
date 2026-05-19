@@ -5,11 +5,10 @@
 export type {
   Project,
   ProjectRegistry,
-  ApiVaultSection,
   ApiTask,
   ApiWorkflowRun,
-  ApiEngramStats,
-  ApiSettings,
+  ApiStepState,
+  ApiTelemetryCounters,
   SseTopic,
   SseEvent,
 } from "@dev-workflow/types";

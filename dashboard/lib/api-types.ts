@@ -6,57 +6,22 @@
 // mutation acks. They live apart from `api.ts` so the wrapper module stays
 // within the 300-LOC budget; `api.ts` re-exports them where callers need them.
 
-import type { Project, ApiTask, ApiWorkflowRun } from "./types";
+import type {
+  Project,
+  ApiTask,
+  ApiWorkflowRun,
+  ApiTelemetryCounters,
+} from "./types";
+
+export type { ApiStepState, ApiTelemetryCounters } from "./types";
 
 /**
- * Engram telemetry counters carried by a workflow run — mirrors the core
- * `TelemetryCounters` (src/workflow/types.ts). Counts of the engram
- * operations a run performed across all of its steps.
+ * A full workflow run as exposed by `GET /api/workflow/runs/:id`. The detail
+ * endpoint serves the same `WorkflowRun` shape as the list endpoint — neither
+ * does any slimming — so detail is a straight alias of `ApiWorkflowRun`. The
+ * named export is kept so `api.ts` and `RunDetail.tsx` callers are untouched.
  */
-export interface ApiTelemetryCounters {
-  search: number;
-  store: number;
-  judge: number;
-  vaultRecord: number;
-  skipped: number;
-}
-
-/**
- * Per-step execution state inside a workflow run — mirrors the core
- * `StepState` (src/workflow/types.ts). Every field is explicitly present;
- * nullable fields are `null` rather than absent.
- */
-export interface ApiStepState {
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
-  output: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  durationMs: number | null;
-  attempt: number;
-  engramMemoryId: string | null;
-  error: string | null;
-}
-
-/**
- * A full workflow run as exposed by `GET /api/workflow/runs/:id` — mirrors the
- * core `WorkflowRun` (src/workflow/types.ts). Distinct from the list shape
- * `ApiWorkflowRun`: `currentStep` is non-null here (a persisted run always has
- * a current step) and the per-step `steps` map plus telemetry are included.
- */
-export interface ApiWorkflowRunDetail {
-  id: string;
-  workflowName: string;
-  taskId: string | null;
-  taskDescription: string;
-  phase: string | null;
-  currentStep: string;
-  startedAt: string;
-  completedAt: string | null;
-  status: "running" | "completed" | "failed" | "paused" | "aborted";
-  steps: Record<string, ApiStepState>;
-  telemetry?: ApiTelemetryCounters;
-  abortReason?: string;
-}
+export type ApiWorkflowRunDetail = ApiWorkflowRun;
 
 /**
  * One line of a workflow run's engram trace JSONL — mirrors the core
@@ -165,8 +130,9 @@ export interface EngramStatsResponse {
 }
 
 /**
- * `GET /api/settings` — wider than the `ApiSettings` contract: it adds
- * `defaultProfile` and the migration-lock document.
+ * `GET /api/settings` — the communication-profile settings document: the
+ * active and default profiles, the available profile names, and the
+ * migration-lock document.
  */
 export interface SettingsResponse {
   activeProfile: string | null;
