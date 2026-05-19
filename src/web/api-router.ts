@@ -19,6 +19,7 @@ import {
 } from "./api-handlers.js";
 import { getSettings, patchCommunication, putProfile } from "./api-settings.js";
 import { getEngramStats, getEngramHealth } from "./api-engram.js";
+import { browseFilesystem } from "./api-fs.js";
 
 /** Resolution result: a validated Project, or a `{ status, error }` rejection. */
 type ProjectResolution =
@@ -82,6 +83,10 @@ const ROUTES: readonly Route[] = [
   {
     method: "PUT", pattern: /^\/api\/projects\/active$/, needsProject: false,
     handle: (ctx) => putActiveProject(ctx.res, ctx.body),
+  },
+  {
+    method: "GET", pattern: /^\/api\/fs\/browse$/, needsProject: false,
+    handle: (ctx) => browseFilesystem(ctx.res, ctx.url.searchParams.get("path")),
   },
   {
     method: "GET", pattern: /^\/api\/vault\/search$/, needsProject: true,

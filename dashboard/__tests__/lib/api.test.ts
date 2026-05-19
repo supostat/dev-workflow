@@ -9,6 +9,7 @@ import {
   createProject,
   getActiveProject,
   putActiveProject,
+  browseFs,
   getVaultSection,
   patchVaultSection,
   searchVault,
@@ -90,6 +91,25 @@ describe("projects wrappers (no project query)", () => {
     expect(calledInit(fetchMock).method).toBe("PUT");
     expect(calledInit(fetchMock).body).toBe(JSON.stringify({ name: "demo" }));
     expect(result.activeProject).toBe("demo");
+  });
+
+  it("browseFs encodes an absolute path query parameter", async () => {
+    const fetchMock = stubFetch({ path: "/abs/path", parent: "/abs", entries: [], truncated: false });
+    await browseFs("/abs/path");
+    expect(calledPath(fetchMock)).toBe("/api/fs/browse?path=%2Fabs%2Fpath");
+  });
+
+  it("browseFs hits the bare endpoint when no path is given", async () => {
+    const fetchMock = stubFetch({ path: "/home", parent: "/", entries: [], truncated: false });
+    await browseFs();
+    expect(calledPath(fetchMock)).toBe("/api/fs/browse");
+  });
+
+  it("browseFs throws the server error message on a non-2xx body", async () => {
+    stubFetch({ error: "path must be absolute" }, 400);
+    const error = await browseFs("relative").catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("path must be absolute");
   });
 });
 

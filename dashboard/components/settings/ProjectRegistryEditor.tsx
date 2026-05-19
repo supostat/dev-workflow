@@ -7,11 +7,12 @@
 // `DELETE /api/projects` route, so removal is not offered — the table renders
 // without a remove action and a note points to the registry file / CLI.
 //
-// `webkitdirectory` does not expose an absolute path to the browser, so the
-// directory `<input>` only seeds the path field — the user confirms the final
-// absolute path in the text `<Input>` before "Add project" POSTs it.
+// "Browse…" opens `DirectoryBrowserDialog`, a server-side directory picker
+// (`GET /api/fs/browse`). The picker returns an absolute path directly, so the
+// chosen directory seeds the path field ready to POST — no manual editing of a
+// browser-hidden path is needed.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Panel } from "@/components/layout/Panel";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getProjects, createProject } from "@/lib/api";
 import type { ProjectListResponse } from "@/lib/api";
+import { DirectoryBrowserDialog } from "./DirectoryBrowserDialog";
 
 /** Project-registry table plus an add-project directory picker. */
 export function ProjectRegistryEditor() {
@@ -34,7 +36,7 @@ export function ProjectRegistryEditor() {
   const [error, setError] = useState<string | null>(null);
   const [path, setPath] = useState("");
   const [adding, setAdding] = useState(false);
-  const directoryInput = useRef<HTMLInputElement | null>(null);
+  const [browserOpen, setBrowserOpen] = useState(false);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -49,15 +51,6 @@ export function ProjectRegistryEditor() {
   useEffect(() => {
     void reload();
   }, [reload]);
-
-  // The browser hides the absolute path; seed the field with the picked
-  // directory name so the user only edits the parent path before confirming.
-  const onDirectoryPicked = useCallback((event: React.ChangeEvent<HTMLInputElement>): void => {
-    const first = event.target.files?.[0];
-    const relative = first?.webkitRelativePath ?? "";
-    const directory = relative.split("/")[0];
-    if (directory) setPath(directory);
-  }, []);
 
   const add = useCallback(async (): Promise<void> => {
     const trimmed = path.trim();
@@ -100,23 +93,18 @@ export function ProjectRegistryEditor() {
                 onChange={(event) => setPath(event.target.value)}
               />
             </div>
-            <input
-              ref={assignDirectoryAttributes(directoryInput)}
-              type="file"
-              className="hidden"
-              onChange={onDirectoryPicked}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => directoryInput.current?.click()}
-            >
-              Pick directory
+            <Button size="sm" variant="outline" onClick={() => setBrowserOpen(true)}>
+              Browse…
             </Button>
             <Button size="sm" disabled={adding || path.trim() === ""} onClick={() => void add()}>
               {adding ? "Adding…" : "Add project"}
             </Button>
           </div>
+          <DirectoryBrowserDialog
+            open={browserOpen}
+            onOpenChange={setBrowserOpen}
+            onSelect={(absolutePath) => setPath(absolutePath)}
+          />
         </div>
       )}
     </Panel>
@@ -155,20 +143,6 @@ function RegistryTable({ registry }: { registry: ProjectListResponse | null }) {
       </TableBody>
     </Table>
   );
-}
-
-/**
- * Set the non-standard `webkitdirectory` attribute on the directory picker.
- * React's `InputHTMLAttributes` omits it; assigning through the DOM ref keeps
- * the component free of an `any`-typed prop spread.
- */
-function assignDirectoryAttributes(
-  ref: React.MutableRefObject<HTMLInputElement | null>,
-): (node: HTMLInputElement | null) => void {
-  return (node: HTMLInputElement | null): void => {
-    ref.current = node;
-    if (node !== null) node.setAttribute("webkitdirectory", "");
-  };
 }
 
 /** Reduce an unknown thrown reason to a display message. */

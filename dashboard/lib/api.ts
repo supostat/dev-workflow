@@ -28,6 +28,7 @@ import type {
   SettingsResponse,
   PatchCommunicationResponse,
   PutProfileResponse,
+  FsBrowseResponse,
 } from "./api-types";
 
 export type {
@@ -49,6 +50,8 @@ export type {
   SettingsResponse,
   PatchCommunicationResponse,
   PutProfileResponse,
+  FsBrowseResponse,
+  FsDirectoryEntry,
 } from "./api-types";
 
 // ── request core ─────────────────────────────────────────────────────────────
@@ -142,6 +145,11 @@ export function putActiveProject(name: string): Promise<PutActiveProjectResponse
     method: "PUT",
     ...jsonBody({ name }),
   });
+}
+
+/** `GET /api/fs/browse` — list a directory's subdirectories (defaults to home). */
+export function browseFs(path?: string): Promise<FsBrowseResponse> {
+  return request<FsBrowseResponse>(`/api/fs/browse${buildQuery({ path })}`);
 }
 
 // ── vault ────────────────────────────────────────────────────────────────────

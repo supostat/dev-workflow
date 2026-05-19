@@ -147,6 +147,20 @@ export interface PatchCommunicationResponse {
   written: boolean;
 }
 
+/** One subdirectory entry returned inside `GET /api/fs/browse`. */
+export interface FsDirectoryEntry {
+  name: string;
+  path: string;
+}
+
+/** `GET /api/fs/browse` — a directory's canonical path, parent, and subdirs. */
+export interface FsBrowseResponse {
+  path: string;
+  parent: string | null;
+  entries: FsDirectoryEntry[];
+  truncated: boolean;
+}
+
 /** `PUT /api/settings/profile` — acknowledges the active profile. */
 export interface PutProfileResponse {
   activeProfile: string;

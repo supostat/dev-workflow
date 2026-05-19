@@ -47,7 +47,7 @@ function httpRequest(
   });
 }
 
-describe("web API — 17 endpoints, mutations, traversal", () => {
+describe("web API — 18 endpoints, mutations, traversal", () => {
   let configHome: string;
   let originalConfigHome: string | undefined;
   let originalSocketPath: string | undefined;
@@ -453,5 +453,171 @@ describe("web API — 17 endpoints, mutations, traversal", () => {
       port, "PATCH", q("/api/settings/communication"), JSON.stringify({ content: "" }),
     );
     expect(result.status).toBe(400);
+  });
+
+  // ── fs browse ──────────────────────────────────────────────────────────────
+
+  it("GET /api/fs/browse lists subdirectories sorted", async () => {
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    mkdirSync(join(browseRoot, "zebra"));
+    mkdirSync(join(browseRoot, "alpha"));
+    writeFileSync(join(browseRoot, "a-file.txt"), "x", "utf-8");
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(browseRoot)}`,
+      );
+      const parsed = JSON.parse(result.body);
+      expect(result.status).toBe(200);
+      expect(parsed.path).toBe(browseRoot);
+      expect(parsed.entries.map((entry: { name: string }) => entry.name)).toEqual([
+        "alpha", "zebra",
+      ]);
+      for (const entry of parsed.entries) {
+        expect(entry.path.startsWith(browseRoot)).toBe(true);
+      }
+      expect(parsed.truncated).toBe(false);
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse with no path defaults to the home directory", async () => {
+    const { homedir } = await import("node:os");
+    const result = await httpRequest(port, "GET", "/api/fs/browse");
+    const parsed = JSON.parse(result.body);
+    expect(result.status).toBe(200);
+    expect(parsed.path).toBe(homedir());
+  });
+
+  it("GET /api/fs/browse exposes a non-null parent for a non-root dir", async () => {
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(browseRoot)}`,
+      );
+      expect(JSON.parse(result.body).parent).not.toBeNull();
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse reports a null parent at the filesystem root", async () => {
+    const { resolve } = await import("node:path");
+    const result = await httpRequest(
+      port, "GET", `/api/fs/browse?path=${encodeURIComponent(resolve("/"))}`,
+    );
+    expect(result.status).toBe(200);
+    expect(JSON.parse(result.body).parent).toBeNull();
+  });
+
+  it("GET /api/fs/browse canonicalizes a `..` segment in the path", async () => {
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    mkdirSync(join(browseRoot, "sub"));
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(`${browseRoot}/sub/..`)}`,
+      );
+      expect(result.status).toBe(200);
+      expect(JSON.parse(result.body).path).toBe(browseRoot);
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse rejects a relative path", async () => {
+    const result = await httpRequest(port, "GET", "/api/fs/browse?path=relative/dir");
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toContain("absolute");
+  });
+
+  it("GET /api/fs/browse rejects a NUL byte in the path", async () => {
+    const result = await httpRequest(port, "GET", "/api/fs/browse?path=%2Ftmp%2F%00evil");
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toContain("invalid character");
+  });
+
+  it("GET /api/fs/browse rejects a missing directory", async () => {
+    const result = await httpRequest(
+      port, "GET", "/api/fs/browse?path=%2Fno%2Fsuch%2Fweb-api-fs-test",
+    );
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toContain("does not exist");
+  });
+
+  it("GET /api/fs/browse rejects a path that is a file", async () => {
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    const filePath = join(browseRoot, "file.txt");
+    writeFileSync(filePath, "x", "utf-8");
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(filePath)}`,
+      );
+      expect(result.status).toBe(400);
+      expect(JSON.parse(result.body).error).toContain("not a directory");
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse rejects an empty path query parameter", async () => {
+    const result = await httpRequest(port, "GET", "/api/fs/browse?path=");
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toContain("non-empty string");
+  });
+
+  it("GET /api/fs/browse degrades a permission-denied directory to a 400", async () => {
+    if (process.getuid?.() === 0) return;
+    const { chmodSync } = await import("node:fs");
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    const denied = join(browseRoot, "denied");
+    mkdirSync(denied);
+    chmodSync(denied, 0o000);
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(denied)}`,
+      );
+      expect(result.status).toBe(400);
+      expect(JSON.parse(result.body).error).toContain("cannot read directory");
+    } finally {
+      chmodSync(denied, 0o755);
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse skips a dangling symlink", async () => {
+    const { symlinkSync } = await import("node:fs");
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    mkdirSync(join(browseRoot, "real"));
+    symlinkSync(join(browseRoot, "nonexistent-target"), join(browseRoot, "broken"));
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(browseRoot)}`,
+      );
+      const parsed = JSON.parse(result.body);
+      expect(result.status).toBe(200);
+      const names = parsed.entries.map((entry: { name: string }) => entry.name);
+      expect(names).toContain("real");
+      expect(names).not.toContain("broken");
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("GET /api/fs/browse truncates beyond 1000 subdirectories", async () => {
+    const browseRoot = mkdtempSync(join(tmpdir(), "web-api-fs-"));
+    for (let index = 0; index <= 1000; index += 1) {
+      mkdirSync(join(browseRoot, `dir-${String(index).padStart(4, "0")}`));
+    }
+    try {
+      const result = await httpRequest(
+        port, "GET", `/api/fs/browse?path=${encodeURIComponent(browseRoot)}`,
+      );
+      const parsed = JSON.parse(result.body);
+      expect(result.status).toBe(200);
+      expect(parsed.entries.length).toBe(1000);
+      expect(parsed.truncated).toBe(true);
+    } finally {
+      rmSync(browseRoot, { recursive: true, force: true });
+    }
   });
 });
