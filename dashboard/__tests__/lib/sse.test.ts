@@ -126,6 +126,12 @@ describe("eventSourceUrl", () => {
     expect(url).toContain("runId=run-aaaaaaaaaaaa");
   });
 
+  it("returns null for the trace topic when no runId is supplied", () => {
+    expect(eventSourceUrl("trace", "demo")).toBeNull();
+    expect(eventSourceUrl("trace", "demo", {})).toBeNull();
+    expect(eventSourceUrl("trace", "demo", { runId: "" })).toBeNull();
+  });
+
   it("percent-encodes a project name with reserved characters", () => {
     const url = eventSourceUrl("vault", "my project");
     expect(url).not.toBeNull();

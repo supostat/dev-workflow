@@ -18,8 +18,10 @@ export type EventTopic = "vault" | "runs" | "trace" | "projects";
 /**
  * Build a project-scoped SSE endpoint URL for `topic`. The server requires a
  * `?project=` query parameter on the `vault`/`runs`/`trace` topics and 400s
- * without it. Returns `null` when no project is resolved (the hook is then
- * disabled). `extra` carries topic-specific params such as the trace `runId`.
+ * without it; the `trace` topic additionally requires a `runId` and 400s
+ * without that. Returns `null` when no project is resolved, or — for `trace` —
+ * when no `runId` is supplied (the hook is then disabled). `extra` carries
+ * topic-specific params such as the trace `runId`.
  */
 export function eventSourceUrl(
   topic: EventTopic,
@@ -27,6 +29,7 @@ export function eventSourceUrl(
   extra?: Record<string, string>,
 ): string | null {
   if (project === null) return null;
+  if (topic === "trace" && (extra?.runId ?? "") === "") return null;
   const params = new URLSearchParams({ project });
   for (const [key, value] of Object.entries(extra ?? {})) {
     params.set(key, value);
