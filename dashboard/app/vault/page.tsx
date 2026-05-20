@@ -9,7 +9,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectNotice } from "@/components/layout/ProjectNotice";
-import { useApi, useActiveProject } from "@/lib/project-context";
+import { useApi } from "@/lib/project-context";
 import type { VaultSection } from "@/lib/api";
 import { VaultEditor } from "@/components/vault/VaultEditor";
 
@@ -23,7 +23,6 @@ const SECTIONS: ReadonlyArray<{ value: VaultSection; label: string }> = [
 
 export default function VaultPage() {
   const api = useApi();
-  const { activeProject } = useActiveProject();
 
   if (!api.ready) {
     return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;
@@ -41,7 +40,7 @@ export default function VaultPage() {
       <div className="flex-1">
         {SECTIONS.map((section) => (
           <TabsContent key={section.value} value={section.value}>
-            <VaultEditor api={api.api} section={section.value} project={activeProject} />
+            <VaultEditor api={api.api} section={section.value} />
           </TabsContent>
         ))}
       </div>

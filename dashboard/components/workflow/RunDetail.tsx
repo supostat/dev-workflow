@@ -9,8 +9,10 @@
 //   (c) a resolved run       → the tabbed detail (Overview / Steps / JSON /
 //                              Trace).
 // A generation guard keyed on the run id discards a response whose id no
-// longer matches the current query param. The trace SSE url stays `null`
-// until the id resolves — the server 400s on a missing runId.
+// longer matches the current query param. The trace tab subscribes to the
+// `trace` topic on the shared multiplexed `/events/stream` connection via
+// `sseHub`; the run id is the client-side filter, so an unresolved id simply
+// leaves the buffer empty until the query param parses.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -25,7 +27,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
 import type { ApiWorkflowRunDetail } from "@/lib/api";
-import { eventSourceUrl } from "@/lib/sse";
 import { RunStatusBadge } from "./RunStatusBadge";
 import { StepList } from "./StepList";
 import { TelemetryCounters } from "./TelemetryCounters";
@@ -64,7 +65,7 @@ export function RunDetail() {
   if (run === null) {
     return <p className="py-12 text-center text-sm text-muted-foreground">Loading run…</p>;
   }
-  return <RunTabs run={run} runId={runId} project={activeProject} />;
+  return <RunTabs run={run} runId={runId} />;
 }
 
 /** Build the generation-guarded run-detail loader. */
@@ -139,11 +140,9 @@ function ErrorState({
 function RunTabs({
   run,
   runId,
-  project,
 }: {
   run: ApiWorkflowRunDetail;
   runId: string;
-  project: string | null;
 }) {
   return (
     <Panel
@@ -174,7 +173,7 @@ function RunTabs({
           </ScrollArea>
         </TabsContent>
         <TabsContent value="trace">
-          <TraceTail url={eventSourceUrl("trace", project, { runId })} />
+          <TraceTail runId={runId} />
         </TabsContent>
       </Tabs>
     </Panel>

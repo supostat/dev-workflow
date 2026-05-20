@@ -202,14 +202,14 @@ describe("TasksPage", () => {
     render(<ProjectProvider><TasksPage /></ProjectProvider> as ReactNode);
     await waitFor(() => expect(getTasksCalls).toBe(1));
 
-    // Switch the active project via the `/events/projects` SSE topic — the
+    // Switch the active project via the multiplexed `projects` topic — the
     // provider re-fetches the active project and the tasks page bumps its
     // generation counter, then re-fetches the new project's list.
     activeName = "second";
-    const projectsStream = MockEventSource.instances.find((source) =>
-      source.url.includes("/events/projects"),
+    const stream = MockEventSource.instances.find((source) =>
+      source.url.includes("/events/stream"),
     );
-    projectsStream?.emit("projects", JSON.stringify({ action: "registry-changed" }));
+    stream?.emit("projects", JSON.stringify({ action: "registry-changed" }));
     await screen.findByText("Other project task");
 
     // The slow first-project list resolves only now — it must be discarded.

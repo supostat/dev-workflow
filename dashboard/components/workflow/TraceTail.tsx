@@ -2,19 +2,21 @@
 
 // Reusable terminal-style live JSONL viewer for a workflow run's engram trace.
 //
-// Subscribes to the `trace` SSE topic at `url`; `url` stays `null` until the
-// run id is known (the server 400s on a missing runId, so a subscription is
-// never opened before the id resolves). Each SSE message carries a
-// `{ line: string }` envelope and `line` itself is one `EngramTraceEvent` —
-// the two JSON.parse calls are independently wrapped in try/catch so a
-// malformed payload skips that line rather than crashing the viewer. The
-// rendered buffer is capped at `MAX_LINES` so a long-running stream cannot
-// grow the DOM without bound.
+// Subscribes to the `trace` topic on the shared `sseHub` — the multiplexed
+// connection carries lines for EVERY run of the active project, so each
+// payload names its source runId and the viewer filters by it client-side.
+// `runId === null` disables the viewer (no lines retained). Each SSE message
+// carries a `{runId, line}` envelope and `line` itself is one
+// `EngramTraceEvent` — the two `JSON.parse` calls are independently wrapped
+// in try/catch so a malformed payload skips that line rather than crashing
+// the viewer. The rendered buffer is capped at `MAX_LINES` so a long-running
+// stream cannot grow the DOM without bound. Changing `runId` resets the
+// buffer so a stale run's lines never leak into a freshly picked one.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEventSource } from "@/lib/sse";
-import type { EngramTraceEvent } from "@/lib/api";
+import { useSseTopic } from "@/lib/sse";
+import type { EngramTraceEvent, TraceEventPayload } from "@/lib/api";
 
 /** Hard cap on retained trace lines — oldest lines drop off the top. */
 const MAX_LINES = 200;
@@ -27,25 +29,36 @@ interface TraceLine {
 }
 
 interface TraceTailProps {
-  /** `trace` SSE endpoint, or `null` until the run id resolves. */
-  url: string | null;
+  /** Source run to display; `null` keeps the viewer empty. */
+  runId: string | null;
+}
+
+/** Parsed trace payload — the source runId plus the inner event. */
+interface ParsedTrace {
+  runId: string;
+  event: EngramTraceEvent;
 }
 
 /** Live terminal-style viewer of a run's engram trace JSONL. */
-export function TraceTail({ url }: TraceTailProps) {
+export function TraceTail({ runId }: TraceTailProps) {
   const [lines, setLines] = useState<TraceLine[]>([]);
   const nextKey = useRef(0);
 
   const append = useCallback((data: string): void => {
-    const event = parseTraceLine(data);
-    if (event === null) return;
+    const parsed = parseTraceLine(data);
+    if (parsed === null) return;
+    if (runId === null || parsed.runId !== runId) return;
     setLines((current) => {
-      const next = [...current, { key: nextKey.current++, event }];
+      const next = [...current, { key: nextKey.current++, event: parsed.event }];
       return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
     });
-  }, []);
+  }, [runId]);
 
-  const { connected } = useEventSource(url, "trace", append);
+  useEffect(() => {
+    setLines([]);
+  }, [runId]);
+
+  const { connected } = useSseTopic("trace", append);
 
   return (
     <div className="rounded-md border border-border bg-[hsl(var(--background))]">
@@ -84,34 +97,33 @@ function TraceRow({ event }: { event: EngramTraceEvent }) {
 }
 
 /**
- * Parse one SSE `trace` payload into an `EngramTraceEvent`. Two independent
- * defensive parses: the SSE `data` string → `{ line }` envelope, then the
- * `line` string → the event. A failure in either is swallowed (returns null).
+ * Parse one SSE `trace` payload into a `ParsedTrace`. Two independent
+ * defensive parses: the SSE `data` string → `{runId, line}` envelope, then
+ * the `line` string → the event. A failure in either is swallowed (returns
+ * null).
  */
-function parseTraceLine(data: string): EngramTraceEvent | null {
-  let line: string;
+function parseTraceLine(data: string): ParsedTrace | null {
+  let envelope: TraceEventPayload;
   try {
-    const envelope: unknown = JSON.parse(data);
-    if (!isLineEnvelope(envelope)) return null;
-    line = envelope.line;
+    const parsed: unknown = JSON.parse(data);
+    if (!isTraceEnvelope(parsed)) return null;
+    envelope = parsed;
   } catch {
     return null;
   }
   try {
-    const event: unknown = JSON.parse(line);
-    return isTraceEvent(event) ? event : null;
+    const event: unknown = JSON.parse(envelope.line);
+    return isTraceEvent(event) ? { runId: envelope.runId, event } : null;
   } catch {
     return null;
   }
 }
 
-/** True when `value` is a `{ line: string }` SSE envelope. */
-function isLineEnvelope(value: unknown): value is { line: string } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { line?: unknown }).line === "string"
-  );
+/** True when `value` is a `{runId, line}` SSE envelope. */
+function isTraceEnvelope(value: unknown): value is TraceEventPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate["runId"] === "string" && typeof candidate["line"] === "string";
 }
 
 /** Structural guard for an `EngramTraceEvent` parsed off the wire. */

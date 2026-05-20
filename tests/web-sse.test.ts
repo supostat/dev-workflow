@@ -11,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import { createWebServer, type WebServerHandle } from "../src/web/server.js";
 import { SseRegistry, HEARTBEAT_MS } from "../src/web/sse.js";
 import { addProject, setActiveProject } from "../src/web/projects.js";
+import type { SseTopic } from "../src/web/types.js";
 
 /** One parsed Server-Sent Event. */
 interface SseRecord {
@@ -85,7 +86,7 @@ class SseClient {
   }
 }
 
-describe("web SSE — delivery, cap, cleanup", () => {
+describe("web SSE — multiplexed /events/stream", () => {
   let configHome: string;
   let originalConfigHome: string | undefined;
   let originalSocketPath: string | undefined;
@@ -132,42 +133,28 @@ describe("web SSE — delivery, cap, cleanup", () => {
     return client;
   };
 
-  it("opens a vault stream with a 200 status", async () => {
+  it("opens the multiplexed stream with a 200 status", async () => {
     const client = track(new SseClient());
-    const status = await client.connect(port, `/events/vault?project=${projectName}`);
+    const status = await client.connect(port, `/events/stream?project=${projectName}`);
     expect(status).toBe(200);
   });
 
-  it("delivers a vault event on a file change", async () => {
+  it("delivers a vault event on the multiplexed stream", async () => {
     const client = track(new SseClient());
-    await client.connect(port, `/events/vault?project=${projectName}`);
+    await client.connect(port, `/events/stream?project=${projectName}`);
     await new Promise((r) => setTimeout(r, 150));
     writeFileSync(join(vaultPath, "knowledge.md"), "# Knowledge\nchanged\n", "utf-8");
     const record = await client.waitFor("vault");
     expect(JSON.parse(record.data).file).toBe("knowledge.md");
   });
 
-  it("rejects an SSE stream with no project param", async () => {
+  it("delivers a registry-changed event to a project-scoped subscriber (projects-bypass)", async () => {
+    // The deviation under test: `projects` topic broadcasts arrive with the
+    // empty project name, but every project-scoped subscriber must still
+    // receive them. A test that opens against the global registry would
+    // not exercise the filter-bypass branch.
     const client = track(new SseClient());
-    const status = await client.connect(port, "/events/vault");
-    expect(status).toBe(400);
-  });
-
-  it("rejects a trace stream with no runId", async () => {
-    const client = track(new SseClient());
-    const status = await client.connect(port, `/events/trace?project=${projectName}`);
-    expect(status).toBe(400);
-  });
-
-  it("rejects an unknown SSE topic", async () => {
-    const client = track(new SseClient());
-    const status = await client.connect(port, `/events/bogus?project=${projectName}`);
-    expect(status).toBe(404);
-  });
-
-  it("delivers a registry-changed event on the projects topic (AC#3)", async () => {
-    const client = track(new SseClient());
-    await client.connect(port, "/events/projects");
+    await client.connect(port, `/events/stream?project=${projectName}`);
     await new Promise((r) => setTimeout(r, 150));
     const other = mkdtempSync(join(tmpdir(), "web-sse-extra-"));
     addProject(other);
@@ -176,14 +163,32 @@ describe("web SSE — delivery, cap, cleanup", () => {
     rmSync(other, { recursive: true, force: true });
   });
 
+  it("rejects /events/stream with no project param", async () => {
+    const client = track(new SseClient());
+    const status = await client.connect(port, "/events/stream");
+    expect(status).toBe(400);
+  });
+
+  it("rejects /events/stream for an unknown project", async () => {
+    const client = track(new SseClient());
+    const status = await client.connect(port, "/events/stream?project=nonexistent");
+    expect(status).toBe(400);
+  });
+
+  it("rejects /events/bogus with 404 — only /events/stream is exposed", async () => {
+    const client = track(new SseClient());
+    const status = await client.connect(port, `/events/bogus?project=${projectName}`);
+    expect(status).toBe(404);
+  });
+
   it("51st concurrent SSE connection returns 503 (AC#8)", async () => {
     for (let i = 0; i < 50; i++) {
       const client = track(new SseClient());
-      const status = await client.connect(port, `/events/vault?project=${projectName}`);
+      const status = await client.connect(port, `/events/stream?project=${projectName}`);
       expect(status).toBe(200);
     }
     const overflow = track(new SseClient());
-    const status = await overflow.connect(port, `/events/vault?project=${projectName}`);
+    const status = await overflow.connect(port, `/events/stream?project=${projectName}`);
     expect(status).toBe(503);
   });
 
@@ -191,13 +196,13 @@ describe("web SSE — delivery, cap, cleanup", () => {
     const clients: SseClient[] = [];
     for (let i = 0; i < 50; i++) {
       const client = new SseClient();
-      await client.connect(port, `/events/vault?project=${projectName}`);
+      await client.connect(port, `/events/stream?project=${projectName}`);
       clients.push(client);
     }
     clients[0]!.close();
     await new Promise((r) => setTimeout(r, 150));
     const replacement = track(new SseClient());
-    const status = await replacement.connect(port, `/events/vault?project=${projectName}`);
+    const status = await replacement.connect(port, `/events/stream?project=${projectName}`);
     expect(status).toBe(200);
     for (const client of clients.slice(1)) client.close();
   });
@@ -224,23 +229,22 @@ describe("web SSE — heartbeat", () => {
     return { res, writes };
   }
 
-  it("emits a ping event once the 30s heartbeat interval elapses", () => {
-    // The heartbeat is an unref'd setInterval — fake timers still fire it.
+  it("emits ONE ping per multiplexed connection — not one per topic", () => {
+    // The heartbeat is per-connection, not per-topic. With four topics in the
+    // subscriber's set a buggy implementation would fire one timer per topic
+    // and write four pings per interval; the multiplexed contract requires
+    // exactly one.
     vi.useFakeTimers();
     try {
       const registry = new SseRegistry();
       const { res, writes } = makeResponse();
-      const opened = registry.open(makeRequest(), res, "vault", "proj", null);
+      const topics = new Set<SseTopic>(["vault", "runs", "projects", "trace"]);
+      const opened = registry.open(makeRequest(), res, topics, "proj");
       expect(opened).toBe(true);
-      // Nothing pinged before the interval elapses.
-      vi.advanceTimersByTime(HEARTBEAT_MS - 1000);
-      expect(writes.some((chunk) => chunk.startsWith("event: ping"))).toBe(false);
-      // Crossing the 30s boundary fires exactly one ping.
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(HEARTBEAT_MS + 100);
       const pings = writes.filter((chunk) => chunk.startsWith("event: ping"));
       expect(pings).toHaveLength(1);
       expect(pings[0]).toBe("event: ping\ndata: \n\n");
-      // A second interval fires a second ping.
       vi.advanceTimersByTime(HEARTBEAT_MS);
       expect(writes.filter((chunk) => chunk.startsWith("event: ping"))).toHaveLength(2);
       registry.closeAll();

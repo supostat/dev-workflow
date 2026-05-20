@@ -31,7 +31,7 @@ function fail(message: string): Promise<Response> {
 }
 
 /**
- * The real `/events/vault` wire payload — `src/web/watcher.ts` broadcasts
+ * The real `vault` SSE wire payload — `src/web/watcher.ts` broadcasts
  * `{file, mtime, action}` and `src/web/sse.ts` frames it as the `data:` line.
  */
 function vaultEvent(file: string): string {
@@ -56,9 +56,9 @@ function stubVaultFetch(): ReturnType<typeof vi.fn> {
   return fetchMock;
 }
 
-/** The `/events/vault` SSE connection opened by the editor. */
+/** The multiplexed SSE connection opened by the project context. */
 function vaultStream(): MockEventSource | undefined {
-  return MockEventSource.instances.find((source) => source.url.includes("/events/vault"));
+  return MockEventSource.instances.find((source) => source.url.includes("/events/stream"));
 }
 
 /** Render the Vault page inside the project provider. */

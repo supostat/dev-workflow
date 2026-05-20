@@ -12,6 +12,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { sseHub } from "@/lib/sse-hub";
 
 /** A single SSE message delivered to a named-event listener. */
 interface MockEvent {
@@ -78,5 +79,10 @@ class MockResizeObserver {
 
 afterEach(() => {
   cleanup();
+  // Close any active multiplexed EventSource and cancel pending retry timers
+  // — the `sseHub` singleton persists across cases, so without this teardown
+  // a stray open connection leaks `MockEventSource.instances` counts into
+  // the next test and makes them non-deterministic.
+  sseHub.setProject(null);
   MockEventSource.reset();
 });

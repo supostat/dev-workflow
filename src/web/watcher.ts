@@ -1,9 +1,14 @@
 // chokidar-backed file-watcher pool for the web dashboard (task-055).
 //
 // Each project gets its own watcher set (vault md files, run JSON files, and
-// optionally a trace JSONL tail). A separate process-wide watcher observes
+// a trace JSONL directory watcher). A separate process-wide watcher observes
 // the multi-project registry file. File events are translated into SSE
 // broadcasts on the matching topic.
+//
+// Trace watcher: a single directory watcher (no glob — chokidar v4 dropped
+// glob support) for `<project>/.dev-vault/workflow-state/runs/` tagging every
+// emitted line with the originating runId. Clients filter by runId; one
+// watcher serves every run of the project.
 //
 // Idle-TTL: a project with no SSE subscribers for 5 minutes has its watchers
 // closed to free file descriptors; a fresh subscription re-opens them. The
@@ -13,7 +18,7 @@ import { statSync, openSync, readSync, closeSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { watch, type FSWatcher } from "chokidar";
 import type { SseRegistry } from "./sse.js";
-import type { Project } from "./types.js";
+import type { Project, TraceEventPayload } from "./types.js";
 import { registryFilePath } from "./projects.js";
 
 /** Project watchers idle for this long (no subscribers) are evicted. */
@@ -25,10 +30,19 @@ const CHOKIDAR_OPTIONS = {
   awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 20 },
 } as const;
 
+/** Suffix marking an engram-trace JSONL — used by the trace directory watcher. */
+const TRACE_FILE_SUFFIX = ".engram-trace.jsonl";
+
+interface TraceWatcherState {
+  watcher: FSWatcher | null;
+  /** Byte offset already emitted, keyed by absolute path. */
+  offsets: Map<string, number>;
+}
+
 interface ProjectWatchers {
   vault: FSWatcher | null;
   runs: FSWatcher | null;
-  trace: Map<string, { watcher: FSWatcher; offset: number }>;
+  trace: TraceWatcherState;
   idleTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -95,22 +109,42 @@ export class WatcherPool {
   }
 
   /**
-   * Tail `<run>.engram-trace.jsonl`, emitting each appended line as one
-   * `trace` event scoped to `runId`. Re-subscribing the same runId is a no-op.
+   * Watch `<project>/.dev-vault/workflow-state/runs` for `*.engram-trace.jsonl`
+   * appends, emitting each new line as one `trace` SSE record tagged with the
+   * source runId. One watcher serves every run of the project — clients filter
+   * by runId.
+   *
+   * Offset-seeding under `ignoreInitial: true`:
+   *  - `add` fires for files created after the watcher mounted; the entire
+   *    file is new content, so `fromOffset` starts at 0.
+   *  - `change` on a pre-existing file means historical bytes already on disk
+   *    when the watcher mounted must NOT be replayed — seed `fromOffset` to
+   *    the current file size so only newly appended bytes broadcast.
+   *  - `unlink` drops the offset entry so the Map does not leak as completed
+   *    runs are pruned by the workflow run GC.
    */
-  startTraceWatch(project: Project, runId: string): void {
+  startTraceWatch(project: Project): void {
     const state = this.ensureProject(project.name);
-    if (state.trace.has(runId)) return;
-    const tracePath = join(
-      project.path, ".dev-vault", "workflow-state", "runs", `${runId}.engram-trace.jsonl`,
-    );
-    const slot = { watcher: watch(tracePath, CHOKIDAR_OPTIONS), offset: this.fileSize(tracePath) };
-    slot.watcher.on("all", (event) => {
+    if (state.trace.watcher !== null) return;
+    const dir = join(project.path, ".dev-vault", "workflow-state", "runs");
+    const watcher = watch(dir, { ...CHOKIDAR_OPTIONS, depth: 0 });
+    watcher.on("all", (event, changedPath) => {
+      if (!changedPath.endsWith(TRACE_FILE_SUFFIX)) return;
+      if (event === "unlink") {
+        state.trace.offsets.delete(changedPath);
+        return;
+      }
       if (event !== "add" && event !== "change") return;
-      slot.offset = this.emitNewLines(tracePath, slot.offset, project.name, runId);
+      const file = changedPath.slice(changedPath.lastIndexOf("/") + 1);
+      const runId = file.slice(0, -TRACE_FILE_SUFFIX.length);
+      const fromOffset =
+        state.trace.offsets.get(changedPath) ??
+        (event === "add" ? 0 : this.fileSize(changedPath));
+      const nextOffset = this.emitNewLines(changedPath, fromOffset, project.name, runId);
+      state.trace.offsets.set(changedPath, nextOffset);
     });
-    slot.watcher.on("error", (error) => this.logError(error));
-    state.trace.set(runId, slot);
+    watcher.on("error", (error) => this.logError(error));
+    state.trace.watcher = watcher;
   }
 
   /**
@@ -145,7 +179,7 @@ export class WatcherPool {
     if (state.idleTimer !== null) clearTimeout(state.idleTimer);
     void state.vault?.close();
     void state.runs?.close();
-    for (const slot of state.trace.values()) void slot.watcher.close();
+    void state.trace.watcher?.close();
     this.perProject.delete(project.name);
   }
 
@@ -153,6 +187,11 @@ export class WatcherPool {
    * Re-evaluate the idle timer for a project after its SSE subscriber count
    * changed. With zero subscribers an eviction timer is armed; with one or
    * more, any pending timer is cancelled.
+   *
+   * With multiplexed subscribers every open connection carries vault + runs +
+   * trace + projects, so the three-way hasSubscribers check is now equivalent
+   * to a single "any project-scoped subscriber" probe. Left as a three-way OR
+   * to avoid an unrelated refactor inside this change.
    */
   noteSubscriberChange(project: Project): void {
     const state = this.perProject.get(project.name);
@@ -180,7 +219,7 @@ export class WatcherPool {
       if (state.idleTimer !== null) clearTimeout(state.idleTimer);
       void state.vault?.close();
       void state.runs?.close();
-      for (const slot of state.trace.values()) void slot.watcher.close();
+      void state.trace.watcher?.close();
     }
     this.perProject.clear();
     void this.registryWatcher?.close();
@@ -190,7 +229,12 @@ export class WatcherPool {
   private ensureProject(name: string): ProjectWatchers {
     const existing = this.perProject.get(name);
     if (existing !== undefined) return existing;
-    const state: ProjectWatchers = { vault: null, runs: null, trace: new Map(), idleTimer: null };
+    const state: ProjectWatchers = {
+      vault: null,
+      runs: null,
+      trace: { watcher: null, offsets: new Map() },
+      idleTimer: null,
+    };
     this.perProject.set(name, state);
     return state;
   }
@@ -208,7 +252,7 @@ export class WatcherPool {
     }
     for (const line of buffer.toString("utf-8").split("\n")) {
       if (line.trim() === "") continue;
-      this.sse.broadcast("trace", project, { line }, runId);
+      this.sse.broadcast("trace", project, { runId, line } satisfies TraceEventPayload);
     }
     return size;
   }

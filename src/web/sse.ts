@@ -4,9 +4,19 @@
 // event-stream response, fans out `broadcast` calls to the subscribers of a
 // (topic, project) pair, and enforces a server-wide 50-connection cap.
 //
+// A subscriber carries a *set* of topics on one connection — the multiplexed
+// `/events/stream` endpoint registers `vault` + `runs` + `projects` + `trace`
+// together so a browser tab opens exactly one persistent HTTP/1.1 connection
+// regardless of which page is rendering. `broadcast()` writes to a subscriber
+// when the broadcast topic is in its set AND its project matches; the
+// `projects` topic is global (the registry watcher broadcasts with the empty
+// project name) and bypasses the project filter so it reaches every subscriber
+// scoped to any concrete project.
+//
 // SSE wire format: `Content-Type: text/event-stream`, one record per change
 // terminated by a blank line, plus a `ping` heartbeat every 30s so idle
-// proxies do not drop the connection.
+// proxies do not drop the connection. The heartbeat is per-connection, not
+// per-topic — one `setInterval` per subscriber regardless of topic-set size.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SseTopic } from "./types.js";
@@ -17,10 +27,10 @@ export const MAX_SSE_CONNECTIONS = 50;
 export const HEARTBEAT_MS = 30_000;
 
 interface Subscriber {
-  topic: SseTopic;
+  /** Topics this connection is multiplexing. */
+  topics: Set<SseTopic>;
+  /** Concrete project name — the `projects` topic broadcast skips this filter. */
   project: string;
-  /** Set for the `trace` topic only — narrows delivery to one workflow run. */
-  runId: string | null;
   response: ServerResponse;
   heartbeat: ReturnType<typeof setInterval>;
 }
@@ -37,16 +47,16 @@ export class SseRegistry {
   private readonly subscribers = new Set<Subscriber>();
 
   /**
-   * Begin an SSE stream on `res`. Returns `false` (and sends a 503) when the
-   * server-wide connection cap is already reached; returns `true` after the
-   * event-stream headers and heartbeat are installed.
+   * Begin an SSE stream on `res` multiplexing every topic in `topics`. Returns
+   * `false` (and sends a 503) when the server-wide connection cap is already
+   * reached; returns `true` after the event-stream headers and heartbeat are
+   * installed.
    */
   open(
     req: IncomingMessage,
     res: ServerResponse,
-    topic: SseTopic,
+    topics: Set<SseTopic>,
     project: string,
-    runId: string | null,
   ): boolean {
     if (this.subscribers.size >= MAX_SSE_CONNECTIONS) {
       res.writeHead(503, { "Content-Type": "application/json" });
@@ -63,7 +73,7 @@ export class SseRegistry {
       res.write("event: ping\ndata: \n\n");
     }, HEARTBEAT_MS);
     heartbeat.unref();
-    const subscriber: Subscriber = { topic, project, runId, response: res, heartbeat };
+    const subscriber: Subscriber = { topics, project, response: res, heartbeat };
     this.subscribers.add(subscriber);
     const cleanup = (): void => {
       clearInterval(heartbeat);
@@ -76,35 +86,37 @@ export class SseRegistry {
 
   /**
    * Push `payload` (serialised to JSON) as one SSE record to every subscriber
-   * of `(topic, project)`. For the `trace` topic, `runId` must also match.
+   * whose topic set contains `topic` and whose project matches `project`. The
+   * `projects` topic is global — the registry watcher broadcasts with the
+   * empty project name, and the project filter is skipped so every project-
+   * scoped subscriber still receives the event.
    */
-  broadcast(topic: SseTopic, project: string, payload: unknown, runId?: string): void {
-    const data = JSON.stringify(payload);
-    const record = `event: ${topic}\ndata: ${data}\n\n`;
+  broadcast(topic: SseTopic, project: string, payload: unknown): void {
+    const record = `event: ${topic}\ndata: ${JSON.stringify(payload)}\n\n`;
     for (const subscriber of this.subscribers) {
-      if (subscriber.topic !== topic || subscriber.project !== project) continue;
-      if (topic === "trace" && subscriber.runId !== (runId ?? null)) continue;
+      if (!subscriber.topics.has(topic)) continue;
+      if (topic !== "projects" && subscriber.project !== project) continue;
       subscriber.response.write(record);
     }
   }
 
-  /** Count subscribers, optionally narrowed to a single topic. */
+  /** Count subscribers, optionally narrowed to those carrying `topic`. */
   subscriberCount(topic?: SseTopic): number {
     if (topic === undefined) return this.subscribers.size;
     let count = 0;
     for (const subscriber of this.subscribers) {
-      if (subscriber.topic === topic) count++;
+      if (subscriber.topics.has(topic)) count++;
     }
     return count;
   }
 
   /**
-   * Whether any subscriber currently watches `(topic, project)`. Used by the
-   * watcher pool's idle-TTL bookkeeping.
+   * Whether any subscriber currently carries `topic` for `project`. Used by
+   * the watcher pool's idle-TTL bookkeeping.
    */
   hasSubscribers(topic: SseTopic, project: string): boolean {
     for (const subscriber of this.subscribers) {
-      if (subscriber.topic === topic && subscriber.project === project) return true;
+      if (subscriber.topics.has(topic) && subscriber.project === project) return true;
     }
     return false;
   }

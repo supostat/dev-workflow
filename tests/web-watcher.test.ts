@@ -8,29 +8,33 @@ import { watch, type FSWatcher } from "chokidar";
 import type { AddressInfo, Socket } from "node:net";
 import { SseRegistry } from "../src/web/sse.js";
 import { WatcherPool } from "../src/web/watcher.js";
-import type { Project } from "../src/web/types.js";
+import type { Project, SseTopic } from "../src/web/types.js";
+
+/** All multiplexed topics carried on one connection. */
+const ALL_TOPICS: ReadonlyArray<SseTopic> = ["vault", "runs", "trace", "projects"];
+
+interface SinkRecord {
+  topic: string;
+  data: string;
+}
 
 /**
  * A throwaway http server that pipes one SSE subscriber into the registry,
- * letting the watcher test observe real broadcasts as parsed events.
+ * letting the watcher test observe real broadcasts. The sink mirrors the
+ * production multiplexed registration — every subscriber carries every topic
+ * and the test filters records by topic name from the parsed `event:` line.
  */
 function makeSseSink(sse: SseRegistry): {
   server: Server;
   listen: () => Promise<number>;
-  subscribe: (port: number, path: string) => Promise<{ records: string[]; close: () => void }>;
+  subscribe: (port: number, path: string) => Promise<{ records: SinkRecord[]; close: () => void }>;
   close: () => Promise<void>;
 } {
   const sockets = new Set<Socket>();
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    const topic = url.searchParams.get("topic");
     const project = url.searchParams.get("project") ?? "";
-    const runId = url.searchParams.get("runId");
-    if (topic === "vault" || topic === "runs" || topic === "trace" || topic === "projects") {
-      sse.open(req, res, topic, project, runId);
-      return;
-    }
-    res.writeHead(404).end();
+    sse.open(req, res, new Set<SseTopic>(ALL_TOPICS), project);
   });
   server.on("connection", (socket: Socket) => {
     sockets.add(socket);
@@ -46,7 +50,7 @@ function makeSseSink(sse: SseRegistry): {
       ),
     subscribe: (port, path) =>
       new Promise((resolvePromise, reject) => {
-        const records: string[] = [];
+        const records: SinkRecord[] = [];
         let buffer = "";
         const req = request({ host: "127.0.0.1", port, path }, (res) => {
           res.setEncoding("utf-8");
@@ -56,9 +60,13 @@ function makeSseSink(sse: SseRegistry): {
             while (sep !== -1) {
               const block = buffer.slice(0, sep);
               buffer = buffer.slice(sep + 2);
+              let topic = "message";
+              let data = "";
               for (const line of block.split("\n")) {
-                if (line.startsWith("data:")) records.push(line.slice(5).trim());
+                if (line.startsWith("event:")) topic = line.slice(6).trim();
+                else if (line.startsWith("data:")) data += line.slice(5).trim();
               }
+              if (data !== "" && topic !== "ping") records.push({ topic, data });
               sep = buffer.indexOf("\n\n");
             }
           });
@@ -76,13 +84,18 @@ function makeSseSink(sse: SseRegistry): {
   };
 }
 
-async function waitForRecord(records: string[], timeoutMs = 3000): Promise<string> {
+async function waitForRecord(
+  records: SinkRecord[],
+  topic: string,
+  timeoutMs = 3000,
+): Promise<SinkRecord> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (records.length > 0) return records[0]!;
+    const found = records.find((record) => record.topic === topic);
+    if (found !== undefined) return found;
     await new Promise((r) => setTimeout(r, 20));
   }
-  throw new Error("no SSE record within timeout");
+  throw new Error(`no SSE record on topic ${topic} within timeout`);
 }
 
 describe("web watcher — chokidar pool", () => {
@@ -113,12 +126,12 @@ describe("web watcher — chokidar pool", () => {
   });
 
   it("delivers a vault event after a file change (liveness)", async () => {
-    const { records } = await sink.subscribe(port, "/?topic=vault&project=watch-target");
+    const { records } = await sink.subscribe(port, "/?project=watch-target");
     watchers.startVaultWatch(project);
     await new Promise((r) => setTimeout(r, 150));
     writeFileSync(join(vaultPath, "knowledge.md"), "# Knowledge\nedited\n", "utf-8");
-    const record = await waitForRecord(records);
-    expect(JSON.parse(record).file).toBe("knowledge.md");
+    const record = await waitForRecord(records, "vault");
+    expect(JSON.parse(record.data).file).toBe("knowledge.md");
   });
 
   it("broadcasts within 100ms of detecting a change (AC#4)", async () => {
@@ -168,11 +181,19 @@ describe("web watcher — chokidar pool", () => {
     const localWatchers = new WatcherPool(localSse);
     localWatchers.startVaultWatch(project);
     localWatchers.startRunsWatch(project);
+    localWatchers.startTraceWatch(project);
     // Intercept the chokidar close calls so eviction is observable.
-    type WithWatchers = { perProject: Map<string, { vault: FSWatcher | null; runs: FSWatcher | null }> };
+    type WithWatchers = {
+      perProject: Map<string, {
+        vault: FSWatcher | null;
+        runs: FSWatcher | null;
+        trace: { watcher: FSWatcher | null; offsets: Map<string, number> };
+      }>;
+    };
     const state = (localWatchers as unknown as WithWatchers).perProject.get(project.name)!;
     const originalVaultClose = state.vault!.close.bind(state.vault);
     const originalRunsClose = state.runs!.close.bind(state.runs);
+    const originalTraceClose = state.trace.watcher!.close.bind(state.trace.watcher);
     state.vault!.close = vi.fn(() => {
       closeSpy();
       return originalVaultClose();
@@ -180,6 +201,10 @@ describe("web watcher — chokidar pool", () => {
     state.runs!.close = vi.fn(() => {
       closeSpy();
       return originalRunsClose();
+    }) as FSWatcher["close"];
+    state.trace.watcher!.close = vi.fn(() => {
+      closeSpy();
+      return originalTraceClose();
     }) as FSWatcher["close"];
 
     vi.useFakeTimers();
@@ -190,12 +215,44 @@ describe("web watcher — chokidar pool", () => {
       expect(closeSpy).not.toHaveBeenCalled();
       // Crossing the 5-minute boundary fires the eviction timer.
       vi.advanceTimersByTime(2000);
-      expect(closeSpy).toHaveBeenCalledTimes(2);
+      expect(closeSpy).toHaveBeenCalledTimes(3);
       // The project entry is gone — a re-arm is a no-op.
       expect((localWatchers as unknown as WithWatchers).perProject.has(project.name)).toBe(false);
     } finally {
       vi.useRealTimers();
       localWatchers.shutdown();
+    }
+  });
+
+  it("evicts the trace watcher after the idle TTL with no subscribers", async () => {
+    // Open one multiplexed subscriber, then close it and call
+    // noteSubscriberChange — the 5-minute timer must drop the trace watcher
+    // along with the rest of the project's set.
+    const localSse = new SseRegistry();
+    const localWatchers = new WatcherPool(localSse);
+    const localSink = makeSseSink(localSse);
+    const localPort = await localSink.listen();
+    try {
+      const { close } = await localSink.subscribe(localPort, "/?project=watch-target");
+      localWatchers.startTraceWatch(project);
+      type WithWatchers = {
+        perProject: Map<string, { trace: { watcher: FSWatcher | null } }>;
+      };
+      const pool = localWatchers as unknown as WithWatchers;
+      expect(pool.perProject.get(project.name)?.trace.watcher).not.toBeNull();
+      close();
+      await new Promise((r) => setTimeout(r, 50));
+      vi.useFakeTimers();
+      try {
+        localWatchers.noteSubscriberChange(project);
+        vi.advanceTimersByTime(5 * 60 * 1000 + 1000);
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(pool.perProject.has(project.name)).toBe(false);
+    } finally {
+      localWatchers.shutdown();
+      await localSink.close();
     }
   });
 
@@ -219,7 +276,7 @@ describe("web watcher — chokidar pool", () => {
       // A subscriber appears before the TTL elapses → timer cancelled.
       const localSink = makeSseSink(localSse);
       const localPort = await localSink.listen();
-      await localSink.subscribe(localPort, "/?topic=vault&project=watch-target");
+      await localSink.subscribe(localPort, "/?project=watch-target");
       localWatchers.noteSubscriberChange(project);
       vi.advanceTimersByTime(10 * 60 * 1000);
       expect(closeSpy).not.toHaveBeenCalled();
@@ -244,7 +301,7 @@ describe("web watcher — chokidar pool", () => {
   });
 
   it("emits a runs event on a run JSON change", async () => {
-    const { records } = await sink.subscribe(port, "/?topic=runs&project=watch-target");
+    const { records } = await sink.subscribe(port, "/?project=watch-target");
     watchers.startRunsWatch(project);
     await new Promise((r) => setTimeout(r, 150));
     writeFileSync(
@@ -252,24 +309,52 @@ describe("web watcher — chokidar pool", () => {
       JSON.stringify({ id: "run-bbbbbbbbbbbb" }),
       "utf-8",
     );
-    const record = await waitForRecord(records);
-    expect(JSON.parse(record).runId).toBe("run-bbbbbbbbbbbb");
+    const record = await waitForRecord(records, "runs");
+    expect(JSON.parse(record.data).runId).toBe("run-bbbbbbbbbbbb");
   });
 
-  it("emits one trace event per appended JSONL line (offset tail)", async () => {
+  it("tags every trace line with its source runId (directory watch, no per-runId filter)", async () => {
+    const { records } = await sink.subscribe(port, "/?project=watch-target");
+    watchers.startTraceWatch(project);
+    await new Promise((r) => setTimeout(r, 150));
     const tracePath = join(
       vaultPath, "workflow-state", "runs", "run-cccccccccccc.engram-trace.jsonl",
     );
-    writeFileSync(tracePath, "", "utf-8");
-    const { records } = await sink.subscribe(
-      port, "/?topic=trace&project=watch-target&runId=run-cccccccccccc",
-    );
-    watchers.startTraceWatch(project, "run-cccccccccccc");
-    await new Promise((r) => setTimeout(r, 150));
     appendFileSync(tracePath, '{"line":1}\n{"line":2}\n', "utf-8");
     await new Promise((r) => setTimeout(r, 400));
-    expect(records.length).toBeGreaterThanOrEqual(2);
-    expect(JSON.parse(records[0]!).line).toBe('{"line":1}');
+    const traceRecords = records.filter((record) => record.topic === "trace");
+    expect(traceRecords.length).toBeGreaterThanOrEqual(2);
+    const first = JSON.parse(traceRecords[0]!.data);
+    expect(first.runId).toBe("run-cccccccccccc");
+    expect(first.line).toBe('{"line":1}');
+  });
+
+  it("tags lines from different runs with their respective runIds", async () => {
+    const { records } = await sink.subscribe(port, "/?project=watch-target");
+    watchers.startTraceWatch(project);
+    await new Promise((r) => setTimeout(r, 150));
+    const runsDir = join(vaultPath, "workflow-state", "runs");
+    appendFileSync(join(runsDir, "run-dddddddddddd.engram-trace.jsonl"), '{"line":"d"}\n', "utf-8");
+    appendFileSync(join(runsDir, "run-eeeeeeeeeeee.engram-trace.jsonl"), '{"line":"e"}\n', "utf-8");
+    await new Promise((r) => setTimeout(r, 400));
+    const traceRecords = records.filter((record) => record.topic === "trace");
+    const runIds = new Set(traceRecords.map((record) => JSON.parse(record.data).runId));
+    expect(runIds.has("run-dddddddddddd")).toBe(true);
+    expect(runIds.has("run-eeeeeeeeeeee")).toBe(true);
+  });
+
+  it("does not emit a trace event for a non-trace file in the runs directory", async () => {
+    const { records } = await sink.subscribe(port, "/?project=watch-target");
+    watchers.startTraceWatch(project);
+    await new Promise((r) => setTimeout(r, 150));
+    writeFileSync(
+      join(vaultPath, "workflow-state", "runs", "run-ffffffffffff.json"),
+      "{}",
+      "utf-8",
+    );
+    await new Promise((r) => setTimeout(r, 400));
+    const traceRecords = records.filter((record) => record.topic === "trace");
+    expect(traceRecords).toHaveLength(0);
   });
 
   it("emits a projects event when the registry file changes", async () => {
@@ -278,14 +363,14 @@ describe("web watcher — chokidar pool", () => {
     process.env.XDG_CONFIG_HOME = configHome;
     try {
       const localWatchers = new WatcherPool(sse);
-      const { records } = await sink.subscribe(port, "/?topic=projects&project=");
+      const { records } = await sink.subscribe(port, "/?project=watch-target");
       localWatchers.startProjectsWatch();
       await new Promise((r) => setTimeout(r, 150));
       const registryFile = join(configHome, "dev-workflow", "projects.json");
       mkdirSync(join(configHome, "dev-workflow"), { recursive: true });
       writeFileSync(registryFile, '{"projects":{},"activeProject":null}', "utf-8");
-      const record = await waitForRecord(records);
-      expect(JSON.parse(record).action).toBe("registry-changed");
+      const record = await waitForRecord(records, "projects");
+      expect(JSON.parse(record.data).action).toBe("registry-changed");
       localWatchers.shutdown();
     } finally {
       if (originalConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
@@ -297,6 +382,7 @@ describe("web watcher — chokidar pool", () => {
   it("stopAll closes a project's watchers without throwing", () => {
     watchers.startVaultWatch(project);
     watchers.startRunsWatch(project);
+    watchers.startTraceWatch(project);
     expect(() => watchers.stopAll(project)).not.toThrow();
   });
 
@@ -310,5 +396,10 @@ describe("web watcher — chokidar pool", () => {
   it("startVaultWatch is idempotent for one project", () => {
     watchers.startVaultWatch(project);
     expect(() => watchers.startVaultWatch(project)).not.toThrow();
+  });
+
+  it("startTraceWatch is idempotent for one project", () => {
+    watchers.startTraceWatch(project);
+    expect(() => watchers.startTraceWatch(project)).not.toThrow();
   });
 });

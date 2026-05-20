@@ -8,7 +8,7 @@
 // the dirty-only `beforeunload` guard.
 //
 // Echo suppression: a save PATCHes the section, then the server emits a
-// `/events/vault` message for the same file. `suppressUntil` is set to
+// `vault` SSE message for the same file. `suppressUntil` is set to
 // `Date.now() + SUPPRESS_WINDOW_MS` WHEN THE PATCH RESOLVES (server has
 // written and rotated the backup); a vault event for the open section inside
 // that window is the dashboard's own write and does not raise the banner.
@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { eventSourceUrl, useEventSource } from "@/lib/sse";
+import { useSseTopic } from "@/lib/sse";
 import type { BoundApi } from "@/lib/project-context";
 import type { VaultSection } from "@/lib/api";
 
@@ -50,7 +50,6 @@ export interface VaultDraft {
 export function useVaultDraft(
   api: BoundApi | null,
   section: VaultSection,
-  project: string | null,
 ): VaultDraft {
   const [draft, setDraft] = useState("");
   const [loaded, setLoaded] = useState("");
@@ -81,7 +80,7 @@ export function useVaultDraft(
   }, [load]);
 
   const save = useSaveDraft(api, section, draft, suppressUntil, setLoaded, setSaving);
-  useExternalEditWatch(section, project, suppressUntil, setExternalEdit);
+  useExternalEditWatch(section, suppressUntil, setExternalEdit);
   useUnsavedGuard(draft !== loaded);
 
   return {
@@ -123,14 +122,13 @@ function useSaveDraft(
   }, [api, section, draft, suppressUntil, setLoaded, setSaving]);
 }
 
-/** Subscribe to `/events/vault`; raise the banner on a non-echo section hit. */
+/** Subscribe to the `vault` topic; raise the banner on a non-echo section hit. */
 function useExternalEditWatch(
   section: VaultSection,
-  project: string | null,
   suppressUntil: { current: number },
   setExternalEdit: (value: boolean) => void,
 ): void {
-  useVaultEventSubscription(project, (file) => {
+  useVaultEventSubscription((file) => {
     if (file !== `${section}.md`) return;
     if (Date.now() < suppressUntil.current) return;
     setExternalEdit(true);
@@ -150,18 +148,15 @@ function useUnsavedGuard(dirty: boolean): void {
   }, [dirty]);
 }
 
-function useVaultEventSubscription(
-  project: string | null,
-  onFile: (file: string) => void,
-): void {
-  useEventSource(eventSourceUrl("vault", project), "vault", (data: string) => {
+function useVaultEventSubscription(onFile: (file: string) => void): void {
+  useSseTopic("vault", (data: string) => {
     const file = parseVaultEventFile(data);
     if (file !== null) onFile(file);
   });
 }
 
 /**
- * The changed file name carried by a `/events/vault` message. The server
+ * The changed file name carried by a `vault` SSE message. The server
  * (`src/web/watcher.ts`) broadcasts `{file, mtime, action}` as the SSE record
  * payload; `file` is the bare file name (e.g. `stack.md`). Returns null when
  * the payload is malformed or carries no `file` field.

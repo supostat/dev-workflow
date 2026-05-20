@@ -5,8 +5,9 @@
 // Composes the project header, the KPI strip, and the live activity feed from
 // one `buildActivity` fetch pass. The page renders three explicit states:
 // `!ready` while the active project resolves, a fetch-error panel with a retry
-// action, and the loaded view. Live updates: a `/events/vault` or
-// `/events/runs` message re-runs `buildActivity` (which re-reads tasks too).
+// action, and the loaded view. Live updates: a `vault` or `runs` SSE message
+// (multiplexed on the shared `/events/stream` connection) re-runs
+// `buildActivity` (which re-reads tasks too).
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -15,7 +16,7 @@ import { ProjectNotice } from "@/components/layout/ProjectNotice";
 import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
-import { eventSourceUrl, useEventSource } from "@/lib/sse";
+import { useSseTopic } from "@/lib/sse";
 import { OverviewHeader } from "@/components/overview/OverviewHeader";
 import { OverviewStats } from "@/components/overview/OverviewStats";
 import { ActivityFeed } from "@/components/overview/ActivityFeed";
@@ -34,8 +35,8 @@ export default function OverviewPage() {
     if (boundApi !== null) void load();
   }, [boundApi, load]);
 
-  useEventSource(eventSourceUrl("vault", activeProject), "vault", () => void load());
-  useEventSource(eventSourceUrl("runs", activeProject), "runs", () => void load());
+  useSseTopic("vault", () => void load());
+  useSseTopic("runs", () => void load());
 
   if (!api.ready) {
     return <ProjectNotice reason={api.reason} message={api.reason === "error" ? api.message : undefined} />;

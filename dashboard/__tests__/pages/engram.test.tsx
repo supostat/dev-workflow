@@ -147,21 +147,21 @@ describe("EngramPage", () => {
     expect(screen.getByText("No data")).toBeInTheDocument();
   });
 
-  it("mounts a trace EventSource when a run is picked", async () => {
+  it("multiplexes the trace topic over the single /events/stream connection", async () => {
     stubEngramFetch();
     renderEngram();
     await screen.findByText("Live trace");
     await userEvent.click(screen.getByRole("combobox", { name: "Select run" }));
     await userEvent.click(await screen.findByRole("option", { name: "run-aaaaaaaaaaaa" }));
-    await waitFor(() =>
-      expect(
-        MockEventSource.instances.some(
-          (source) =>
-            source.url.includes("/events/trace?") &&
-            source.url.includes("runId=run-aaaaaaaaaaaa"),
-        ),
-      ).toBe(true),
+    // The page does NOT open a per-trace EventSource any more — the
+    // dashboard tab holds exactly one connection opened by `ProjectProvider`
+    // and `TraceTail` filters incoming records by runId client-side. Picking
+    // a run must therefore NOT spawn a new EventSource.
+    const streams = MockEventSource.instances.filter((source) =>
+      source.url.includes("/events/stream"),
     );
+    expect(streams).toHaveLength(1);
+    expect(streams[0]?.url).toBe("/events/stream?project=demo");
   });
 
   it("shows the error panel with Retry when the stats fetch fails", async () => {

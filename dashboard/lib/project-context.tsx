@@ -3,8 +3,9 @@
 // Active-project React context for the dashboard.
 //
 // `ProjectProvider` loads the active project from `GET /api/projects/active`
-// on mount and subscribes to the `/events/projects` SSE topic so a switch in
-// another browser tab is picked up here too. `useActiveProject` exposes the
+// on mount and drives `sseHub.setProject(activeProject)`; the multiplexed
+// `/events/stream` connection then delivers the `projects` topic so a switch
+// in another browser tab is picked up here too. `useActiveProject` exposes the
 // current project, the load `error` (null on success), and a `setActiveProject`
 // action; `useApi` binds the project-scoped REST wrappers to the active project.
 //
@@ -51,9 +52,8 @@ import {
   patchCommunication,
   putProfile,
 } from "./api";
-import { useEventSource } from "./sse";
-
-const PROJECTS_EVENT_URL = "/events/projects";
+import { useSseTopic } from "./sse";
+import { sseHub } from "./sse-hub";
 
 /** Project-scoped REST wrappers with the active project pre-bound. */
 export interface BoundApi {
@@ -130,7 +130,11 @@ export function ProjectProvider({ children }: { children: ReactNode }): ReactEle
     void refresh();
   }, [refresh]);
 
-  useEventSource(PROJECTS_EVENT_URL, "projects", () => {
+  useEffect(() => {
+    sseHub.setProject(activeProject);
+  }, [activeProject]);
+
+  useSseTopic("projects", () => {
     void refresh();
   });
 

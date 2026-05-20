@@ -75,7 +75,7 @@ export default function EngramPage() {
       <EngramCards stats={stats} health={health ?? { healthy: false, status: null }} />
       <EngramCharts stats={stats} />
       <RecentMemories stats={stats} />
-      <TraceTailPanel stats={stats} activeProject={activeProject} />
+      <TraceTailPanel stats={stats} />
     </div>
   );
 }

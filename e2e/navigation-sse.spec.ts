@@ -52,15 +52,16 @@ async function selectTraceRun(page: Page): Promise<void> {
   await page.waitForTimeout(SETTLE_MS);
 }
 
-test("SSE streams answer 200 with no 400 flood", async ({ page, dashboard }) => {
+test("the multiplexed SSE stream answers 200 with no 400 flood", async ({ page, dashboard }) => {
   const recorder = recordNetwork(page);
   const sseRoutes = ["/", "/workflow/", "/engram/"];
   for (const path of sseRoutes) {
     await openRoute(page, dashboard.baseURL, path);
   }
-  // On `/engram/`, `TraceTailPanel` mounts with no run selected, so the trace
-  // URL stays null and `/events/trace` never opens. Pick the scaffolded run so
-  // the project-scoped trace subscription is actually exercised.
+  // On `/engram/`, picking a run no longer triggers a new SSE connection —
+  // the dashboard already holds the single multiplexed `/events/stream` that
+  // carries every topic. Selecting a run exercises the client-side runId
+  // filter inside `TraceTail` rather than opening a fresh EventSource.
   await selectTraceRun(page);
 
   expect(recorder.sseResponses.length).toBeGreaterThan(0);
@@ -68,40 +69,24 @@ test("SSE streams answer 200 with no 400 flood", async ({ page, dashboard }) => 
     expect(sse.status, `SSE ${sse.url}`).toBe(200);
   }
 
-  const topicHits = new Map<string, number>();
+  const endpointHits = new Map<string, number>();
   for (const sse of recorder.sseResponses) {
     const url = new URL(sse.url);
-    // `vault`/`runs`/`trace` are project-scoped and 400 without `?project=`;
-    // `/events/projects` is the global registry topic and carries no project.
-    if (PROJECT_SCOPED_SSE.has(url.pathname)) {
-      expect(url.searchParams.get("project"), `SSE ${sse.url} project param`).toBe(
-        dashboard.projectName,
-      );
-    }
-    // The trace topic additionally carries the picked run id.
-    if (url.pathname === "/events/trace") {
-      expect(url.searchParams.get("runId"), `SSE ${sse.url} runId param`).toBe(
-        FIXTURE_RUN_ID,
-      );
-    }
-    topicHits.set(url.pathname, (topicHits.get(url.pathname) ?? 0) + 1);
+    expect(url.pathname).toBe("/events/stream");
+    expect(PROJECT_SCOPED_SSE.has(url.pathname)).toBe(true);
+    expect(url.searchParams.get("project"), `SSE ${sse.url} project param`).toBe(
+      dashboard.projectName,
+    );
+    endpointHits.set(url.pathname, (endpointHits.get(url.pathname) ?? 0) + 1);
   }
 
-  // A regression dropping a subscription entirely would still pass a bare
-  // length check — assert the expected topic SET is present. `/events/projects`
-  // is opened by `ProjectProvider` on every route; `vault`/`runs` by Overview;
-  // `trace` once a run is picked on `/engram/`.
-  const observedTopics = new Set(topicHits.keys());
-  for (const topic of ["/events/vault", "/events/runs", "/events/trace", "/events/projects"]) {
-    expect(observedTopics.has(topic), `SSE topic ${topic} never opened`).toBe(true);
-  }
-
-  // Each full navigation re-mounts the topic's owner and legitimately
-  // re-connects once; one extra reconnect is tolerated. A 400 loop reconnects
-  // many times per page load and blows well past this ceiling.
-  const connectCeiling = sseRoutes.length + 1;
-  for (const [topic, hits] of topicHits) {
-    expect(hits, `SSE topic ${topic} connect count`).toBeLessThanOrEqual(connectCeiling);
+  // Exactly one connection per browser session under the multiplex contract.
+  // One extra is tolerated for a legitimate reconnect window. The pre-
+  // multiplex implementation opened ~4 separate EventSources here and would
+  // blow well past `connectCeiling`.
+  const connectCeiling = 2;
+  for (const [endpoint, hits] of endpointHits) {
+    expect(hits, `SSE endpoint ${endpoint} connect count`).toBeLessThanOrEqual(connectCeiling);
   }
 });
 

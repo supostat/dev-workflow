@@ -45,6 +45,7 @@ export type {
   ApiStepState,
   ApiTelemetryCounters,
   EngramTraceEvent,
+  TraceEventPayload,
   EngramHealthResponse,
   EngramStatsResponse,
   SettingsResponse,

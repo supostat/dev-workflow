@@ -24,6 +24,19 @@ export type { ApiStepState, ApiTelemetryCounters } from "./types";
 export type ApiWorkflowRunDetail = ApiWorkflowRun;
 
 /**
+ * Envelope carried on the `trace` SSE topic. The multiplexed connection delivers
+ * trace lines for every run of the project, so each record names its source
+ * `runId`; the client filters by it. The `line` is one JSON-encoded
+ * `EngramTraceEvent`.
+ *
+ * Mirrors src/web/types.ts TraceEventPayload — keep shape in sync.
+ */
+export interface TraceEventPayload {
+  runId: string;
+  line: string;
+}
+
+/**
  * One line of a workflow run's engram trace JSONL — mirrors the core
  * `EngramTraceEvent` (src/lib/engram-trace.ts). Streamed line-by-line over the
  * `trace` SSE topic; each SSE payload is a `{ line: string }` envelope whose

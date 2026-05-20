@@ -1,5 +1,6 @@
 // Tests for the active-project context. `fetch` is stubbed; the mock
-// `EventSource` from `vitest.setup.ts` covers the `/events/projects` stream.
+// `EventSource` from `vitest.setup.ts` covers the `projects` topic on the
+// multiplexed `/events/stream` connection.
 // Covers: the active project loads on mount, `setActiveProject` PUTs and
 // updates, `useApi()` walks its 4-state discriminant (loading / no-project /
 // error / ready), an SSE event triggers a re-fetch, and `useActiveProject`
@@ -9,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ProjectProvider, useActiveProject, useApi } from "@/lib/project-context";
+import { sseHub } from "@/lib/sse-hub";
 import { MockEventSource } from "../../vitest.setup";
 
 /**
@@ -54,6 +56,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  sseHub.setProject(null);
 });
 
 describe("ProjectProvider", () => {
@@ -74,10 +77,18 @@ describe("ProjectProvider", () => {
     expect(putCall?.[0]).toBe("/api/projects/active");
   });
 
+  it("opens the multiplexed /events/stream once the active project resolves", async () => {
+    stubProjectFetch("demo");
+    renderHook(() => useActiveProject(), { wrapper });
+    await waitFor(() =>
+      expect(MockEventSource.instances.some((source) => source.url === "/events/stream?project=demo")).toBe(true),
+    );
+  });
+
   it("re-fetches when the projects SSE topic fires", async () => {
     const fetchMock = stubProjectFetch("demo");
     renderHook(() => useActiveProject(), { wrapper });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await waitFor(() => expect(MockEventSource.last).not.toBeNull());
     const callsBefore = fetchMock.mock.calls.length;
     act(() => MockEventSource.last?.emit("projects", "switched"));
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore));

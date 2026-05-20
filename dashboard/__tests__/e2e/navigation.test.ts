@@ -139,12 +139,8 @@ describe("ViewportGuard (AC#8)", () => {
 describe("SSE reconnect (AC#10)", () => {
   it("constructs a fresh EventSource after an error past the 1s backoff", async () => {
     vi.useFakeTimers();
-    const { useEventSource } = await import("@/lib/sse");
-    const Probe = (): null => {
-      useEventSource("/events/runs", "runs", () => {});
-      return null;
-    };
-    render(createElement(Probe));
+    const { sseHub } = await import("@/lib/sse-hub");
+    sseHub.setProject("demo");
     expect(MockEventSource.instances).toHaveLength(1);
 
     const first = MockEventSource.last;
@@ -153,6 +149,7 @@ describe("SSE reconnect (AC#10)", () => {
 
     expect(MockEventSource.instances.length).toBeGreaterThan(1);
     expect(MockEventSource.last).not.toBe(first);
+    sseHub.setProject(null);
   });
 });
 

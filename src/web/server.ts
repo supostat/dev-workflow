@@ -13,7 +13,7 @@ import { WatcherPool } from "./watcher.js";
 import { EngramPool } from "./engram-pool.js";
 import { serveStatic } from "./static.js";
 import { loadRegistry, validateProjectName } from "./projects.js";
-import type { Project, SseTopic } from "./types.js";
+import type { SseTopic } from "./types.js";
 
 /** Loopback bind address — hardcoded, never overridable. */
 const HOST = "127.0.0.1";
@@ -25,8 +25,8 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const RATE_LIMIT_PER_MIN = 60;
 /** Rolling window the rate limiter refills over. */
 const RATE_WINDOW_MS = 60_000;
-/** A run identifier — `run-` + 12 hex digits (the `trace` SSE topic param). */
-const RUN_ID_PATTERN = /^run-[a-f0-9]{12}$/;
+/** Every topic the multiplexed `/events/stream` connection carries. */
+const MULTIPLEXED_TOPICS: ReadonlyArray<SseTopic> = ["vault", "runs", "projects", "trace"];
 
 /**
  * Per-client token-bucket rate limiter.
@@ -139,7 +139,7 @@ async function route(req: IncomingMessage, res: ServerResponse, state: ServerSta
   }
 
   if (url.pathname.startsWith("/events/")) {
-    handleSse(req, res, url, state);
+    handleEventStream(req, res, url, state);
     return;
   }
 
@@ -168,15 +168,21 @@ async function handleApiPrefix(
   await handleApi(res, method, url, body, state.engramPool);
 }
 
-/** Open an SSE stream for one of the four topics, starting watchers as needed. */
-function handleSse(req: IncomingMessage, res: ServerResponse, url: URL, state: ServerState): void {
-  const topic = url.pathname.slice("/events/".length) as SseTopic;
-  if (topic === "projects") {
-    state.sse.open(req, res, "projects", "", null);
-    return;
-  }
-  if (topic !== "vault" && topic !== "runs" && topic !== "trace") {
-    sendError(res, 404, `unknown SSE topic: ${topic}`);
+/**
+ * Open the single multiplexed `/events/stream` connection. One browser tab
+ * opens one EventSource carrying every topic — the client demuxes by event
+ * name. Ordering invariant: `sse.open` runs FIRST and the function short-
+ * circuits on the 503 cap path, so a rejected connection never starts
+ * filesystem watchers it cannot consume.
+ */
+function handleEventStream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+  state: ServerState,
+): void {
+  if (url.pathname !== "/events/stream") {
+    sendError(res, 404, `unknown SSE endpoint: ${url.pathname}`);
     return;
   }
   const projectName = url.searchParams.get("project");
@@ -189,26 +195,11 @@ function handleSse(req: IncomingMessage, res: ServerResponse, url: URL, state: S
     sendError(res, 400, `unknown project: ${projectName}`);
     return;
   }
-  attachProjectStream(req, res, url, topic, project, state);
-}
-
-/** Validate the runId (trace only), open the stream, and start its watcher. */
-function attachProjectStream(
-  req: IncomingMessage, res: ServerResponse, url: URL,
-  topic: "vault" | "runs" | "trace", project: Project, state: ServerState,
-): void {
-  let runId: string | null = null;
-  if (topic === "trace") {
-    runId = url.searchParams.get("runId");
-    if (runId === null || !RUN_ID_PATTERN.test(runId)) {
-      sendError(res, 400, "missing or invalid runId query parameter");
-      return;
-    }
-  }
-  if (!state.sse.open(req, res, topic, project.name, runId)) return;
-  if (topic === "vault") state.watchers.startVaultWatch(project);
-  if (topic === "runs") state.watchers.startRunsWatch(project);
-  if (topic === "trace" && runId !== null) state.watchers.startTraceWatch(project, runId);
+  const topics = new Set<SseTopic>(MULTIPLEXED_TOPICS);
+  if (!state.sse.open(req, res, topics, project.name)) return;
+  state.watchers.startVaultWatch(project);
+  state.watchers.startRunsWatch(project);
+  state.watchers.startTraceWatch(project);
   state.watchers.noteSubscriberChange(project);
   req.on("close", () => state.watchers.noteSubscriberChange(project));
 }

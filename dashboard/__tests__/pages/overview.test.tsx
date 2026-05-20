@@ -104,10 +104,10 @@ describe("OverviewPage", () => {
     renderOverview();
     await screen.findByText("demo");
     const callsBefore = fetchMock.mock.calls.length;
-    const runsStream = MockEventSource.instances.find((source) =>
-      source.url.includes("/events/runs"),
+    const stream = MockEventSource.instances.find((source) =>
+      source.url.includes("/events/stream"),
     );
-    runsStream?.emit("runs", "run-003");
+    stream?.emit("runs", "run-003");
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore));
   });
 });

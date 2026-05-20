@@ -109,3 +109,13 @@ export interface SseEvent {
   /** ISO timestamp the event was emitted. */
   emittedAt: string;
 }
+
+/**
+ * The `trace` SSE record payload. Unlike other topics, the multiplexed
+ * connection carries trace lines for EVERY run of the project, so each
+ * record names its source runId; the client filters by it.
+ */
+export interface TraceEventPayload {
+  runId: string;
+  line: string;
+}

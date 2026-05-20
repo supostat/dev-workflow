@@ -2,7 +2,7 @@
 
 // Workflow route (`/workflow`) — the read-only runs list.
 //
-// Live updates arrive over the `/events/runs` SSE topic: every run-state
+// Live updates arrive over the multiplexed `runs` SSE topic: every run-state
 // change re-fetches the list. A generation counter keyed on the active
 // project discards a response that belongs to a project switched away from
 // mid-fetch. The list is read-only — run mutations happen through the CLI,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useApi, useActiveProject } from "@/lib/project-context";
 import type { BoundApi } from "@/lib/project-context";
 import type { ApiWorkflowRun } from "@/lib/types";
-import { eventSourceUrl, useEventSource } from "@/lib/sse";
+import { useSseTopic } from "@/lib/sse";
 import { WorkflowFilters } from "@/components/workflow/WorkflowFilters";
 import { RunsTable } from "@/components/workflow/RunsTable";
 import {
@@ -43,7 +43,7 @@ export default function WorkflowPage() {
     if (boundApi !== null) void reload();
   }, [boundApi, activeProject, reload]);
 
-  useEventSource(eventSourceUrl("runs", activeProject), "runs", () => {
+  useSseTopic("runs", () => {
     void reload();
   });
 

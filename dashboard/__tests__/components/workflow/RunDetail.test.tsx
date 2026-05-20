@@ -130,7 +130,7 @@ describe("RunDetail", () => {
     expect(await screen.findByText("Run run-aaaaaaaaaaaa")).toBeInTheDocument();
   });
 
-  it("renders the four tabs and opens the trace SSE stream on the happy path", async () => {
+  it("renders the four tabs and uses the multiplexed SSE stream on the happy path", async () => {
     searchParamsMock = new URLSearchParams("id=run-aaaaaaaaaaaa");
     stubRunFetch();
     renderRunDetail();
@@ -141,14 +141,16 @@ describe("RunDetail", () => {
     expect(screen.getByRole("tab", { name: "Trace" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Trace" }));
-    await waitFor(() =>
-      expect(
-        MockEventSource.instances.some(
-          (source) =>
-            source.url.includes("/events/trace?") &&
-            source.url.includes("runId=run-aaaaaaaaaaaa"),
-        ),
-      ).toBe(true),
-    );
+    // Switching to the Trace tab must NOT open a per-trace EventSource —
+    // the single multiplexed `/events/stream` connection owned by
+    // `ProjectProvider` already carries the `trace` topic and `TraceTail`
+    // subscribes through `useSseTopic`.
+    await waitFor(() => {
+      const streams = MockEventSource.instances.filter((source) =>
+        source.url.includes("/events/stream"),
+      );
+      expect(streams).toHaveLength(1);
+      expect(streams[0]?.url).toBe("/events/stream?project=demo");
+    });
   });
 });

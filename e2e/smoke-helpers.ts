@@ -16,14 +16,12 @@ export const SETTLE_MS = 2000;
 export const QUIESCENCE_TIMEOUT_MS = 5000;
 
 /**
- * SSE topic pathnames the server scopes to a project — they 400 without a
- * `?project=` param. `/events/projects` (the global registry topic) is
- * intentionally absent: it carries no project.
+ * The single project-scoped SSE endpoint the dashboard opens — the
+ * multiplexed `/events/stream` carries every topic on one connection per
+ * browser tab. It 400s without a `?project=` query parameter.
  */
 export const PROJECT_SCOPED_SSE: ReadonlySet<string> = new Set([
-  "/events/vault",
-  "/events/runs",
-  "/events/trace",
+  "/events/stream",
 ]);
 
 /** A navbar route: its URL path and exact text unique to its loaded content. */

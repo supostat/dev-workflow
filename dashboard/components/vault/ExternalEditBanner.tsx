@@ -2,7 +2,8 @@
 
 // "File changed externally" banner for the Vault editor.
 //
-// Raised when a `/events/vault` message reports the currently-open section was
+// Raised when a `vault` SSE topic message (on the shared multiplexed
+// `/events/stream` connection) reports the currently-open section was
 // modified outside the dashboard (an editor write, a CLI command). Offers two
 // resolutions: reload the server copy and discard local edits, or keep the
 // local draft and dismiss the banner.

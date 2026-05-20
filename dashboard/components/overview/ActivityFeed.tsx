@@ -2,8 +2,9 @@
 
 // Overview activity feed — the merged vault / task / run timeline produced by
 // `buildActivity`, newest first. The panel carries the `live` badge because the
-// parent page re-runs the fetch on every `/events/vault` and `/events/runs`
-// message; task rows refresh whenever one of those re-fetches fires.
+// parent page re-runs the fetch on every `vault` and `runs` SSE topic message
+// (multiplexed on `/events/stream`); task rows refresh whenever one of those
+// re-fetches fires.
 
 import { FileText, ListTodo, Workflow } from "lucide-react";
 import type { ReactElement } from "react";

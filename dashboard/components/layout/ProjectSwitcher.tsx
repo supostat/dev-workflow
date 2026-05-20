@@ -2,8 +2,9 @@
 
 // Navbar project switcher — a dropdown over the registered projects. The
 // active project and the registry list both come from `ProjectContext`; the
-// provider keeps the list live via its `/events/projects` SSE subscription, so
-// a project added in Settings appears here without a reload. Selecting a
+// provider keeps the list live via the `projects` topic on the shared
+// multiplexed `/events/stream` connection, so a project added in Settings
+// appears here without a reload. Selecting a
 // project PUTs `/api/projects/active` through the context, which also fans the
 // change out to other tabs over SSE.
 

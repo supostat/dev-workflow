@@ -2,9 +2,9 @@
 
 // Live-trace panel for the Engram page — a run picker over `stats.recentRuns`
 // plus the reusable `TraceTail` viewer. No run is selected on mount, so the
-// trace URL stays `null` (the server 400s on a missing runId); picking a run
-// resolves the project-scoped `/events/trace` URL and `TraceTail` opens the
-// SSE subscription. The URL also stays `null` while no project is resolved.
+// `TraceTail` runId stays `null` and the viewer renders empty until the user
+// picks a run. The trace subscription itself rides the shared `sseHub`
+// connection — there is no per-panel EventSource and no project plumbing.
 
 import { useState } from "react";
 import { Panel } from "@/components/layout/Panel";
@@ -16,17 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TraceTail } from "@/components/workflow/TraceTail";
-import { eventSourceUrl } from "@/lib/sse";
 import type { EngramStatsResponse } from "@/lib/api";
 
 /** Live engram-trace panel with a run picker sourced from `recentRuns`. */
-export function TraceTailPanel({
-  stats,
-  activeProject,
-}: {
-  stats: EngramStatsResponse;
-  activeProject: string | null;
-}) {
+export function TraceTailPanel({ stats }: { stats: EngramStatsResponse }) {
   const [runId, setRunId] = useState<string | null>(null);
   const runs = stats.recentRuns;
 
@@ -54,9 +47,7 @@ export function TraceTailPanel({
       {runs.length === 0 ? (
         <p className="text-sm text-muted-foreground">No runs to trace.</p>
       ) : (
-        <TraceTail
-          url={eventSourceUrl("trace", activeProject, runId ? { runId } : undefined)}
-        />
+        <TraceTail runId={runId} />
       )}
     </Panel>
   );

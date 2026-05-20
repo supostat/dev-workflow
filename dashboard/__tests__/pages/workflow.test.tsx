@@ -147,10 +147,10 @@ describe("WorkflowPage", () => {
     await screen.findByText("run-aaaaaaaaaaaa");
     expect(screen.queryByText("run-bbbbbbbbbbbb")).not.toBeInTheDocument();
 
-    const runsStream = MockEventSource.instances.find((source) =>
-      source.url.includes("/events/runs"),
+    const stream = MockEventSource.instances.find((source) =>
+      source.url.includes("/events/stream"),
     );
-    runsStream?.emit("runs", JSON.stringify({ runId: "run-bbbbbbbbbbbb" }));
+    stream?.emit("runs", JSON.stringify({ runId: "run-bbbbbbbbbbbb" }));
 
     expect(await screen.findByText("run-bbbbbbbbbbbb")).toBeInTheDocument();
     expect(runsFetches).toBeGreaterThanOrEqual(2);
