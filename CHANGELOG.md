@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] — 2026-05-20
+
+A web-dashboard internals refactor: the dashboard now opens one multiplexed
+SSE connection per browser tab instead of one per topic. This frees the
+browser HTTP/1.1 connection pool that the per-topic model was starving
+during navigation. The published package's entry-point API and the CLI
+surface are unchanged.
+
+### Changed
+
+- **Web dashboard SSE topology.** The four per-topic endpoints —
+  `/events/{vault,runs,trace,projects}` — are replaced by a single
+  `/events/stream?project=` endpoint. The server multiplexes every topic on
+  one connection; the client owns one `EventSource` per tab and
+  demultiplexes by `event:` name through a new
+  `dashboard/lib/sse-hub.ts` singleton. The `trace` topic now streams from
+  a `runs/` directory watcher and tags every line with its `runId` so the
+  client filters by the currently selected run rather than reconnecting on
+  every run switch. The change is internal to `dev-workflow web` — no
+  effect on consumers of the package's communication-profile API or on the
+  CLI. (`07f6cc3`)
+
+### Fixed
+
+- **Dashboard navigation no longer stalls during page transitions.** With
+  four concurrent EventSources on HTTP/1.1 the browser's ~6-connection
+  pool was starved by Next.js's RSC prefetch burst, leaving requests
+  pending for seconds before recovering. With one connection per tab the
+  pool stays clear. As a side effect the trace topic no longer carries a
+  per-`runId` URL, so the bug class where `eventSourceUrl` produced
+  `/events/trace?project=...` without a `runId` and the server replied 400
+  in a reconnect loop is structurally eliminated.
+
 ## [3.0.1] — 2026-05-19
 
 A patch release for the web dashboard. v3.0.0 shipped with a set of
@@ -1138,6 +1171,7 @@ explicitly elsewhere (e.g. in step files or hooks), update accordingly.
 `dev-workflow validate` (which runs in `session-start` and on demand) will
 warn about stale references — re-run it after upgrading.
 
+[3.0.2]: https://github.com/supostat/dev-workflow/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/supostat/dev-workflow/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/supostat/dev-workflow/compare/v2.0.0...v3.0.0
 [0.2.0]: https://github.com/supostat/dev-workflow/compare/v0.1.7...v0.2.0
