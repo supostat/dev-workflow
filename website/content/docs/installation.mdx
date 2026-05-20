@@ -93,7 +93,18 @@ dev-workflow doctor --fix
 
 Автоматическое исправление: перезапускает `init --force`.
 
+## Веб-дашборд
+
+После `init` локальный read-write дашборд поднимается одной командой:
+
+```bash
+dev-workflow web                  # http://127.0.0.1:3737
+```
+
+Один процесс Node, loopback-only (`127.0.0.1`, без `--host`-флага по дизайну). Шесть страниц — Overview / Vault / Tasks / Workflow / Engram / Settings. Multi-project навбар, live-обновления через SSE. Подробнее — [концепция «Дашборд»](/docs/concepts/dashboard).
+
 ## Следующий шаг
 
 - Новый проект со спекой: `/vault:from-spec`
 - Существующий проект: `/vault:analyze`
+- Локальный веб-UI: `dev-workflow web`
