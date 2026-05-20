@@ -215,11 +215,16 @@ export class ToolHandlers {
         const beforeSearchMemoryIds = memory.validateBeforeSearchMemoryIds(
           params["beforeSearchMemoryIds"],
         );
+        const runIdParam = params["runId"];
+        if (runIdParam !== undefined && typeof runIdParam !== "string") {
+          throw new Error("step_complete: runId must be a string when provided");
+        }
         return memory.stepComplete(
           this.context,
           stepName,
           beforeSearchMemoryIds,
           params["output"] as string,
+          typeof runIdParam === "string" ? runIdParam : null,
         );
       }
 

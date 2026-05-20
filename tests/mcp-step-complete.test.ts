@@ -436,7 +436,7 @@ describe("step_complete MCP handler — runId optional", () => {
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it("accepts optional runId parameter without altering behavior", async () => {
+  it("accepts a valid-format optional runId parameter without altering engram-feedback behavior", async () => {
     const env = createTestContext();
     projectRoot = env.projectRoot;
     const handlers = createHandlers(env.context);
@@ -446,9 +446,12 @@ describe("step_complete MCP handler — runId optional", () => {
       `- ${UUID_A}: 0.6 — used`,
     ].join("\n");
 
+    // Valid runId format but pointing at a run that does not exist —
+    // step state mutation is a fail-safe no-op while engram feedback
+    // still applies.
     const result = await handlers.handle("step_complete", {
       stepName: "code",
-      runId: "run-007",
+      runId: "run-abcdef012345",
       beforeSearchMemoryIds: [{ id: UUID_A, memoryType: "pattern" }],
       output,
     }) as StepCompleteResult;
@@ -495,5 +498,202 @@ describe("step_complete MCP handler — JUDGE_CAP enforcement", () => {
     // judgmentsApplied counts judge invocations actually made (capped at 20).
     expect(result.judgmentsApplied).toBe(20);
     expect(engramJudge).toHaveBeenCalledTimes(20);
+  });
+});
+
+describe("step_complete MCP handler — step state mutation", () => {
+  let projectRoot: string;
+  let originalRunId: string | undefined;
+  let originalTraceFile: string | undefined;
+
+  beforeEach(() => {
+    originalRunId = process.env["ENGRAM_RUN_ID"];
+    originalTraceFile = process.env["ENGRAM_TRACE_FILE"];
+    delete process.env["ENGRAM_RUN_ID"];
+    delete process.env["ENGRAM_TRACE_FILE"];
+  });
+
+  afterEach(() => {
+    if (originalRunId === undefined) delete process.env["ENGRAM_RUN_ID"];
+    else process.env["ENGRAM_RUN_ID"] = originalRunId;
+    if (originalTraceFile === undefined) delete process.env["ENGRAM_TRACE_FILE"];
+    else process.env["ENGRAM_TRACE_FILE"] = originalTraceFile;
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  async function startAndPrimeRun(env: { context: ProjectContext }): Promise<{
+    handlers: ToolHandlers;
+    runId: string;
+  }> {
+    const handlers = createHandlers(env.context);
+    const startResult = await handlers.handle("workflow_start", {
+      workflowName: "dev",
+      taskDescription: "step-complete state test",
+    }) as { runId: string };
+    delete process.env["ENGRAM_RUN_ID"];
+    return { handlers, runId: startResult.runId };
+  }
+
+  it("marks the step completed and stamps completedAt + durationMs when runId is passed", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const { handlers, runId } = await startAndPrimeRun(env);
+
+    // Open the step via step_start so startedAt is recorded.
+    await handlers.handle("step_start", { stepName: "code", runId });
+    const stateMod = await import("../src/workflow/state.js");
+    const state = new stateMod.WorkflowState(env.context.vaultPath);
+    expect(state.load(runId).steps["code"]?.status).toBe("running");
+
+    await handlers.handle("step_complete", {
+      stepName: "code",
+      runId,
+      beforeSearchMemoryIds: [],
+      output: "## Engram Feedback\n(no memories retrieved for query 1)",
+    });
+
+    const after = state.load(runId);
+    const codeStep = after.steps["code"]!;
+    expect(codeStep.status).toBe("completed");
+    expect(codeStep.completedAt).not.toBeNull();
+    expect(codeStep.durationMs).not.toBeNull();
+    expect(codeStep.durationMs!).toBeGreaterThanOrEqual(0);
+  });
+
+  it("uses ENGRAM_RUN_ID env when runId param omitted", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const { handlers, runId } = await startAndPrimeRun(env);
+
+    await handlers.handle("step_start", { stepName: "verify", runId });
+    process.env["ENGRAM_RUN_ID"] = runId;
+
+    await handlers.handle("step_complete", {
+      stepName: "verify",
+      beforeSearchMemoryIds: [],
+      output: "## Engram Feedback\n(no memories retrieved for query 1)",
+    });
+
+    const stateMod = await import("../src/workflow/state.js");
+    const state = new stateMod.WorkflowState(env.context.vaultPath);
+    expect(state.load(runId).steps["verify"]?.status).toBe("completed");
+  });
+
+  it("rejects an explicit runId with invalid format (loud caller-side error)", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    await expect(handlers.handle("step_complete", {
+      stepName: "code",
+      runId: "not-a-run-id",
+      beforeSearchMemoryIds: [],
+      output: "## Engram Feedback\n(no memories retrieved for query 1)",
+    })).rejects.toThrow(/runId must match/);
+  });
+
+  it("is a fail-safe no-op when no runId resolves (engram judgments still applied)", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+    expect(process.env["ENGRAM_RUN_ID"]).toBeUndefined();
+
+    const output = [
+      "## Engram Feedback",
+      `- ${UUID_A}: 0.8 — used`,
+    ].join("\n");
+
+    const result = await handlers.handle("step_complete", {
+      stepName: "code",
+      beforeSearchMemoryIds: [{ id: UUID_A, memoryType: "pattern" }],
+      output,
+    }) as StepCompleteResult;
+
+    // Engram side still works — feedback parsed, judgment applied.
+    expect(result.judgmentsApplied).toBe(1);
+    // State side is a no-op — no run to load, nothing thrown.
+  });
+
+  it("is a fail-safe no-op when the runId points to a non-existent run", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const handlers = createHandlers(env.context);
+
+    const result = await handlers.handle("step_complete", {
+      stepName: "code",
+      runId: "run-abcdef012345",
+      beforeSearchMemoryIds: [],
+      output: "## Engram Feedback\n(no memories retrieved for query 1)",
+    }) as StepCompleteResult;
+
+    expect(result.judgmentsApplied).toBe(0);
+  });
+
+  it("is a fail-safe no-op when the step is not declared in the run.steps map", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const { handlers, runId } = await startAndPrimeRun(env);
+
+    await handlers.handle("step_complete", {
+      stepName: "unknown-step",
+      runId,
+      beforeSearchMemoryIds: [],
+      output: "## Engram Feedback\n(no memories retrieved for query 1)",
+    });
+
+    const stateMod = await import("../src/workflow/state.js");
+    const state = new stateMod.WorkflowState(env.context.vaultPath);
+    const run = state.load(runId);
+    expect(run.steps["unknown-step"]).toBeUndefined();
+    // Existing steps untouched.
+    expect(run.steps["code"]?.status).toBe("pending");
+  });
+
+  it("makes a happy-path conversational run classify as completed in dev-workflow workflow cleanup", async () => {
+    const env = createTestContext();
+    projectRoot = env.projectRoot;
+    const { handlers, runId } = await startAndPrimeRun(env);
+
+    // Walk every declared step through start → complete, then leave the
+    // run in its conversational-zombie state (status: "running" because
+    // no workflow_complete tool exists).
+    const stateMod = await import("../src/workflow/state.js");
+    const state = new stateMod.WorkflowState(env.context.vaultPath);
+    const stepNames = Object.keys(state.load(runId).steps);
+    expect(stepNames.length).toBeGreaterThan(0);
+    for (const stepName of stepNames) {
+      await handlers.handle("step_start", { stepName, runId });
+      await handlers.handle("step_complete", {
+        stepName,
+        runId,
+        beforeSearchMemoryIds: [],
+        output: "## Engram Feedback\n(no memories retrieved for query 1)",
+      });
+    }
+
+    const run = state.load(runId);
+    expect(run.status).toBe("running"); // orchestrator never finalized
+    for (const stepName of stepNames) {
+      expect(run.steps[stepName]?.status).toBe("completed");
+    }
+
+    // Simulate the cleanup age threshold by back-dating startedAt.
+    run.startedAt = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    state.save(run);
+
+    const { runWorkflowCleanup } = await import("../src/cli/workflow-cleanup.js");
+    const origLog = console.log;
+    const logOutput: string[] = [];
+    console.log = ((msg: string) => { logOutput.push(String(msg)); return true; }) as typeof console.log;
+    try {
+      runWorkflowCleanup([], env.context.vaultPath);
+    } finally {
+      console.log = origLog;
+    }
+
+    const afterCleanup = state.load(runId);
+    expect(afterCleanup.status).toBe("completed");
+    expect(afterCleanup.abortReason).toBeUndefined();
+    expect(logOutput.join("\n")).toContain("1 run(s) marked completed");
   });
 });

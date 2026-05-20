@@ -6,6 +6,10 @@ import {
   type EngramFeedbackResult,
 } from "../../lib/engram-feedback.js";
 import { bumpTelemetry } from "./helpers.js";
+import { WorkflowState } from "../../workflow/state.js";
+import type { WorkflowRun } from "../../workflow/types.js";
+
+const RUN_ID_PATTERN = /^run-[a-f0-9]{12}$/;
 
 const UUID_REGEX = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const JUDGE_CAP = 20;
@@ -124,17 +128,31 @@ export interface StepCompleteResult {
  *   - Validation at entry: stepName non-empty, output is string, each item is
  *     `{ id: UUID, memoryType: non-empty string }`
  *   - JUDGE_CAP=20 per call to bound daemon load
+ *
+ * Step state mutation (mirrors the CLI engine path): if a run can be
+ * resolved (explicit `runId` → `ENGRAM_RUN_ID` env), mark
+ * `run.steps[stepName]` as `"completed"`, stamp `completedAt`, compute
+ * `durationMs` from `startedAt`, and persist via `state.save`. Failure to
+ * resolve or load the run is fail-safe — engram judgments still apply.
+ * The state mutation is sync, atomic against event-loop interleaving for
+ * small JSON files (knowledge.md "Sync I/O для atomic counters in
+ * long-running MCP server"). The contract makes `dev-workflow workflow
+ * cleanup` able to classify stale conversational runs as completed vs
+ * aborted, and surfaces real step state to the dashboard Workflow page.
  */
 export async function stepComplete(
   context: ProjectContext,
   stepName: string,
   beforeSearchMemoryIds: BeforeSearchMemory[],
   output: string,
+  runId: string | null,
 ): Promise<StepCompleteResult> {
   if (output.length > MAX_OUTPUT_LEN) {
     throw new Error(`step_complete: output exceeds ${MAX_OUTPUT_LEN} bytes`);
   }
-  void stepName; // accepted for telemetry/auto-tags by spec; not currently consumed inside helper
+
+  recordStepCompletion(context.vaultPath, stepName, runId);
+
   const expectedIds = beforeSearchMemoryIds.map((m) => m.id);
   const feedbackResult = parseEngramFeedbackFn(output, expectedIds);
 
@@ -158,6 +176,52 @@ export async function stepComplete(
     antipatternIdsInBefore,
     antipatternJudgmentDistribution,
   };
+}
+
+/**
+ * Mark `run.steps[stepName]` as completed and persist. Fail-safe: if no
+ * runId can be resolved, the run file is missing, or the step is not
+ * declared in the run, this is a no-op (the engram judgment side of
+ * step_complete still applies). Validation: an explicitly-passed runId
+ * that does not match `RUN_ID_PATTERN` is rejected at the boundary (loud)
+ * because that signals a caller-side bug; an absent runId with no env
+ * fallback is the silent path because legacy callers never passed it.
+ */
+function recordStepCompletion(
+  vaultPath: string,
+  stepName: string,
+  runId: string | null,
+): void {
+  if (runId !== null && !RUN_ID_PATTERN.test(runId)) {
+    throw new Error(
+      `step_complete: runId must match /^run-[a-f0-9]{12}$/, got "${runId}"`,
+    );
+  }
+  const resolvedRunId = runId ?? process.env["ENGRAM_RUN_ID"];
+  if (!resolvedRunId) return;
+
+  const state = new WorkflowState(vaultPath);
+  let run: WorkflowRun;
+  try {
+    run = state.load(resolvedRunId);
+  } catch {
+    return;
+  }
+
+  const stepState = run.steps[stepName];
+  if (stepState === undefined) return;
+
+  const completedAt = new Date().toISOString();
+  stepState.status = "completed";
+  stepState.completedAt = completedAt;
+  if (stepState.startedAt !== null) {
+    const startedMs = Date.parse(stepState.startedAt);
+    const completedMs = Date.parse(completedAt);
+    if (!Number.isNaN(startedMs) && !Number.isNaN(completedMs)) {
+      stepState.durationMs = completedMs - startedMs;
+    }
+  }
+  state.save(run);
 }
 
 async function applyJudgmentsCapped(feedbackResult: EngramFeedbackResult): Promise<number> {

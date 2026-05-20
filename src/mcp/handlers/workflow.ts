@@ -256,6 +256,19 @@ function validateStepStartInput(
  * in the message instead of silent fail-safe — an orchestrator calling
  * `step_start` against a stale/wrong runId would otherwise emit memories
  * tagged with a step name that no run record will ever know about.
+ *
+ * Step state mutation (mirrors the CLI engine path):
+ * - On first entry to a `pending` step → set `status = "running"`,
+ *   `startedAt = now`. `attempt` stays at its initial 0 (engine.ts
+ *   convention: attempt counts re-entries, first try is 0).
+ * - On re-entry after a `completed` / `failed` / `skipped` state →
+ *   `attempt += 1`, `startedAt` is reset to now.
+ * - On a redundant call while already `running` (orchestrator double-fired
+ *   step_start) → idempotent no-op for the step state, only `currentStep`
+ *   is updated.
+ * This makes step state machine-verifiable for `dev-workflow workflow
+ * cleanup` (which classifies stale runs by examining every step's status)
+ * and for the dashboard Workflow page on conversational runs.
  */
 export function stepStart(
   vaultPath: string,
@@ -280,6 +293,21 @@ export function stepStart(
   }
 
   run.currentStep = input.stepName;
+  const stepState = run.steps[input.stepName];
+  if (stepState !== undefined && stepState.status !== "running") {
+    if (
+      stepState.status === "completed" ||
+      stepState.status === "failed" ||
+      stepState.status === "skipped"
+    ) {
+      stepState.attempt = stepState.attempt + 1;
+      stepState.completedAt = null;
+      stepState.durationMs = null;
+      stepState.error = null;
+    }
+    stepState.status = "running";
+    stepState.startedAt = new Date().toISOString();
+  }
   state.save(run);
 
   // Propagate step name to engram trace events via env. Subagent

@@ -223,4 +223,92 @@ describe("step_start MCP handler", () => {
     const run = state.load(runId);
     expect(run.currentStep).toBe("verify");
   });
+
+  it("transitions a pending step to running and stamps startedAt", async () => {
+    const runId = await startRun();
+
+    const state = new WorkflowState(context.vaultPath);
+    const before = state.load(runId);
+    expect(before.steps["plan"]?.status).toBe("pending");
+    expect(before.steps["plan"]?.startedAt).toBeNull();
+    expect(before.steps["plan"]?.attempt).toBe(0);
+
+    await handlers.handle("step_start", { stepName: "plan", runId });
+
+    const after = state.load(runId);
+    expect(after.steps["plan"]?.status).toBe("running");
+    expect(after.steps["plan"]?.startedAt).not.toBeNull();
+    // First entry into a step does not increment attempt — engine convention
+    // (attempt counts re-entries, first try is 0).
+    expect(after.steps["plan"]?.attempt).toBe(0);
+  });
+
+  it("is idempotent for the step state when re-called on an already-running step", async () => {
+    const runId = await startRun();
+
+    await handlers.handle("step_start", { stepName: "code", runId });
+    const state = new WorkflowState(context.vaultPath);
+    const afterFirst = state.load(runId);
+    const firstStartedAt = afterFirst.steps["code"]?.startedAt;
+    expect(afterFirst.steps["code"]?.status).toBe("running");
+    expect(afterFirst.steps["code"]?.attempt).toBe(0);
+
+    await handlers.handle("step_start", { stepName: "code", runId });
+
+    const afterSecond = state.load(runId);
+    expect(afterSecond.steps["code"]?.status).toBe("running");
+    // No re-stamp on idempotent re-call.
+    expect(afterSecond.steps["code"]?.startedAt).toBe(firstStartedAt);
+    expect(afterSecond.steps["code"]?.attempt).toBe(0);
+  });
+
+  it("re-entering a completed step bumps attempt and resets completion fields", async () => {
+    const runId = await startRun();
+
+    // Simulate prior completion by editing state directly — exercises the
+    // re-entry path that the conversational orchestrator hits when a gate
+    // fails and onFail routes back to a finished step.
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(runId);
+    const completedStep = run.steps["review"]!;
+    completedStep.status = "completed";
+    completedStep.startedAt = new Date(Date.now() - 60_000).toISOString();
+    completedStep.completedAt = new Date().toISOString();
+    completedStep.durationMs = 60_000;
+    completedStep.error = null;
+    completedStep.attempt = 1;
+    state.save(run);
+
+    await handlers.handle("step_start", { stepName: "review", runId });
+
+    const after = state.load(runId);
+    const revisited = after.steps["review"]!;
+    expect(revisited.status).toBe("running");
+    expect(revisited.attempt).toBe(2);
+    expect(revisited.completedAt).toBeNull();
+    expect(revisited.durationMs).toBeNull();
+    expect(revisited.error).toBeNull();
+    expect(revisited.startedAt).not.toBeNull();
+  });
+
+  it("re-entering a failed step bumps attempt and clears the error field", async () => {
+    const runId = await startRun();
+
+    const state = new WorkflowState(context.vaultPath);
+    const run = state.load(runId);
+    const failedStep = run.steps["test"]!;
+    failedStep.status = "failed";
+    failedStep.error = "tests-pass gate: 2 failing tests";
+    failedStep.completedAt = new Date().toISOString();
+    failedStep.attempt = 1;
+    state.save(run);
+
+    await handlers.handle("step_start", { stepName: "test", runId });
+
+    const after = state.load(runId);
+    expect(after.steps["test"]?.status).toBe("running");
+    expect(after.steps["test"]?.attempt).toBe(2);
+    expect(after.steps["test"]?.error).toBeNull();
+    expect(after.steps["test"]?.completedAt).toBeNull();
+  });
 });
