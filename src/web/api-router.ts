@@ -12,7 +12,7 @@ import type { EngramPool } from "./engram-pool.js";
 import { loadRegistry, validateProjectName } from "./projects.js";
 import {
   buildProjectScope, sendJson, NOT_A_GIT_REPO_ERROR,
-  listProjects, createProject, getActiveProjectEndpoint, putActiveProject,
+  listProjects, createProject, deleteProject, getActiveProjectEndpoint, putActiveProject,
   getVaultSection, patchVaultSection, searchVault,
   getTasks, getTask, postTask, patchTask,
   getWorkflowRuns, getWorkflowRun,
@@ -83,6 +83,10 @@ const ROUTES: readonly Route[] = [
   {
     method: "PUT", pattern: /^\/api\/projects\/active$/, needsProject: false,
     handle: (ctx) => putActiveProject(ctx.res, ctx.body),
+  },
+  {
+    method: "DELETE", pattern: /^\/api\/projects\/([^/]+)$/, needsProject: false,
+    handle: (ctx, params) => deleteProject(ctx.res, params[0]!),
   },
   {
     method: "GET", pattern: /^\/api\/fs\/browse$/, needsProject: false,

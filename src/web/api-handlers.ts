@@ -19,7 +19,7 @@ import { vaultRead, vaultSearch } from "../mcp/handlers/vault.js";
 import { taskCreate, taskUpdate } from "../mcp/handlers/task.js";
 import { workflowList, workflowStatus } from "../mcp/handlers/workflow.js";
 import {
-  loadRegistry, addProject, setActiveProject, validateProjectName,
+  loadRegistry, addProject, removeProject, setActiveProject, validateProjectName,
 } from "./projects.js";
 import type { Project } from "./types.js";
 
@@ -116,6 +116,40 @@ export function getActiveProjectEndpoint(res: ServerResponse): void {
   sendJson(res, 200, {
     activeProject: active !== null ? (registry.projects[active] ?? null) : null,
   });
+}
+
+/**
+ * `DELETE /api/projects/:name` — remove a project from the registry.
+ * Registry-only: the project's files on disk are untouched. Clears
+ * `activeProject` if the removed project was active — re-selection is the
+ * caller's responsibility (the dashboard prompts the user; the CLI does
+ * not auto-pick).
+ *
+ * Status codes: 204 on success, 400 on a name that fails validation or is
+ * the reserved `active` sub-resource token (which is a different endpoint
+ * handled by `putActiveProject`), 404 on a name not in the registry.
+ */
+export function deleteProject(res: ServerResponse, name: string): void {
+  if (name === "active") {
+    sendJson(res, 400, {
+      error:
+        "DELETE /api/projects/active is not allowed — `active` is a reserved sub-resource; use PUT /api/projects/active to change the active selection.",
+    });
+    return;
+  }
+  if (!validateProjectName(name)) {
+    sendJson(res, 400, { error: "invalid project name" });
+    return;
+  }
+  try {
+    removeProject(name);
+    res.writeHead(204);
+    res.end();
+  } catch (error) {
+    sendJson(res, 404, {
+      error: error instanceof Error ? error.message : "removal failed",
+    });
+  }
 }
 
 /** `PUT /api/projects/active` — switch the active project by name. */

@@ -153,6 +153,56 @@ describe("web API — 18 endpoints, mutations, traversal", () => {
     expect(result.status).toBe(400);
   });
 
+  it("DELETE /api/projects/:name removes the registry entry and returns 204", async () => {
+    const other = mkdtempSync(join(tmpdir(), "web-api-extra-"));
+    const extra = JSON.parse((await httpRequest(
+      port, "POST", "/api/projects", JSON.stringify({ path: other }),
+    )).body) as { name: string };
+
+    const result = await httpRequest(port, "DELETE", `/api/projects/${extra.name}`);
+
+    expect(result.status).toBe(204);
+    expect(result.body).toBe("");
+    const list = JSON.parse((await httpRequest(port, "GET", "/api/projects")).body) as {
+      projects: Array<{ name: string }>;
+    };
+    expect(list.projects.map((p) => p.name)).not.toContain(extra.name);
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it("DELETE /api/projects/:name clears activeProject when removing the active project", async () => {
+    const result = await httpRequest(port, "DELETE", `/api/projects/${projectName}`);
+    expect(result.status).toBe(204);
+
+    const active = JSON.parse((await httpRequest(port, "GET", "/api/projects/active")).body) as {
+      activeProject: unknown;
+    };
+    expect(active.activeProject).toBeNull();
+  });
+
+  it("DELETE /api/projects/:name returns 404 for an unknown project", async () => {
+    const result = await httpRequest(port, "DELETE", "/api/projects/ghost");
+    expect(result.status).toBe(404);
+    expect(JSON.parse(result.body).error).toMatch(/Unknown project/);
+  });
+
+  it("DELETE /api/projects/:name returns 400 for an invalid name", async () => {
+    const result = await httpRequest(port, "DELETE", "/api/projects/Bad%20Name");
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toMatch(/invalid project name/);
+  });
+
+  it("DELETE /api/projects/active is rejected — the 'active' sub-resource is reserved", async () => {
+    const result = await httpRequest(port, "DELETE", "/api/projects/active");
+    expect(result.status).toBe(400);
+    expect(JSON.parse(result.body).error).toMatch(/reserved/);
+    // The active selection is untouched by the rejection.
+    const active = JSON.parse((await httpRequest(port, "GET", "/api/projects/active")).body) as {
+      activeProject: { name: string } | null;
+    };
+    expect(active.activeProject?.name).toBe(projectName);
+  });
+
   // ── vault ─────────────────────────────────────────────────────────────────────
 
   it("GET /api/vault/:section reads a vault file", async () => {

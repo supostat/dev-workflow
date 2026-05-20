@@ -137,6 +137,16 @@ export function createProject(path: string): Promise<Project> {
   return request<Project>("/api/projects", { method: "POST", ...jsonBody({ path }) });
 }
 
+/**
+ * `DELETE /api/projects/:name` — remove a project from the registry. The
+ * project files on disk are untouched. If the removed project was active,
+ * the server clears `activeProject`; the caller (registry editor) should
+ * refresh and re-prompt for a new active selection.
+ */
+export function deleteProject(name: string): Promise<void> {
+  return request<void>(`/api/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
+}
+
 export function getActiveProject(): Promise<ActiveProjectResponse> {
   return request<ActiveProjectResponse>("/api/projects/active");
 }

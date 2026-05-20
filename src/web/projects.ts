@@ -177,6 +177,25 @@ export function setActiveProject(name: string): void {
   saveRegistry(registry);
 }
 
+/**
+ * Remove `name` from the registry. Registry-only: the project's files on
+ * disk are untouched. If the removed project was active, `activeProject`
+ * is cleared to `null` — selecting a new active project is left to the
+ * caller. Throws when the name is not present so the API layer can map it
+ * to a 404.
+ */
+export function removeProject(name: string): void {
+  const registry = loadRegistry();
+  if (!Object.prototype.hasOwnProperty.call(registry.projects, name)) {
+    throw new Error(`Unknown project: "${name}"`);
+  }
+  delete registry.projects[name];
+  if (registry.activeProject === name) {
+    registry.activeProject = null;
+  }
+  saveRegistry(registry);
+}
+
 /** Resolve a registered project name to its absolute path. Throws if unknown. */
 export function resolveProjectPath(name: string): string {
   const registry = loadRegistry();

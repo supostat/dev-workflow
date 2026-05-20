@@ -22,15 +22,18 @@ beforeAll(() => {
   }
 });
 
-// `ProjectRegistryEditor` imports `getProjects` / `createProject`, and the
-// `DirectoryBrowserDialog` it renders imports `browseFs` — the factory must
-// provide all three or the editor crashes on mount.
+// `ProjectRegistryEditor` imports `getProjects` / `createProject` /
+// `deleteProject`, and the `DirectoryBrowserDialog` it renders imports
+// `browseFs` — the factory must provide all four or the editor crashes on
+// mount.
 const getProjectsMock = vi.fn();
 const createProjectMock = vi.fn();
+const deleteProjectMock = vi.fn();
 const browseFsMock = vi.fn();
 vi.mock("@/lib/api", () => ({
   getProjects: () => getProjectsMock() as Promise<ProjectListResponse>,
   createProject: (path: string) => createProjectMock(path) as Promise<Project>,
+  deleteProject: (name: string) => deleteProjectMock(name) as Promise<void>,
   browseFs: (path?: string) => browseFsMock(path) as Promise<FsBrowseResponse>,
 }));
 
@@ -61,6 +64,7 @@ function listing(overrides: Partial<FsBrowseResponse>): FsBrowseResponse {
 afterEach(() => {
   getProjectsMock.mockReset();
   createProjectMock.mockReset();
+  deleteProjectMock.mockReset();
   browseFsMock.mockReset();
 });
 
@@ -96,5 +100,80 @@ describe("ProjectRegistryEditor", () => {
     // "Add project" POSTs the confirmed absolute path.
     await userEvent.click(addButton);
     await waitFor(() => expect(createProjectMock).toHaveBeenCalledWith("/home/user"));
+  });
+
+  it("removes a project after confirming the AlertDialog and reloads the table", async () => {
+    // Two-project registry — remove the idle one, the active one stays.
+    const twoProjects: ProjectListResponse = {
+      projects: [
+        { name: "demo", path: "/p", lastSeen: "2026-05-10T00:00:00.000Z", active: true },
+        { name: "scratch", path: "/q", lastSeen: "2026-05-11T00:00:00.000Z", active: false },
+      ],
+      activeProject: "demo",
+    };
+    const afterRemove: ProjectListResponse = {
+      projects: [twoProjects.projects[0]!],
+      activeProject: "demo",
+    };
+    getProjectsMock.mockResolvedValueOnce(twoProjects).mockResolvedValueOnce(afterRemove);
+    deleteProjectMock.mockResolvedValueOnce(undefined);
+
+    render(<ProjectRegistryEditor />);
+
+    expect(await screen.findByText("scratch")).toBeInTheDocument();
+
+    // Each project row carries an aria-labelled "Remove project <name>" button.
+    await userEvent.click(screen.getByRole("button", { name: "Remove project scratch" }));
+
+    // Confirmation dialog opens with a "Remove" action.
+    expect(await screen.findByText(/Remove project from registry/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(deleteProjectMock).toHaveBeenCalledWith("scratch"));
+    // After the delete, the editor reloads the registry — scratch disappears.
+    await waitFor(() => expect(screen.queryByText("scratch")).not.toBeInTheDocument());
+    expect(screen.getByText("demo")).toBeInTheDocument();
+  });
+
+  it("warns when removing the active project (server clears the active selection)", async () => {
+    const justActive: ProjectListResponse = {
+      projects: [{ name: "demo", path: "/p", lastSeen: "2026-05-10T00:00:00.000Z", active: true }],
+      activeProject: "demo",
+    };
+    const empty: ProjectListResponse = { projects: [], activeProject: null };
+    getProjectsMock.mockResolvedValueOnce(justActive).mockResolvedValueOnce(empty);
+    deleteProjectMock.mockResolvedValueOnce(undefined);
+
+    render(<ProjectRegistryEditor />);
+
+    expect(await screen.findByText("demo")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove project demo" }));
+
+    // The dialog calls out the active-clears side effect explicitly.
+    expect(
+      await screen.findByText(/currently active.*clear the active selection/i),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(deleteProjectMock).toHaveBeenCalledWith("demo"));
+    await waitFor(() => expect(screen.queryByText("demo")).not.toBeInTheDocument());
+    expect(screen.getByText("No projects registered.")).toBeInTheDocument();
+  });
+
+  it("Cancel keeps the project in the table and does not call deleteProject", async () => {
+    getProjectsMock.mockResolvedValue(REGISTRY);
+
+    render(<ProjectRegistryEditor />);
+
+    expect(await screen.findByText("demo")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove project demo" }));
+    expect(await screen.findByText(/Remove project from registry/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Remove project from registry/i)).not.toBeInTheDocument(),
+    );
+    expect(deleteProjectMock).not.toHaveBeenCalled();
+    expect(screen.getByText("demo")).toBeInTheDocument();
   });
 });
