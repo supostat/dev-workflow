@@ -3,7 +3,11 @@ name: Deploy Website
 on:
   push:
     branches: [main]
-    paths: [website/**]
+    paths:
+      - website/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/website.yml
   workflow_dispatch:
 
 permissions:
@@ -27,15 +31,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: website/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
-        working-directory: website
+      - name: Install dependencies (workspace root)
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        working-directory: website
-        run: pnpm run build
+      - name: Build website
+        run: pnpm --filter dev-workflow-docs build
         env:
           GITHUB_ACTIONS: "true"
 
