@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -7,7 +7,7 @@ import { request } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { createWebServer, type WebServerHandle } from "../src/web/server.js";
 import { addProject, setActiveProject } from "../src/web/projects.js";
-import { STATIC_ROOT } from "../src/web/static.js";
+import { staticRoot } from "../src/web/static.js";
 
 interface HttpResult {
   status: number;
@@ -201,33 +201,38 @@ describe("web server — static dashboard serving", () => {
   let configHome: string;
   let originalConfigHome: string | undefined;
   let originalSocketPath: string | undefined;
+  let originalStaticRoot: string | undefined;
+  let staticFixtureRoot: string;
   let handle: WebServerHandle;
   let port: number;
-  let createdStaticRoot = false;
 
   beforeEach(async () => {
     originalConfigHome = process.env.XDG_CONFIG_HOME;
     originalSocketPath = process.env.ENGRAM_SOCKET_PATH;
+    originalStaticRoot = process.env.DEV_WORKFLOW_STATIC_ROOT;
     configHome = mkdtempSync(join(tmpdir(), "web-static-cfg-"));
     process.env.XDG_CONFIG_HOME = configHome;
     process.env.ENGRAM_SOCKET_PATH = "/tmp/no-such-engram-socket-isolated-test";
 
-    if (!existsSync(STATIC_ROOT)) {
-      mkdirSync(join(STATIC_ROOT, "assets"), { recursive: true });
-      createdStaticRoot = true;
-    } else {
-      mkdirSync(join(STATIC_ROOT, "assets"), { recursive: true });
-    }
-    writeFileSync(join(STATIC_ROOT, "index.html"), "<!doctype html><title>dash</title>", "utf-8");
-    writeFileSync(join(STATIC_ROOT, "assets", "app.js"), "console.error('x');", "utf-8");
-    mkdirSync(join(STATIC_ROOT, "vault"), { recursive: true });
+    // Redirect the static root into a hermetic fixture so this suite can
+    // never overwrite a real dist/dashboard build (which `publish.yml`
+    // runs between build and publish — release-integrity hazard).
+    staticFixtureRoot = mkdtempSync(join(tmpdir(), "web-static-root-"));
+    process.env.DEV_WORKFLOW_STATIC_ROOT = staticFixtureRoot;
+    // Sanity check — the function the server uses must resolve to our fixture.
+    expect(staticRoot()).toBe(staticFixtureRoot);
+
+    mkdirSync(join(staticFixtureRoot, "assets"), { recursive: true });
+    writeFileSync(join(staticFixtureRoot, "index.html"), "<!doctype html><title>dash</title>", "utf-8");
+    writeFileSync(join(staticFixtureRoot, "assets", "app.js"), "console.error('x');", "utf-8");
+    mkdirSync(join(staticFixtureRoot, "vault"), { recursive: true });
     writeFileSync(
-      join(STATIC_ROOT, "vault", "index.html"),
+      join(staticFixtureRoot, "vault", "index.html"),
       "<!doctype html><title>vault page</title>",
       "utf-8",
     );
     writeFileSync(
-      join(STATIC_ROOT, "404.html"),
+      join(staticFixtureRoot, "404.html"),
       "<!doctype html><title>not found</title>",
       "utf-8",
     );
@@ -239,11 +244,9 @@ describe("web server — static dashboard serving", () => {
 
   afterEach(async () => {
     await handle.close();
-    rmSync(join(STATIC_ROOT, "index.html"), { force: true });
-    rmSync(join(STATIC_ROOT, "assets"), { recursive: true, force: true });
-    rmSync(join(STATIC_ROOT, "vault"), { recursive: true, force: true });
-    rmSync(join(STATIC_ROOT, "404.html"), { force: true });
-    if (createdStaticRoot) rmSync(STATIC_ROOT, { recursive: true, force: true });
+    rmSync(staticFixtureRoot, { recursive: true, force: true });
+    if (originalStaticRoot === undefined) delete process.env.DEV_WORKFLOW_STATIC_ROOT;
+    else process.env.DEV_WORKFLOW_STATIC_ROOT = originalStaticRoot;
     if (originalConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = originalConfigHome;
     if (originalSocketPath === undefined) delete process.env.ENGRAM_SOCKET_PATH;

@@ -13,8 +13,25 @@ import { resolve, sep, extname } from "node:path";
 import type { ServerResponse } from "node:http";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
 
-/** Root the dashboard build is served from — `<package>/dist/dashboard`. */
-export const STATIC_ROOT = resolve(PACKAGE_ROOT, "dist", "dashboard");
+const PACKAGE_DEFAULT_STATIC_ROOT = resolve(PACKAGE_ROOT, "dist", "dashboard");
+
+/**
+ * Root the dashboard build is served from.
+ *
+ * Defaults to `<package>/dist/dashboard`. Overridable per process via the
+ * `DEV_WORKFLOW_STATIC_ROOT` env var so that tests can redirect writes to a
+ * `mkdtempSync` fixture and never touch real build artifacts (a stale
+ * version of this suite used to overwrite then delete files in the real
+ * `dist/dashboard`, which `publish.yml` runs between build and publish —
+ * release-integrity hazard). Read on every call: env mutations between
+ * calls take effect on the next call.
+ */
+export function staticRoot(): string {
+  const override = process.env["DEV_WORKFLOW_STATIC_ROOT"];
+  return override !== undefined && override !== ""
+    ? resolve(override)
+    : PACKAGE_DEFAULT_STATIC_ROOT;
+}
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   ".html": "text/html; charset=utf-8",
@@ -30,10 +47,15 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
 };
 
 /**
- * Resolve a request pathname to an absolute file path inside {@link STATIC_ROOT},
- * or `null` when the path is malformed or escapes the root. Exported for tests.
+ * Resolve a request pathname to an absolute file path inside the static
+ * root, or `null` when the path is malformed or escapes the root.
+ * Exported for tests.
  */
 export function resolveStaticPath(pathname: string): string | null {
+  return resolveStaticPathUnder(pathname, staticRoot());
+}
+
+function resolveStaticPathUnder(pathname: string, root: string): string | null {
   let decoded: string;
   try {
     decoded = decodeURIComponent(pathname);
@@ -42,8 +64,8 @@ export function resolveStaticPath(pathname: string): string | null {
   }
   if (decoded.includes("\0")) return null;
   const relative = decoded.replace(/^\/+/, "");
-  const candidate = resolve(STATIC_ROOT, relative);
-  if (candidate !== STATIC_ROOT && !candidate.startsWith(STATIC_ROOT + sep)) {
+  const candidate = resolve(root, relative);
+  if (candidate !== root && !candidate.startsWith(root + sep)) {
     return null;
   }
   return candidate;
@@ -54,9 +76,14 @@ export function resolveStaticPath(pathname: string): string | null {
  * or traversal path, the file with its content-type when it exists, the
  * `index.html` of a requested directory, and a 404 otherwise — the
  * pre-rendered `404.html` when present, plain text when it is not.
+ *
+ * Reads the static root once at the start of the call and reuses it for
+ * resolution and the 404-page lookup, so a mid-call env mutation cannot
+ * make the request straddle two roots.
  */
 export function serveStatic(res: ServerResponse, pathname: string): void {
-  const resolved = resolveStaticPath(pathname);
+  const root = staticRoot();
+  const resolved = resolveStaticPathUnder(pathname, root);
   if (resolved === null) {
     sendPlain(res, 400, "Bad Request");
     return;
@@ -72,7 +99,7 @@ export function serveStatic(res: ServerResponse, pathname: string): void {
       return;
     }
   }
-  serveNotFound(res);
+  serveNotFound(res, root);
 }
 
 function isFile(path: string): boolean {
@@ -92,12 +119,12 @@ function isDirectory(path: string): boolean {
 }
 
 /**
- * Serve a 404. Uses the pre-rendered `dist/dashboard/404.html` when present —
- * with an explicit `writeHead(404)` since `sendFile` hardcodes 200 — and
- * falls back to a plain-text 404 when that page is absent.
+ * Serve a 404. Uses the pre-rendered `<root>/404.html` when present — with
+ * an explicit `writeHead(404)` since `sendFile` hardcodes 200 — and falls
+ * back to a plain-text 404 when that page is absent.
  */
-function serveNotFound(res: ServerResponse): void {
-  const notFoundPath = resolve(STATIC_ROOT, "404.html");
+function serveNotFound(res: ServerResponse, root: string): void {
+  const notFoundPath = resolve(root, "404.html");
   if (isFile(notFoundPath)) {
     res.writeHead(404, { "Content-Type": CONTENT_TYPES[".html"] });
     res.end(readFileSync(notFoundPath));
