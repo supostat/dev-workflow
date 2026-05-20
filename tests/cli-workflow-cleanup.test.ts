@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runWorkflowCleanup } from "../src/cli/workflow-cleanup.js";
-import type { WorkflowRun, WorkflowStatus } from "../src/workflow/types.js";
+import type { StepState, WorkflowRun, WorkflowStatus } from "../src/workflow/types.js";
 
 function makeRun(overrides: Partial<WorkflowRun> & { id: string; startedAt: string; status: WorkflowStatus }): WorkflowRun {
   return {
@@ -15,6 +15,19 @@ function makeRun(overrides: Partial<WorkflowRun> & { id: string; startedAt: stri
     completedAt: null,
     steps: {},
     ...overrides,
+  };
+}
+
+function makeStep(status: StepState["status"]): StepState {
+  return {
+    status,
+    output: null,
+    startedAt: null,
+    completedAt: null,
+    durationMs: null,
+    attempt: 1,
+    engramMemoryId: null,
+    error: null,
   };
 }
 
@@ -192,5 +205,125 @@ describe("dev-workflow workflow cleanup", () => {
     runWorkflowCleanup(["--dry-run", "--delete"], vaultPath);
     expect(process.exitCode).toBe(1);
     expect(errOutput.join("\n")).toContain("mutually exclusive");
+  });
+
+  it("marks a stale running run with all steps completed as completed (not aborted)", () => {
+    writeRun(makeRun({
+      id: "run-zombie-success",
+      status: "running",
+      startedAt: isoOffset(48),
+      currentStep: "vault-updates",
+      steps: {
+        read: makeStep("completed"),
+        plan: makeStep("completed"),
+        code: makeStep("completed"),
+        commit: makeStep("completed"),
+        "vault-updates": makeStep("completed"),
+      },
+    }));
+
+    runWorkflowCleanup([], vaultPath);
+
+    const reloaded = readRun("run-zombie-success");
+    expect(reloaded.status).toBe("completed");
+    expect(reloaded.completedAt).not.toBeNull();
+    expect(reloaded.abortReason).toBeUndefined();
+    expect(logOutput.join("\n")).toContain("1 run(s) marked completed");
+    expect(logOutput.join("\n")).toContain("→ completed");
+  });
+
+  it("marks a stale running run with a mid-pipeline running step as aborted", () => {
+    writeRun(makeRun({
+      id: "run-truly-aborted",
+      status: "running",
+      startedAt: isoOffset(48),
+      currentStep: "code",
+      steps: {
+        read: makeStep("completed"),
+        plan: makeStep("completed"),
+        code: makeStep("running"),
+      },
+    }));
+
+    runWorkflowCleanup([], vaultPath);
+
+    const reloaded = readRun("run-truly-aborted");
+    expect(reloaded.status).toBe("aborted");
+    expect(reloaded.abortReason).toContain("auto-aborted");
+    expect(logOutput.join("\n")).toContain("→ aborted");
+  });
+
+  it("marks a stale running run with a failed step as aborted", () => {
+    writeRun(makeRun({
+      id: "run-failed-step",
+      status: "running",
+      startedAt: isoOffset(48),
+      currentStep: "test",
+      steps: {
+        read: makeStep("completed"),
+        plan: makeStep("completed"),
+        code: makeStep("completed"),
+        test: makeStep("failed"),
+      },
+    }));
+
+    runWorkflowCleanup([], vaultPath);
+
+    const reloaded = readRun("run-failed-step");
+    expect(reloaded.status).toBe("aborted");
+    expect(reloaded.abortReason).toContain("auto-aborted");
+  });
+
+  it("classifies a mixed batch — some completed, some aborted — independently", () => {
+    writeRun(makeRun({
+      id: "run-mixed-good",
+      status: "running",
+      startedAt: isoOffset(48),
+      steps: {
+        read: makeStep("completed"),
+        plan: makeStep("completed"),
+        commit: makeStep("completed"),
+      },
+    }));
+    writeRun(makeRun({
+      id: "run-mixed-bad",
+      status: "running",
+      startedAt: isoOffset(48),
+      steps: {
+        read: makeStep("completed"),
+        plan: makeStep("running"),
+      },
+    }));
+
+    runWorkflowCleanup([], vaultPath);
+
+    expect(readRun("run-mixed-good").status).toBe("completed");
+    expect(readRun("run-mixed-good").abortReason).toBeUndefined();
+    expect(readRun("run-mixed-bad").status).toBe("aborted");
+    expect(readRun("run-mixed-bad").abortReason).toContain("auto-aborted");
+    expect(logOutput.join("\n")).toContain("1 run(s) marked completed, 1 run(s) marked aborted");
+  });
+
+  it("--dry-run shows the per-run target classification", () => {
+    writeRun(makeRun({
+      id: "run-zombie-success",
+      status: "running",
+      startedAt: isoOffset(48),
+      steps: { read: makeStep("completed"), commit: makeStep("completed") },
+    }));
+    writeRun(makeRun({
+      id: "run-truly-aborted",
+      status: "running",
+      startedAt: isoOffset(48),
+      steps: { read: makeStep("completed"), code: makeStep("running") },
+    }));
+
+    runWorkflowCleanup(["--dry-run"], vaultPath);
+
+    const log = logOutput.join("\n");
+    expect(log).toMatch(/run-zombie-success\s+status=running\s+→\s+completed/);
+    expect(log).toMatch(/run-truly-aborted\s+status=running\s+→\s+aborted/);
+    expect(readRun("run-zombie-success").status).toBe("running"); // unchanged
+    expect(readRun("run-truly-aborted").status).toBe("running"); // unchanged
   });
 });

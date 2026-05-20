@@ -57,6 +57,8 @@ export function runWorkflowCleanup(args: string[], vaultPath: string): void {
   }
 
   let processed = 0;
+  let completedCount = 0;
+  let abortedCount = 0;
   const runsDir = join(vaultPath, "workflow-state", "runs");
   for (const { run } of candidates) {
     if (options.delete) {
@@ -66,16 +68,49 @@ export function runWorkflowCleanup(args: string[], vaultPath: string): void {
         unlinkSync(tracePath);
       }
     } else {
-      run.status = "aborted";
+      const terminal = classifyTerminalStatus(run);
+      run.status = terminal;
       run.completedAt = new Date().toISOString();
-      run.abortReason = ABORT_REASON;
+      if (terminal === "aborted") {
+        run.abortReason = ABORT_REASON;
+      }
       state.save(run);
+      if (terminal === "completed") completedCount++;
+      else abortedCount++;
     }
     processed++;
   }
 
-  const verb = options.delete ? "deleted" : "marked aborted";
-  console.log(`\n${processed} run(s) ${verb}.`);
+  if (options.delete) {
+    console.log(`\n${processed} run(s) deleted.`);
+  } else {
+    console.log(
+      `\n${completedCount} run(s) marked completed, ${abortedCount} run(s) marked aborted.`,
+    );
+  }
+}
+
+/**
+ * Classify a stale `running`/`paused` run into its true terminal status by
+ * examining recorded step states.
+ *
+ * The conversational orchestrator (Claude-driven slash dispatcher) forgets to
+ * transition `run.status` from `"running"` to `"completed"` even on a clean
+ * finish (the transition lives in `WorkflowEngine.executeLoop` on the CLI
+ * path only). The result is a fully-finished pipeline whose run JSON looks
+ * like a zombie. Marking every such run as `"aborted"` would lie about
+ * success.
+ *
+ * Heuristic: if every recorded `StepState` has `status === "completed"`, the
+ * pipeline reached its end successfully — return `"completed"`. Any
+ * `running`/`failed`/`pending`/`skipped` step (or an empty `steps` map, which
+ * means the run never advanced past `workflow_start`) means the pipeline did
+ * not finish — return `"aborted"`.
+ */
+function classifyTerminalStatus(run: WorkflowRun): "completed" | "aborted" {
+  const steps = Object.values(run.steps);
+  if (steps.length === 0) return "aborted";
+  return steps.every((step) => step.status === "completed") ? "completed" : "aborted";
 }
 
 function parseFlags(args: string[]): CleanupOptions {
@@ -144,12 +179,19 @@ function printCandidates(candidates: CleanupCandidate[], options: CleanupOptions
     ? "Would affect"
     : options.delete
     ? "Will delete"
-    : "Will mark aborted";
+    : "Will reclassify";
   console.log(`${action} ${candidates.length} run(s):`);
   for (const { run, ageMs } of candidates) {
-    console.log(
-      `  ${run.id}  status=${run.status}  startedAt=${run.startedAt}  age=${formatAge(ageMs)}`,
-    );
+    if (options.delete) {
+      console.log(
+        `  ${run.id}  status=${run.status}  startedAt=${run.startedAt}  age=${formatAge(ageMs)}`,
+      );
+    } else {
+      const target = classifyTerminalStatus(run);
+      console.log(
+        `  ${run.id}  status=${run.status} → ${target}  startedAt=${run.startedAt}  age=${formatAge(ageMs)}`,
+      );
+    }
   }
 }
 
