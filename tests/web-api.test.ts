@@ -47,7 +47,7 @@ function httpRequest(
   });
 }
 
-describe("web API — 18 endpoints, mutations, traversal", () => {
+describe("web API — 20 endpoints, mutations, traversal", () => {
   let configHome: string;
   let originalConfigHome: string | undefined;
   let originalSocketPath: string | undefined;
