@@ -53,7 +53,7 @@ dev-workflow web --no-open             # не открывать браузер
 
 ## Тех-детали для любопытных
 
-- Сервер: один процесс `node:http`, `~/Projects/.../src/web/server.ts`, без runtime-фреймворка. `chokidar` — единственная permitted runtime-зависимость (file-watching для SSE).
+- Сервер: один процесс `node:http`, `~/Projects/.../src/web/server.ts`, без runtime-фреймворка. `chokidar` — единственная runtime-зависимость веб-слоя (file-watching для SSE).
 - UI: Next.js 16 static export → `dist/dashboard/*`. Раздаётся самим Node-сервером (`src/web/static.ts`).
 - Watcher per project с idle-TTL 5 минут — если на проект нет подписчиков, chokidar-инстансы освобождаются.
 - E2E: Playwright против реального CLI, см. `e2e/` и CI-workflow `e2e.yml`.

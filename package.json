@@ -50,6 +50,7 @@
   },
   "packageManager": "pnpm@10.22.0",
   "dependencies": {
+    "@anthropic-ai/tokenizer": "^0.0.4",
     "chokidar": "^4.0.3"
   },
   "devDependencies": {

@@ -9,6 +9,7 @@ import { icon } from "../lib/output.js";
 import { PACKAGE_ROOT } from "../lib/package-root.js";
 import { parseFrontmatter } from "../lib/frontmatter.js";
 import { requireClaudeCodeVersion } from "../lib/claude-code-version.js";
+import { countTokens } from "../lib/tokens.js";
 
 export interface SkillProblem {
   filepath: string;
@@ -168,6 +169,19 @@ export async function doctor(fix: boolean = false): Promise<void> {
     }
   }
 
+  // Tokenizer
+  try {
+    if (countTokens("hello") > 0) {
+      console.log(`  ${icon.success} ${"Tokenizer".padEnd(16)} @anthropic-ai/tokenizer ok`);
+    } else {
+      console.log(`  ${icon.error} ${"Tokenizer".padEnd(16)} returned a non-positive count`);
+      issues.push("Tokenizer returned a non-positive count for a known input");
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.log(`  ${icon.error} ${"Tokenizer".padEnd(16)} load failed: ${reason}`);
+    issues.push(`Tokenizer load failed: ${reason}`);
+  }
   // Claude Code version
   const versionCheck = requireClaudeCodeVersion();
   if (versionCheck.detected === null) {
