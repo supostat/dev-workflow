@@ -12,11 +12,11 @@ export function getToolDefinitions(): ToolDefinition[] {
   return [
     {
       name: "vault_read",
-      description: "Read a vault section (stack, conventions, knowledge, gameplan)",
+      description: "Read a vault section (stack, conventions, knowledge, gameplan). knowledge.md is also addressable per sub-section via knowledge:<sub> — sub ∈ architecture, gotchas, security, patterns, engram",
       inputSchema: {
         type: "object",
         properties: {
-          section: { type: "string", enum: ["stack", "conventions", "knowledge", "gameplan"] },
+          section: { type: "string", enum: ["stack", "conventions", "knowledge", "gameplan", "knowledge:architecture", "knowledge:gotchas", "knowledge:security", "knowledge:patterns", "knowledge:engram"] },
         },
         required: ["section"],
       },

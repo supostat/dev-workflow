@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getToolDefinitions } from "../src/mcp/tools.js";
+import { KNOWLEDGE_SUB_SECTIONS } from "../src/lib/knowledge-slicer.js";
+import { renderTemplate } from "../src/lib/templates.js";
 import { PACKAGE_ROOT } from "../src/lib/package-root.js";
 
 function readSrc(relative: string): string {
@@ -342,6 +344,65 @@ describe("docs-invariant: workflow yaml name matches filename", () => {
       ).toBe(basename);
     });
   }
+});
+
+describe("docs-invariant: vault_read knowledge sub-section addressing", () => {
+  // The vault_read `section` enum and the KNOWLEDGE_SUB_SECTIONS registry are
+  // two coordinated surfaces: every registry key K must be addressable as
+  // `knowledge:K` via the enum. Drift here means an MCP client could request a
+  // slice the schema rejects, or vice versa.
+  const vaultRead = getToolDefinitions().find((t) => t.name === "vault_read")!;
+  const sectionSchema = vaultRead.inputSchema.properties["section"] as { enum: string[] };
+  const sectionEnum = sectionSchema.enum;
+
+  const EXPECTED_ENUM = [
+    "stack",
+    "conventions",
+    "knowledge",
+    "gameplan",
+    "knowledge:architecture",
+    "knowledge:gotchas",
+    "knowledge:security",
+    "knowledge:patterns",
+    "knowledge:engram",
+  ];
+
+  it("vault_read section enum equals the verbatim 9-entry list", () => {
+    expect(sectionEnum.length).toBe(9);
+    expect(sectionEnum).toEqual(EXPECTED_ENUM);
+  });
+
+  it("every KNOWLEDGE_SUB_SECTIONS key has a knowledge:<key> enum entry", () => {
+    for (const key of KNOWLEDGE_SUB_SECTIONS.keys()) {
+      expect(sectionEnum, `enum missing knowledge:${key}`).toContain(`knowledge:${key}`);
+    }
+  });
+
+  it("bare 'knowledge' whole-section read is retained alongside the slice addresses", () => {
+    expect(sectionEnum).toContain("knowledge");
+  });
+});
+
+describe("docs-invariant: knowledge.md scaffold fence-free header invariant", () => {
+  // sliceMarkdownSection inherits a `\n## ` false-boundary limitation: a `## `
+  // line inside a code fence truncates a slice early. The committed scaffold
+  // template is the CI-stable target (the live .dev-vault/knowledge.md is
+  // gitignored). Assert the scaffold carries exactly the 5 canonical headers
+  // and no other body line begins with `## ` — so every registry slice is
+  // addressable and no fenced/stray `## ` line can corrupt a boundary.
+  const scaffold = renderTemplate("vault/knowledge", { projectName: "fixture" });
+  const headerLines = scaffold.split("\n").filter((line) => /^## /.test(line));
+  const CANONICAL = ["## Architecture", "## Gotchas", "## Security", "## Patterns", "## Engram"];
+
+  it("scaffold contains exactly the 5 canonical headers in order", () => {
+    expect(headerLines).toEqual(CANONICAL);
+  });
+
+  it("every KNOWLEDGE_SUB_SECTIONS header text appears as a scaffold ## header", () => {
+    for (const header of KNOWLEDGE_SUB_SECTIONS.values()) {
+      expect(headerLines, `scaffold missing ## ${header}`).toContain(`## ${header}`);
+    }
+  });
 });
 
 describe("docs-invariant: skill description min length", () => {

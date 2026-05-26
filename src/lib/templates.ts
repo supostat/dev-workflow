@@ -55,7 +55,11 @@ tags: [knowledge, {{projectName}}]
 
 ## Gotchas
 
+## Security
+
 ## Patterns
+
+## Engram
 `,
 
   "vault/gameplan": `---

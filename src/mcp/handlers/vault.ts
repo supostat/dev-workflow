@@ -12,6 +12,14 @@ import { bumpTelemetry, searchVaultFiles, slugifyTitle, type SearchMatch } from 
 const VAULT_RECORD_TYPES = new Set(["adr", "bug", "debt"]);
 
 export function vaultRead(reader: VaultReader, section: string): string | null {
+  const colonIndex = section.indexOf(":");
+  if (colonIndex !== -1) {
+    const base = section.slice(0, colonIndex);
+    const sub = section.slice(colonIndex + 1);
+    if (base !== "knowledge") throw new Error(`Unknown vault section: ${section}`);
+    return reader.readKnowledgeSection(sub);
+  }
+
   const readers: Record<string, () => string | null> = {
     stack: () => reader.readStack(),
     conventions: () => reader.readConventions(),

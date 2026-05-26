@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ProjectContext, VaultData, BranchContext, DailyLog } from "./types.js";
 import { readFileOrNull, slugify } from "./fs-helpers.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import { KNOWLEDGE_SUB_SECTIONS, sliceMarkdownSection } from "./knowledge-slicer.js";
 
 function parseBranchFrontmatter(raw: string): Partial<BranchContext> {
   const { fields } = parseFrontmatter(raw);
@@ -36,6 +37,15 @@ export class VaultReader {
 
   readKnowledge(): string | null {
     return readFileOrNull(join(this.vaultPath, "knowledge.md"));
+  }
+
+  readKnowledgeSection(subSection: string): string | null {
+    if (!KNOWLEDGE_SUB_SECTIONS.has(subSection)) {
+      throw new Error(`Unknown knowledge sub-section: ${subSection}`);
+    }
+    const raw = this.readKnowledge();
+    if (raw === null) return null;
+    return sliceMarkdownSection(raw, KNOWLEDGE_SUB_SECTIONS.get(subSection)!);
   }
 
   readGameplan(): string | null {

@@ -114,6 +114,49 @@ describe("ToolHandlers", () => {
       .rejects.toThrow("Unknown vault section");
   });
 
+  it("vault_read knowledge:gotchas returns the gotchas slice only", async () => {
+    writeFileSync(
+      join(env.context.vaultPath, "knowledge.md"),
+      [
+        "# k",
+        "",
+        "## Architecture",
+        "",
+        "- ARCH_MARKER",
+        "",
+        "## Gotchas",
+        "",
+        "- GOTCHA_MARKER",
+        "",
+        "## Security",
+        "",
+        "- SECURITY_MARKER",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const result = await env.handlers.handle("vault_read", { section: "knowledge:gotchas" }) as string;
+    expect(result).toContain("## Gotchas");
+    expect(result).toContain("GOTCHA_MARKER");
+    expect(result).not.toContain("ARCH_MARKER");
+    expect(result).not.toContain("## Security");
+  });
+
+  it("vault_read knowledge:bogus throws Unknown knowledge sub-section", async () => {
+    await expect(env.handlers.handle("vault_read", { section: "knowledge:bogus" }))
+      .rejects.toThrow("Unknown knowledge sub-section");
+  });
+
+  it("vault_read knowledge: (empty sub-section) throws Unknown knowledge sub-section", async () => {
+    await expect(env.handlers.handle("vault_read", { section: "knowledge:" }))
+      .rejects.toThrow("Unknown knowledge sub-section");
+  });
+
+  it("vault_read stack:foo throws Unknown vault section (non-knowledge base rejects colon address)", async () => {
+    await expect(env.handlers.handle("vault_read", { section: "stack:foo" }))
+      .rejects.toThrow("Unknown vault section: stack:foo");
+  });
+
   it("vault_search finds text in vault", async () => {
     const result = await env.handlers.handle("vault_search", { query: "Stack" }) as Array<unknown>;
     expect(result.length).toBeGreaterThan(0);
@@ -915,6 +958,22 @@ describe("McpServer.handleLine", () => {
     expect(traced.payload.path).toBe("stack.md");
     expect(traced.tokens).toBeGreaterThan(0);
     expect(traced.chars).toBe(result.content[0]!.text.length);
+  });
+
+  it("tools/call records the colon sub-section address as payload.path for vault_read knowledge:gotchas", async () => {
+    // tokenPayload maps section verbatim + ".md", so the colon address surfaces
+    // as "knowledge:gotchas.md" — deliberate, makes per-slice reads
+    // analyzer-visible (grouped distinctly from whole-file "knowledge.md").
+    appendTokenTraceSpy.mockClear();
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "vault_read", arguments: { section: "knowledge:gotchas" } },
+    }));
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.source).toBe("vault_read");
+    expect(traced.payload.path).toBe("knowledge:gotchas.md");
   });
 
   it("tools/call records the query payload for memory_search", async () => {
