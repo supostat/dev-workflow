@@ -23,6 +23,7 @@ import { runWorkflowCommand } from "./workflow.js";
 import { runVaultCommand } from "./vault.js";
 import { snapshot } from "./snapshot.js";
 import { engramStats } from "./engram-stats.js";
+import { tokens } from "./tokens.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -56,6 +57,7 @@ Usage:
   dev-workflow communication-template    Print bundled communication.yaml template (4 profiles)
   dev-workflow doctor [--fix]            Check vault health
   dev-workflow engram-trace <runId>      Show engram socket trace summary [--raw]
+  dev-workflow tokens analyze|compare|tail   Token usage breakdown for a run [--json]
   dev-workflow workflow show|graph|effective <name>   Inspect workflow structure
   dev-workflow workflow cleanup [options] Mark/delete stale paused or running runs
   dev-workflow vault diff [SPEC.md]    Compare SPEC.md against vault sections
@@ -137,6 +139,9 @@ switch (command) {
     break;
   case "engram-stats":
     engramStats(args.slice(1)).catch(handleAsyncError);
+    break;
+  case "tokens":
+    tokens(args.slice(1));
     break;
   case "serve": {
     import("./serve.js").then((m) => m.serve()).catch(handleAsyncError);

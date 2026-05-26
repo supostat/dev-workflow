@@ -145,6 +145,7 @@ dev-workflow settings-template           # Print bundled .claude/settings.json (
 dev-workflow spec-template               # Print bundled SPEC.md template (Mirror Skeleton)
 dev-workflow communication-template      # Print bundled communication.yaml template (4 profiles)
 dev-workflow engram-trace <runId>        # Show engram socket trace summary [--raw]
+dev-workflow tokens analyze|compare|tail # Token usage breakdown per run [--json, --all]
 dev-workflow workflow show <name> [--bodies]   # Inspect workflow structure
 dev-workflow workflow graph <name> [--ascii]   # Render DAG (Mermaid default)
 dev-workflow workflow effective <name>          # Show resolved step-files + subagents
