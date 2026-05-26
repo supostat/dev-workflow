@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { McpServer } from "../src/mcp/server.js";
+import * as tokenTrace from "../src/lib/token-trace.js";
+import * as tokens from "../src/lib/tokens.js";
 import { ToolHandlers } from "../src/mcp/handlers.js";
 import { getToolDefinitions } from "../src/mcp/tools.js";
 import { VaultReader } from "../src/lib/reader.js";
@@ -775,15 +777,22 @@ describe("McpServer.handleLine", () => {
   let env: ReturnType<typeof createTestEnv>;
   let server: McpServer;
   let originalEngramSocket: string | undefined;
+  // Spied for EVERY test in this describe: in tests there is no
+  // ENGRAM_RUN_ID/ENGRAM_TRACE_FILE, so an unspied appendTokenTrace would run
+  // detectContext() (git spawn) and write orphan-tokens.jsonl into the real
+  // .dev-vault/. The describe-level spy prevents that side effect.
+  let appendTokenTraceSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     originalEngramSocket = process.env["ENGRAM_SOCKET_PATH"];
     process.env["ENGRAM_SOCKET_PATH"] = "/tmp/no-such-engram-socket-isolated-test";
     env = createTestEnv();
     server = new McpServer(env.handlers);
+    appendTokenTraceSpy = vi.spyOn(tokenTrace, "appendTokenTrace").mockImplementation(() => {});
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(env.projectRoot, { recursive: true, force: true });
     if (originalEngramSocket === undefined) {
       delete process.env["ENGRAM_SOCKET_PATH"];
@@ -890,5 +899,102 @@ describe("McpServer.handleLine", () => {
       jsonrpc: "2.0", method: "notifications/initialized",
     }));
     expect(response).toBeNull();
+  });
+
+  it("tools/call records a token trace for vault_read", async () => {
+    appendTokenTraceSpy.mockClear();
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "vault_read", arguments: { section: "stack" } },
+    }));
+    const result = response!.result as { content: Array<{ text: string }> };
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.source).toBe("vault_read");
+    expect(traced.payload.path).toBe("stack.md");
+    expect(traced.tokens).toBeGreaterThan(0);
+    expect(traced.chars).toBe(result.content[0]!.text.length);
+  });
+
+  it("tools/call records the query payload for memory_search", async () => {
+    appendTokenTraceSpy.mockClear();
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "memory_search", arguments: { query: "auth flow", limit: 5 } },
+    }));
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.source).toBe("memory_search");
+    expect(traced.payload.query).toBe("auth flow");
+    expect(traced.payload.path).toBeUndefined();
+  });
+
+  it("tools/call maps memory_judge snake_case memory_id to camelCase memoryId", async () => {
+    appendTokenTraceSpy.mockClear();
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "memory_judge", arguments: { memory_id: "mem-test", score: 0.5, explanation: "x" } },
+    }));
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.payload.memoryId).toBe("mem-test");
+  });
+
+  it("tools/call does NOT record a token trace on the error path", async () => {
+    appendTokenTraceSpy.mockClear();
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "nonexistent_tool_xyz", arguments: {} },
+    }));
+
+    expect(appendTokenTraceSpy).not.toHaveBeenCalled();
+  });
+
+  it("tools/call response survives a throwing token counter (inner fail-safe)", async () => {
+    vi.spyOn(tokens, "countTokens").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const response = await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "vault_read", arguments: { section: "stack" } },
+    }));
+
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { content: Array<{ text: string }> };
+    expect(result.content[0]!.text).toContain("Stack");
+  });
+
+  it("tools/call maps task_create_from_phase phaseFile to payload.path", async () => {
+    appendTokenTraceSpy.mockClear();
+    writeFileSync(
+      join(env.context.projectRoot, "phase-trace.md"),
+      "## Tasks\n\n- [ ] Trace subtask\n",
+      "utf-8",
+    );
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "task_create_from_phase", arguments: { phaseFile: "phase-trace.md" } },
+    }));
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.source).toBe("task_create_from_phase");
+    expect(traced.payload.path).toBe("phase-trace.md");
+  });
+
+  it("tools/call records an empty payload for a tool with no mapped args", async () => {
+    appendTokenTraceSpy.mockClear();
+    await server.handleLine(JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "vault_status", arguments: {} },
+    }));
+
+    expect(appendTokenTraceSpy).toHaveBeenCalledTimes(1);
+    const traced = appendTokenTraceSpy.mock.calls[0]![0] as tokenTrace.TokenTraceRecord;
+    expect(traced.source).toBe("vault_status");
+    expect(traced.payload).toEqual({});
   });
 });

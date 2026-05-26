@@ -1,6 +1,8 @@
 import { createInterface } from "node:readline";
 import { getToolDefinitions } from "./tools.js";
 import { formatToolResult } from "./format-result.js";
+import { countTokens } from "../lib/tokens.js";
+import { appendTokenTrace, type TokenTracePayload } from "../lib/token-trace.js";
 import type { ToolHandlers } from "./handlers.js";
 import { getPackageVersion } from "../lib/migration-lock.js";
 
@@ -24,6 +26,29 @@ function successResponse(id: number | string | null, result: unknown): JsonRpcRe
 
 function errorResponse(id: number | string | null, code: number, message: string): JsonRpcResponse {
   return { jsonrpc: "2.0", id, error: { code, message } };
+}
+
+const VAULT_SECTION_FILE_SUFFIX = ".md";
+
+// Map a tool's call arguments to the structured token-trace payload. Only
+// string-typed args are lifted; every payload field is optional, so an
+// unmapped tool yields {}.
+function tokenPayload(source: string, args: Record<string, unknown>): TokenTracePayload {
+  switch (source) {
+    case "vault_read":
+      return typeof args["section"] === "string"
+        ? { path: args["section"] + VAULT_SECTION_FILE_SUFFIX }
+        : {};
+    case "vault_search":
+    case "memory_search":
+      return typeof args["query"] === "string" ? { query: args["query"] } : {};
+    case "memory_judge":
+      return typeof args["memory_id"] === "string" ? { memoryId: args["memory_id"] } : {};
+    case "task_create_from_phase":
+      return typeof args["phaseFile"] === "string" ? { path: args["phaseFile"] } : {};
+    default:
+      return {};
+  }
 }
 
 export class McpServer {
@@ -102,10 +127,21 @@ export class McpServer {
         }
 
         try {
-          const result = await this.handlers.handle(params.name, params.arguments ?? {});
-          return successResponse(id, {
-            content: [{ type: "text", text: formatToolResult(params.name, result) }],
-          });
+          const args = params.arguments ?? {};
+          const result = await this.handlers.handle(params.name, args);
+          const text = formatToolResult(params.name, result);
+          try {
+            appendTokenTrace({
+              source: params.name,
+              payload: tokenPayload(params.name, args),
+              tokens: countTokens(text),
+              chars: text.length,
+            });
+          } catch {
+            // Documented fail-safe: countTokens (tokenizer) is unguarded and could
+            // throw; token measurement must never alter or block the tool response.
+          }
+          return successResponse(id, { content: [{ type: "text", text }] });
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : "Tool execution failed";
           return successResponse(id, {
