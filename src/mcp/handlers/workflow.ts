@@ -6,6 +6,8 @@ import { parseGameplanPhase } from "../../lib/gameplan-parser.js";
 import { WorkflowState } from "../../workflow/state.js";
 import type { StepState, WorkflowRun } from "../../workflow/types.js";
 import { createWorkflow, type WorkflowCreateInput } from "../workflow-create.js";
+import { appendTokenTrace } from "../../lib/token-trace.js";
+import { getStepBodyTokens, getStepBodyChars } from "../../lib/step-file-sizes.js";
 
 const WORKFLOW_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const TASK_ID_PATTERN = /^task-\d{3,}$/;
@@ -315,6 +317,18 @@ export function stepStart(
   // self-tagged with the current step, even though search-path tags
   // no longer carry step: (asymmetric tag injection, ADR 2026-05-14).
   process.env["ENGRAM_STEP"] = input.stepName;
+
+  try {
+    appendTokenTrace({
+      source: "step_file_body",
+      payload: { step: input.stepName },
+      tokens: getStepBodyTokens(input.stepName),
+      chars: getStepBodyChars(input.stepName),
+    });
+  } catch {
+    // Documented fail-safe measurement boundary — token-trace failures must
+    // never bubble; the step-file body approximation is best-effort.
+  }
 
   return { ok: true };
 }

@@ -1,0 +1,46 @@
+{
+  "preflight": {
+    "tokens": 364,
+    "chars": 1306
+  },
+  "read": {
+    "tokens": 1267,
+    "chars": 4476
+  },
+  "plan": {
+    "tokens": 1596,
+    "chars": 5702
+  },
+  "plan-review": {
+    "tokens": 977,
+    "chars": 3635
+  },
+  "plan-fix": {
+    "tokens": 1914,
+    "chars": 6783
+  },
+  "code": {
+    "tokens": 2079,
+    "chars": 7506
+  },
+  "review": {
+    "tokens": 2997,
+    "chars": 11171
+  },
+  "test": {
+    "tokens": 334,
+    "chars": 1200
+  },
+  "verify": {
+    "tokens": 1822,
+    "chars": 6824
+  },
+  "commit": {
+    "tokens": 609,
+    "chars": 2241
+  },
+  "vault-updates": {
+    "tokens": 904,
+    "chars": 3208
+  }
+}

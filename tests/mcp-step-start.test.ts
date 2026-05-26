@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ProjectContext } from "../src/lib/types.js";
@@ -53,6 +53,7 @@ describe("step_start MCP handler", () => {
   let handlers: ToolHandlers;
   let originalTraceFile: string | undefined;
   let originalRunId: string | undefined;
+  let originalStep: string | undefined;
 
   beforeEach(() => {
     const env = createTestContext();
@@ -61,8 +62,10 @@ describe("step_start MCP handler", () => {
     handlers = createHandlers(context);
     originalTraceFile = process.env["ENGRAM_TRACE_FILE"];
     originalRunId = process.env["ENGRAM_RUN_ID"];
+    originalStep = process.env["ENGRAM_STEP"];
     delete process.env["ENGRAM_TRACE_FILE"];
     delete process.env["ENGRAM_RUN_ID"];
+    delete process.env["ENGRAM_STEP"];
   });
 
   afterEach(() => {
@@ -70,6 +73,8 @@ describe("step_start MCP handler", () => {
     else process.env["ENGRAM_TRACE_FILE"] = originalTraceFile;
     if (originalRunId === undefined) delete process.env["ENGRAM_RUN_ID"];
     else process.env["ENGRAM_RUN_ID"] = originalRunId;
+    if (originalStep === undefined) delete process.env["ENGRAM_STEP"];
+    else process.env["ENGRAM_STEP"] = originalStep;
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
@@ -310,5 +315,47 @@ describe("step_start MCP handler", () => {
     expect(after.steps["test"]?.attempt).toBe(2);
     expect(after.steps["test"]?.error).toBeNull();
     expect(after.steps["test"]?.completedAt).toBeNull();
+  });
+
+  interface TokensRecord {
+    source: string;
+    step: string;
+    tokens: number;
+    chars: number;
+    payload: { step?: string };
+  }
+
+  function readTokensRecords(runId: string): TokensRecord[] {
+    const tokensPath = join(
+      context.vaultPath,
+      "workflow-state",
+      "runs",
+      `${runId}.tokens.jsonl`,
+    );
+    return readFileSync(tokensPath, "utf-8")
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as TokensRecord);
+  }
+
+  it("emits exactly one step_file_body token-trace record stamped with the step name", async () => {
+    const runId = await startRun();
+    // appendTokenTrace writes only when an active run is signalled via env.
+    process.env["ENGRAM_RUN_ID"] = runId;
+
+    // `code` is a REAL dev-pipeline step name; its body is coder.md. Positive
+    // tokens prove the step-name → basename mapping resolved (regression guard:
+    // before the fix this emitted 0 because the JSON was keyed by basename).
+    await handlers.handle("step_start", { stepName: "code", runId });
+
+    const bodyRecords = readTokensRecords(runId).filter(
+      (record) => record.source === "step_file_body",
+    );
+    expect(bodyRecords).toHaveLength(1);
+    const [record] = bodyRecords;
+    expect(record!.payload.step).toBe("code");
+    expect(record!.step).toBe("code");
+    expect(record!.tokens).toBeGreaterThan(0);
+    expect(record!.chars).toBeGreaterThan(0);
   });
 });

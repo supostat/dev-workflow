@@ -13,6 +13,7 @@ export interface TokenTracePayload {
   memoryId?: string;
   memoryType?: string;
   query?: string;
+  step?: string;
 }
 
 export interface TokenTraceRecord {

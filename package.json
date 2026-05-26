@@ -16,8 +16,8 @@
     }
   },
   "scripts": {
-    "build": "tsc && bash scripts/build-dashboard.sh",
-    "build:core": "tsc",
+    "build": "tsc && node dist/scripts/compute-step-sizes.js && bash scripts/build-dashboard.sh",
+    "build:core": "tsc && node dist/scripts/compute-step-sizes.js",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:e2e": "playwright test",
