@@ -142,6 +142,66 @@ export interface EngramStatsResponse {
   };
 }
 
+/** A token total grouped by step or engram memory type, with its share. */
+export interface TokenGroup {
+  name: string;
+  tokens: number;
+  percent: number;
+}
+
+/** A token total grouped by trace source, with call count and per-call mean. */
+export interface TokenSourceGroup {
+  name: string;
+  tokens: number;
+  callCount: number;
+  avgTokens: number;
+}
+
+/** A token total grouped by vault file, with the number of reads. */
+export interface TokenFileGroup {
+  path: string;
+  tokens: number;
+  reads: number;
+}
+
+/** One advisory raised by the analyzer for a run. */
+export interface TokenWarning {
+  kind: "split" | "dominant_source" | "total_budget" | "engram_cache";
+  message: string;
+}
+
+/**
+ * `GET /api/tokens` — the analyzer's per-run breakdown. Mirrors the server's
+ * `TokenRunStats` (src/lib/token-stats.ts) verbatim, including `byEngramType`.
+ */
+export interface TokenRunStatsResponse {
+  runId: string;
+  totalTokens: number;
+  totalChars: number;
+  recordCount: number;
+  durationMs: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  stepCount: number;
+  byStep: TokenGroup[];
+  bySource: TokenSourceGroup[];
+  byVaultFile: TokenFileGroup[];
+  byEngramType: TokenGroup[];
+  warnings: TokenWarning[];
+}
+
+/** One discovered token-trace run, as surfaced by `GET /api/tokens/runs`. */
+export interface TokenRunSummary {
+  runId: string;
+  filePath: string;
+  mtimeMs: number;
+}
+
+/** `GET /api/tokens/runs` — discovered runs, newest first. */
+export interface TokenRunListResponse {
+  runs: TokenRunSummary[];
+}
+
 /**
  * `GET /api/settings` — the communication-profile settings document: the
  * active and default profiles, the available profile names, and the

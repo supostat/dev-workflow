@@ -11,7 +11,7 @@ import type { Page } from "@playwright/test";
 
 // Per-route smoke checks for the `dev-workflow web` dashboard.
 //
-// Drives headless Chromium across the six navbar routes against the real CLI
+// Drives headless Chromium across the seven navbar routes against the real CLI
 // subprocess booted by the `dashboard` fixture. Each route must render its own
 // distinct content (no foreign anchors), surface real scaffolded data — not
 // just a Panel title a crashed content area could leave standing — and produce
@@ -39,6 +39,12 @@ async function expectRouteContent(page: Page, path: string): Promise<void> {
   if (path === "/tasks/") {
     // The scaffolded task must be present in the tasks table.
     await expect(page.getByText("First task", { exact: true })).toBeVisible();
+    return;
+  }
+  if (path === "/tokens/") {
+    // The scaffolded run's by-step breakdown must render at least one row — the
+    // `code` step cell — proving the analyzer breakdown reached the table.
+    await expect(page.getByText("code", { exact: true })).toBeVisible();
   }
 }
 

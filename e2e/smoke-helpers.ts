@@ -32,12 +32,13 @@ export interface RouteAnchor {
   anchor: string;
 }
 
-/** The six navbar routes with a distinctive text anchor for each. */
+/** The seven navbar routes with a distinctive text anchor for each. */
 export const ROUTES: ReadonlyArray<RouteAnchor> = [
   { path: "/", anchor: "Project" },
   { path: "/vault/", anchor: "Stack" },
   { path: "/tasks/", anchor: "New task" },
   { path: "/workflow/", anchor: "Workflow runs" },
+  { path: "/tokens/", anchor: "Token usage" },
   { path: "/engram/", anchor: "Recent memories" },
   { path: "/settings/", anchor: "Migration lock" },
 ];
@@ -46,6 +47,7 @@ export const ROUTES: ReadonlyArray<RouteAnchor> = [
 export const LOADING_NOTICES: ReadonlyArray<string> = [
   "Loading overview…",
   "Loading engram stats…",
+  "Loading token usage…",
   "Loading settings…",
   "Loading project…",
 ];
@@ -100,6 +102,7 @@ export function navLabel(path: string): string {
     "/vault/": "Vault",
     "/tasks/": "Tasks",
     "/workflow/": "Workflow",
+    "/tokens/": "Tokens",
     "/engram/": "Engram",
     "/settings/": "Settings",
   };

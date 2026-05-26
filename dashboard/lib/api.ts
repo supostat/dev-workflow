@@ -25,6 +25,8 @@ import type {
   ApiWorkflowRunDetail,
   EngramHealthResponse,
   EngramStatsResponse,
+  TokenRunStatsResponse,
+  TokenRunListResponse,
   SettingsResponse,
   PatchCommunicationResponse,
   PutProfileResponse,
@@ -48,6 +50,13 @@ export type {
   TraceEventPayload,
   EngramHealthResponse,
   EngramStatsResponse,
+  TokenGroup,
+  TokenSourceGroup,
+  TokenFileGroup,
+  TokenWarning,
+  TokenRunStatsResponse,
+  TokenRunSummary,
+  TokenRunListResponse,
   SettingsResponse,
   PatchCommunicationResponse,
   PutProfileResponse,
@@ -253,6 +262,19 @@ export function getEngramStats(
 
 export function getEngramHealth(project: string): Promise<EngramHealthResponse> {
   return request<EngramHealthResponse>(withProject("/api/engram/health", project));
+}
+
+// ── tokens ───────────────────────────────────────────────────────────────────
+
+export function getTokenRuns(project: string): Promise<TokenRunListResponse> {
+  return request<TokenRunListResponse>(withProject("/api/tokens/runs", project));
+}
+
+export function getTokenStats(
+  project: string,
+  runId?: string,
+): Promise<TokenRunStatsResponse> {
+  return request<TokenRunStatsResponse>(`/api/tokens${buildQuery({ project, runId })}`);
 }
 
 // ── settings ─────────────────────────────────────────────────────────────────

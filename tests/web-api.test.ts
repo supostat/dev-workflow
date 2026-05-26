@@ -47,7 +47,7 @@ function httpRequest(
   });
 }
 
-describe("web API — 20 endpoints, mutations, traversal", () => {
+describe("web API — 22 endpoints, mutations, traversal", () => {
   let configHome: string;
   let originalConfigHome: string | undefined;
   let originalSocketPath: string | undefined;
@@ -85,6 +85,14 @@ describe("web API — 20 endpoints, mutations, traversal", () => {
         phase: null, currentStep: "code", startedAt: "2026-05-18T00:00:00.000Z",
         completedAt: null, status: "running", steps: {},
       }),
+      "utf-8",
+    );
+    writeFileSync(
+      join(vaultPath, "workflow-state", "runs", "run-aaaaaaaaaaaa.tokens.jsonl"),
+      JSON.stringify({
+        runId: "run-aaaaaaaaaaaa", step: "code", timestamp: "2026-05-18T00:00:00.000Z",
+        source: "vault_read", payload: { path: "knowledge.md" }, tokens: 120, chars: 480,
+      }) + "\n",
       "utf-8",
     );
 
@@ -337,6 +345,77 @@ describe("web API — 20 endpoints, mutations, traversal", () => {
     const result = await httpRequest(port, "GET", q("/api/engram/health"));
     expect(result.status).toBe(200);
     expect(JSON.parse(result.body).healthy).toBe(true);
+  });
+
+  // ── tokens ────────────────────────────────────────────────────────────────────
+
+  it("GET /api/tokens/runs lists discovered runs newest first", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens/runs"));
+    const parsed = JSON.parse(result.body);
+    expect(result.status).toBe(200);
+    expect(parsed.runs.length).toBeGreaterThan(0);
+    expect(parsed.runs[0].runId).toBe("run-aaaaaaaaaaaa");
+  });
+
+  it("GET /api/tokens defaults to the most recent run", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens"));
+    const parsed = JSON.parse(result.body);
+    expect(result.status).toBe(200);
+    expect(parsed.runId).toBe("run-aaaaaaaaaaaa");
+    expect(parsed.totalTokens).toBe(120);
+    expect(parsed.byStep.length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/tokens with an explicit runId aggregates that run", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens?runId=run-aaaaaaaaaaaa"));
+    const parsed = JSON.parse(result.body);
+    expect(result.status).toBe(200);
+    expect(parsed.recordCount).toBe(1);
+  });
+
+  it("GET /api/tokens rejects a path-traversal run id", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens?runId=..%2F..%2Fpasswd"));
+    expect(result.status).toBe(400);
+  });
+
+  it("GET /api/tokens 404s a valid-but-missing run id", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens?runId=run-bbbbbbbbbbbb"));
+    expect(result.status).toBe(404);
+    // The trace-not-found branch (valid id, no file) is distinct from the
+    // no-traces-at-all branch below.
+    expect(JSON.parse(result.body).error).toMatch(/token trace not found/);
+  });
+
+  it("GET /api/tokens 404s with 'no token traces found' when no runs exist", async () => {
+    // Removing the only seeded trace leaves `mostRecentTokenRun` returning null,
+    // so a default (no runId) request falls into the no-traces-at-all branch.
+    rmSync(join(vaultPath, "workflow-state", "runs", "run-aaaaaaaaaaaa.tokens.jsonl"), {
+      force: true,
+    });
+    const result = await httpRequest(port, "GET", q("/api/tokens"));
+    expect(result.status).toBe(404);
+    expect(JSON.parse(result.body).error).toMatch(/no token traces found/);
+  });
+
+  it("GET /api/tokens returns all-zero stats for a present-but-blank trace", async () => {
+    // A whitespace-only file is size>0 (passes `discoverTokenRuns`) yet yields
+    // zero parseable records (`readTokenTrace` skips blank lines) — the read-only
+    // observability contract returns 200 all-zeros, not an error.
+    writeFileSync(
+      join(vaultPath, "workflow-state", "runs", "run-cccccccccccc.tokens.jsonl"),
+      " \n",
+      "utf-8",
+    );
+    const result = await httpRequest(port, "GET", q("/api/tokens?runId=run-cccccccccccc"));
+    const parsed = JSON.parse(result.body);
+    expect(result.status).toBe(200);
+    expect(parsed.totalTokens).toBe(0);
+    expect(parsed.recordCount).toBe(0);
+  });
+
+  it("GET /api/tokens does not leak the trace file path", async () => {
+    const result = await httpRequest(port, "GET", q("/api/tokens"));
+    expect(JSON.parse(result.body).filePath).toBeUndefined();
   });
 
   // ── settings ──────────────────────────────────────────────────────────────────

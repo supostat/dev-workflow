@@ -19,6 +19,7 @@ import {
 } from "./api-handlers.js";
 import { getSettings, patchCommunication, putProfile } from "./api-settings.js";
 import { getEngramStats, getEngramHealth } from "./api-engram.js";
+import { getTokenRuns, getTokenStats } from "./api-tokens.js";
 import { browseFilesystem } from "./api-fs.js";
 
 /** Resolution result: a validated Project, or a `{ status, error }` rejection. */
@@ -146,6 +147,15 @@ const ROUTES: readonly Route[] = [
   {
     method: "GET", pattern: /^\/api\/engram\/health$/, needsProject: true,
     handle: (ctx, _p, project) => getEngramHealth(ctx.res, project!, ctx.engramPool),
+  },
+  {
+    method: "GET", pattern: /^\/api\/tokens\/runs$/, needsProject: true,
+    handle: (ctx, _p, project) => getTokenRuns(ctx.res, buildProjectScope(project!)),
+  },
+  {
+    method: "GET", pattern: /^\/api\/tokens$/, needsProject: true,
+    handle: (ctx, _p, project) =>
+      getTokenStats(ctx.res, buildProjectScope(project!), ctx.url.searchParams.get("runId")),
   },
   {
     method: "GET", pattern: /^\/api\/settings$/, needsProject: true,

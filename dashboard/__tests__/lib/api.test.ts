@@ -21,6 +21,8 @@ import {
   getWorkflowRun,
   getEngramStats,
   getEngramHealth,
+  getTokenRuns,
+  getTokenStats,
   getSettings,
   patchCommunication,
   putProfile,
@@ -194,6 +196,26 @@ describe("engram wrappers", () => {
     const fetchMock = stubFetch({ healthy: true, status: null });
     await getEngramHealth("demo");
     expect(calledPath(fetchMock)).toBe("/api/engram/health?project=demo");
+  });
+});
+
+describe("tokens wrappers", () => {
+  it("getTokenRuns hits /api/tokens/runs", async () => {
+    const fetchMock = stubFetch({ runs: [] });
+    await getTokenRuns("demo");
+    expect(calledPath(fetchMock)).toBe("/api/tokens/runs?project=demo");
+  });
+
+  it("getTokenStats omits runId when not given", async () => {
+    const fetchMock = stubFetch({ runId: "run-aaaaaaaaaaaa" });
+    await getTokenStats("demo");
+    expect(calledPath(fetchMock)).toBe("/api/tokens?project=demo");
+  });
+
+  it("getTokenStats appends the runId", async () => {
+    const fetchMock = stubFetch({ runId: "run-aaaaaaaaaaaa" });
+    await getTokenStats("demo", "run-aaaaaaaaaaaa");
+    expect(calledPath(fetchMock)).toBe("/api/tokens?project=demo&runId=run-aaaaaaaaaaaa");
   });
 });
 

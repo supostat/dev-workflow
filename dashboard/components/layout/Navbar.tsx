@@ -14,6 +14,7 @@ const NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/vault", label: "Vault" },
   { href: "/tasks", label: "Tasks" },
   { href: "/workflow", label: "Workflow" },
+  { href: "/tokens", label: "Tokens" },
   { href: "/engram", label: "Engram" },
   { href: "/settings", label: "Settings" },
 ];

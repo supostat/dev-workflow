@@ -117,6 +117,14 @@ function scaffoldFixtureProject(): string {
     }),
     "utf-8",
   );
+  writeFileSync(
+    join(vaultPath, "workflow-state", "runs", "run-aaaaaaaaaaaa.tokens.jsonl"),
+    JSON.stringify({
+      runId: "run-aaaaaaaaaaaa", step: "code", timestamp: "2026-05-18T00:00:00.000Z",
+      source: "vault_read", payload: { path: "knowledge.md" }, tokens: 120, chars: 480,
+    }) + "\n",
+    "utf-8",
+  );
   return projectRoot;
 }
 

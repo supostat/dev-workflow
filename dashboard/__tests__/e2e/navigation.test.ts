@@ -69,6 +69,22 @@ const ENGRAM_STATS = {
   missingStepComplete: { totalRuns: 0, affectedRuns: [], count: 0 },
 };
 
+const TOKEN_STATS = {
+  runId: "run-aaaaaaaaaaaa",
+  totalTokens: 0,
+  totalChars: 0,
+  recordCount: 0,
+  durationMs: null,
+  startedAt: null,
+  endedAt: null,
+  stepCount: 0,
+  byStep: [],
+  bySource: [],
+  byVaultFile: [],
+  byEngramType: [],
+  warnings: [],
+};
+
 /** Catch-all `fetch` mock answering every `/api/*` route with a minimal body. */
 function stubAllRoutes(): void {
   const fetchMock = vi.fn((input: string) => {
@@ -81,6 +97,8 @@ function stubAllRoutes(): void {
     if (input.startsWith("/api/workflow/runs")) return ok({ runs: [] });
     if (input.startsWith("/api/engram/stats")) return ok(ENGRAM_STATS);
     if (input.startsWith("/api/engram/health")) return ok({ healthy: true, status: {} });
+    if (input.startsWith("/api/tokens/runs")) return ok({ runs: [] });
+    if (input.startsWith("/api/tokens")) return ok(TOKEN_STATS);
     if (input.startsWith("/api/settings")) {
       return ok({
         activeProfile: "default",
@@ -112,6 +130,7 @@ describe("cross-page navigation smoke", () => {
         import("@/app/tasks/page"),
         import("@/app/workflow/page"),
         import("@/app/engram/page"),
+        import("@/app/tokens/page"),
         import("@/app/settings/page"),
       ]),
     ]);

@@ -48,6 +48,8 @@ import {
   getWorkflowRun,
   getEngramStats,
   getEngramHealth,
+  getTokenRuns,
+  getTokenStats,
   getSettings,
   patchCommunication,
   putProfile,
@@ -68,6 +70,8 @@ export interface BoundApi {
   getWorkflowRun: OmitProject<typeof getWorkflowRun>;
   getEngramStats: OmitProject<typeof getEngramStats>;
   getEngramHealth: OmitProject<typeof getEngramHealth>;
+  getTokenRuns: OmitProject<typeof getTokenRuns>;
+  getTokenStats: OmitProject<typeof getTokenStats>;
   getSettings: OmitProject<typeof getSettings>;
   patchCommunication: OmitProject<typeof patchCommunication>;
   putProfile: OmitProject<typeof putProfile>;
@@ -190,6 +194,8 @@ function bindApi(project: string): BoundApi {
     getWorkflowRun: (...args) => getWorkflowRun(project, ...args),
     getEngramStats: (...args) => getEngramStats(project, ...args),
     getEngramHealth: (...args) => getEngramHealth(project, ...args),
+    getTokenRuns: (...args) => getTokenRuns(project, ...args),
+    getTokenStats: (...args) => getTokenStats(project, ...args),
     getSettings: (...args) => getSettings(project, ...args),
     patchCommunication: (...args) => patchCommunication(project, ...args),
     putProfile: (...args) => putProfile(project, ...args),
